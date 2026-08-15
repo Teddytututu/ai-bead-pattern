@@ -76,6 +76,17 @@
 
 Kopf 等人的内容自适应下采样通过调整采样核的位置和形状保持线条连接；Weber 等人的 DPID 采用线性复杂度卷积，对局部突出差异赋予更高权重。DPID 的用户研究获得较高偏好，同时论文记录了细线变粗与混叠案例。因此 A2 适合作为强基线，A3 继续负责语义保护和工艺整理。[Content-adaptive image downscaling](https://doi.org/10.1145/2508363.2508370)，[Rapid, detail-preserving image downscaling](https://doi.org/10.1145/2980179.2980239)
 
+另外设置四条像素化研究对照，分别检验结构抽象、网格控制、学习型像素化和离散实体生成：
+
+| 编号 | 研究对照 | 主要检验项 |
+|---|---|---|
+| P0 | Pixelated Image Abstraction | 超像素映射与有限调色板联合优化 |
+| P1 | Deep Unsupervised Pixelization | 多尺度网格、锐利边缘与局部结构保持 |
+| P2 | Make Your Own Sprites | cell size 控制、cell-aware 与 aliasing-aware 分阶段处理 |
+| P3 | SD-πXL | 固定 `H × W × n` 离散元素生成与实体制作适配 |
+
+P0 与 A3 的结构和色板阶段最接近，适合作为传统优化强对照。P1 与 P2 进入第二阶段模型对照，其中 P2 官方代码和数据授权范围限于非商业科研、教学与个人实验。P3 直接覆盖有限网格、有限元素集合与 beading 等制作任务，适合作为离线生成教师与上限参考。[Pixelated Image Abstraction](https://doi.org/10.1016/j.cag.2012.12.007)，[Deep Unsupervised Pixelization](https://doi.org/10.1145/3272127.3275082)，[Make Your Own Sprites](https://doi.org/10.1145/3550454.3555482)，[SD-πXL](https://doi.org/10.1145/3680528.3687570)
+
 ### 1.3 自动诊断指标
 
 自动指标分成四组：
@@ -266,6 +277,8 @@ MergeCost =
 5. 检查对称特征、轮廓连通和一格长条。
 
 这一步负责把连续图像区域转换成工艺合法的离散结构。SLIC 提供候选区域，最终网格由特征预算和拓扑约束决定。
+
+Pixelated Image Abstraction 同时优化特征映射与有限调色板，为“结构和颜色联合决定”提供传统优化基线。Make Your Own Sprites 将 cell-aware 与 aliasing-aware 处理拆开，适合检验格子尺寸控制和边缘混叠。Deep Unsupervised Pixelization 通过 GridNet、PixelNet 与 DepixelNet 保持多尺度网格、锐利边缘和局部结构。SD-πXL 将输出表示为 `H × W × n` 张量，每格选择有限颜色或元素类别，并在官方项目中展示拼豆、积木马赛克与刺绣应用。
 
 ## 5. 色卡、颜色空间与色差
 
@@ -775,6 +788,7 @@ SHA256(标准化图片)
 | ONNX Runtime | MIT | 服务端轻模型推理候选 |
 | XGBoost | Apache-2.0 | P1 偏好排序器候选 |
 | PyMaxflow | GPL | 研究隔离与许可证专项复核 |
+| Make Your Own Sprites 官方代码与数据 | 非商业科研许可 | 方法研究和内部对照；商业产品另行取得书面授权 |
 | White-box Cartoonization 实现 | 仓库条款按版本复核 | 论文方法研究与教师候选 |
 | CLIP / DINO 类视觉权重 | 模型与权重按版本复核 | P2 排序特征候选 |
 | Artkal / Hama 官方色卡 | 厂家发布资料，数据再分发采用单独授权 | 内部参考；公开品牌色库前取得授权或发布自测数据 |
@@ -803,6 +817,14 @@ SHA256(标准化图片)
 - He, K., Sun, J., & Tang, X. Guided Image Filtering. https://doi.org/10.1109/TPAMI.2012.213
 - Tomasi, C., & Manduchi, R. Bilateral Filtering. https://doi.org/10.1109/ICCV.1998.710815
 - Winnemöller, H., Olsen, S. C., & Gooch, B. Real-time video abstraction. https://doi.org/10.1145/1141911.1142018
+
+### 像素化与离散生成
+
+- Gerstner, T. et al. Pixelated image abstraction with integrated user constraints. https://doi.org/10.1016/j.cag.2012.12.007
+- Han, C. et al. Deep unsupervised pixelization. https://doi.org/10.1145/3272127.3275082
+- Wu, Z. et al. Make Your Own Sprites. https://doi.org/10.1145/3550454.3555482
+- Binninger, A., & Sorkine-Hornung, O. SD-πXL: Generating Low-Resolution Quantized Imagery via Score Distillation. https://doi.org/10.1145/3680528.3687570
+- Make Your Own Sprites official implementation and license. https://github.com/WuZongWei6/Pixelization
 
 ### 颜色
 
@@ -867,6 +889,10 @@ Scite 检查：主体理解、结构与颜色核心 DOI 已完成题录与引用
 | 超像素 | SLIC, 10.1109/TPAMI.2012.120 | Lab+空间距离、边界召回、欠分割误差 | 结构候选区域 | 全文摘录、引用语境完成 |
 | 边缘平滑 | Guided Filter, 10.1109/TPAMI.2012.213 | 局部线性模型、线性时间 | 主平滑候选 | 题录、摘要、引用语境完成 |
 | 图像抽象 | 10.1145/1141911.1142018 | bilateral、DoG、软量化、用户研究 | 低对比纹理压缩 | 题录、摘要、引用语境完成 |
+| 像素化抽象 | 10.1016/j.cag.2012.12.007 | 特征映射与有限调色板联合优化 | 传统优化强对照 | Crossref 题录与 Princeton 项目页核对 |
+| 学习型像素化 | 10.1145/3272127.3275082 | GridNet、PixelNet、DepixelNet、锐利边缘 | 第二阶段模型对照 | Crossref 题录与作者项目页核对 |
+| 格子控制 | 10.1145/3550454.3555482 | cell-aware、aliasing-aware、cell size 控制 | 第二阶段模型对照 | Crossref 摘要与官方仓库核对 |
+| 离散实体生成 | 10.1145/3680528.3687570 | `H × W × n`、有限元素、beading 与 embroidery | 离线教师与上限参考 | Crossref 题录与 ETH 项目页核对 |
 | 色差 | CIEDE2000, 10.1002/col.20070 | 实现说明、测试数据、连续性细节 | 主色差与 34 组单测 | 题录完成，作者页交叉核对 |
 | Artkal 色卡 | 官方 S-5mm RGB PDF | 225 色、显示参考声明、特殊材质 | 研究参考色 + 实测色 | 官方页面与 PDF 核对 |
 | Hama 色卡 | 官方 Midi PDF | 色号、名称、材质分类、颜色变化声明 | 实测前的编号目录 | 官方页面与 PDF 核对 |
