@@ -1,0 +1,23 @@
+export type { PatternAlgorithm } from './algorithm'
+export type {
+  BeadPattern,
+  ColorDistanceMethod,
+  CropRect,
+  GenerationMetrics,
+  ImageAnalysis,
+  ImageType,
+  ImportanceMap,
+  Lab,
+  MaterialColor,
+  MaterialCount,
+  MaterialPalette,
+  OptimizationOptions,
+  PatternCell,
+  PatternGenerationRequest,
+  PatternGenerationResult,
+  PatternMetadata,
+  PatternOptions,
+  PixelImage,
+  ResizeMethod,
+  RGB,
+} from './types'
