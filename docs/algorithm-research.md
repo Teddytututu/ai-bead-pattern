@@ -1,10 +1,12 @@
-# 拼豆生成算法第一批调研
+# 拼豆生成算法完整调研
 
 查询日期：2026-08-15
 
+整体方法和阶段关系见 [从绘画过程到拼豆图纸：生成方法论](drawing-to-bead-method.md)。本文集中记录模型选择、算法细节、实验设计、许可证和来源。
+
 ## 结论
 
-第一版算法建议采用下面这套组合：
+八个专题调研完成后，第一版算法建议采用下面这套组合：
 
 ```text
 人物：MediaPipe Face Landmarker + SelfieMulticlass
@@ -12,12 +14,18 @@
 尺寸：32 / 48 / 64 离散候选搜索
 结构：边缘保持平滑 + SLIC + 受约束区域合并 + 受约束栅格化
 颜色：sRGB → CIELAB(D65) → CIEDE2000 → 全局材料色板优化
-评估：自动诊断指标 + 随机双盲成对选择
+光影：语义区域固有色 + 区域相对明暗 + 二至三档阴影
+网格：连通域规则 + 2×2 拓扑检查 + 受约束局部搜索
+排序：规则评分 → Bradley-Terry / XGBoost → 视觉特征排序头
+部署：服务端主流程 + 小程序压缩上传与预览 + 轻模型端侧实验
+评估：自动诊断指标 + 随机双盲成对选择 + 来源图片级数据切分
 ```
 
 人物路线具备现成模型、细密五官锚点和人物多类分割。宠物路线先用通用身体关键点稳定姿态和脸部三角形，再从主体轮廓与局部色块提取耳朵、脸部花纹等身份特征。猫狗面部专用数据适合第二阶段训练，商业训练数据采用自有或单独授权图片池。
 
-尺寸规划采用候选评分，避免直接套用 seam carving 改变脸型和身体比例。结构阶段先分配关键特征格数，再合并摄影纹理。颜色阶段同时维护屏幕参考色与实体测量色，金属、透明、夜光等材料独立成特殊色组。
+尺寸规划采用候选评分，并保持脸型和身体比例稳定。结构阶段先分配关键特征格数，再合并摄影纹理。颜色阶段同时维护屏幕参考色与实体测量色，金属、透明、夜光等材料独立成特殊色组。
+
+完整 intrinsic decomposition、GAN 卡通化和大模型审美评分安排为第二阶段候选。首版使用区域级可解释算法建立稳定基线，并通过偏好数据逐步升级排序器。
 
 ## 术语账本
 
@@ -344,7 +352,325 @@ ColorEnergy =
 
 流程先为每个语义区域生成固有色、亮部、中间色和阴影色候选，再从真实材料色号中联合选择。最终映射以区域为单位，网格单元沿用区域色号；局部单格颜色调整只服务于眼睛、高光和轮廓等明确特征。
 
-## 6. 最小验证实验
+## 6. 卡通化、扁平化与二分阴影
+
+### 6.1 首版技术选择
+
+光影阶段以 `StructurePlan` 的语义区域为单位处理。每个区域先估计固有色，再从区域内部的相对明暗生成二档或三档阴影：
+
+```text
+区域像素
+  ↓
+边缘保持平滑 / 纹理压缩
+  ↓
+区域固有色估计
+  ↓
+相对明暗残差
+  ↓
+二档或三档分层
+  ↓
+从真实材料色卡选择有序亮暗色组
+```
+
+推荐三种首版风格：
+
+| 风格 | 阴影层数 | 结构倾向 | 配色倾向 |
+|---|---:|---|---|
+| 简洁平涂 | 2 | 大色块、轮廓清楚 | 色差较大、颜色较少 |
+| 平衡 | 3 | 保留主要体积转折 | 固有色、亮部、阴影完整 |
+| 高对比 | 2 至 3 | 强调五官与姿态 | 提升关键区域明暗差 |
+
+### 6.2 纹理压缩方法
+
+L0 Gradient Minimization 直接控制非零梯度数量，适合生成稀疏而清楚的主要边缘。Relative Total Variation 使用窗口内总变差与固有变差的比值区分结构和纹理，适合压缩毛发细丝、衣服纹理和背景重复纹理。[L0 Gradient Minimization](https://doi.org/10.1145/2024156.2024208)，[Relative Total Variation](https://doi.org/10.1145/2366145.2366158)
+
+建议形成四条光影比较路线：
+
+| 编号 | 方法 | 项目用途 |
+|---|---|---|
+| S0 | Guided Filter + 区域亮度分位数 | 首版快速基线 |
+| S1 | L0 smoothing + 区域亮度分位数 | 强轮廓、低纹理候选 |
+| S2 | RTV + 区域亮度分位数 | 长毛、布料与复杂背景候选 |
+| S3 | White-box Cartoonization 中间表示 | 第二阶段学习型对照 |
+
+White-box Cartoonization 将卡通外观拆成平滑表面、稀疏色块结构和高频纹理三类表示。这种分解与本项目的 `StructurePlan + ColorPlan` 接近，适合第二阶段作为教师模型或候选生成器。[Learning to Cartoonize Using White-Box Cartoon Representations](https://doi.org/10.1109/CVPR42600.2020.00811)
+
+XDoG 适合作为补充轮廓证据。最终色块边界继续由主体轮廓、语义边界和关键特征约束共同决定。[XDoG](https://doi.org/10.1016/j.cag.2012.03.004)
+
+### 6.3 固有色与光照分离
+
+Intrinsic Images in the Wild 将图像分为 reflectance 与 shading，并指出真实场景中的自动分解仍具有较高难度。首版采用区域级近似，将完整 intrinsic 网络安排在第二阶段。[Intrinsic Images in the Wild](https://doi.org/10.1145/2601097.2601206)
+
+每个语义区域 `r` 建议计算：
+
+```text
+A_r = 区域平滑后 Lab 中位色
+B_r(x) = L*(x) - median(L*_r)
+Q_r(x) = weighted_quantile_bin(B_r(x), K_r)
+```
+
+其中：
+
+- `A_r` 表示区域固有色近似。
+- `B_r(x)` 表示区域内部相对明暗。
+- `K_r` 为 2 或 3，由风格、区域面积和目标网格尺寸决定。
+- 权重来自 `ImportanceMap`、边界距离、镜面高光抑制和模型置信度。
+
+Multi-scale Retinex 可作为明暗基底的对照方法，重点检查色偏、光晕和局部对比变化。[Multi-scale Retinex](https://doi.org/10.1109/83.597272)
+
+### 6.4 材料阴影色组
+
+阴影色选择同时满足：
+
+1. 同一区域的 `L*` 严格有序。
+2. 色相漂移位于风格允许范围。
+3. 关键特征与邻域保持最低对比。
+4. 同一材料类别内选择色号。
+5. 全图颜色数量满足 `maxColors`。
+
+建议为每个基础色维护候选关系：
+
+```ts
+interface ShadeRamp {
+  baseColorId: string
+  lightColorIds: readonly string[]
+  shadowColorIds: readonly string[]
+  hueShift: 'neutral' | 'warm-light-cool-shadow' | 'cool-light-warm-shadow'
+  confidence: number
+}
+```
+
+实体色卡完成测量后，`ShadeRamp` 由 `measuredLab`、区域语义和人工偏好共同校准。
+
+## 7. 网格优化、孤立豆与轮廓美化
+
+### 7.1 处理顺序
+
+首版采用确定性规则与小范围局部搜索：
+
+```text
+关键特征单元锁定
+  ↓
+连通域与孤立豆整理
+  ↓
+一格宽长条检查
+  ↓
+2×2 对角拓扑检查
+  ↓
+轮廓阶梯与毛刺整理
+  ↓
+对称特征一致性调整
+  ↓
+受约束局部搜索
+```
+
+每次改色只从有限候选集合中选择：当前色、四邻域主色、所属区域色组和关键轮廓色。候选集合建议控制在 6 个以内。
+
+### 7.2 连通性与拓扑
+
+工艺指标以四邻域连通域为主，八邻域用于视觉连续性辅助判断。人物双眼、嘴部、鼻尖、宠物耳尖与身份花纹由 `FeatureConstraintMap` 指定保护状态。
+
+建议规则：
+
+- 1 格连通域：普通区域优先合并到能量最低的邻域色。
+- 2 格连通域：结合区域重要性、边界证据和身份特征置信度决定保留或合并。
+- 一格宽长条：长度达到 4 格后检查两侧颜色、原图边界与结构标签。
+- 2×2 对角布局：检查两组对角色的语义与连通意图，选择轮廓连续性更高的布局。
+- 轮廓毛刺：检查单格凸起、单格凹口和连续折返，按局部边界代价调整。
+
+Depixelizing Pixel Art 重点处理方格中对角邻居的连接歧义，并通过拓扑连接保持细线结构。本项目借用其对角歧义判断，输出仍保持拼豆方格。[Depixelizing Pixel Art](https://doi.org/10.1145/1964921.1964994)
+
+### 7.3 局部能量函数
+
+```text
+GridEnergy =
+  原区域颜色代价
++ 边界一致性代价
++ 小连通域代价
++ 一格宽长条代价
++ 2×2 拓扑代价
++ 对称差异代价
++ 全图色号数量代价
++ 关键特征违反项
+```
+
+Graph Cut 的 alpha-expansion 适合一元项与度量型两两平滑项，并提供已知近似界。Label Costs 扩展可以直接惩罚解中出现的颜色种类数量。[Graph Cuts](https://doi.org/10.1109/34.969114)，[Label Costs](https://doi.org/10.1007/s11263-011-0437-z)
+
+孤立域、长条、2×2 拓扑和关键特征属于高阶条件。首版先执行确定性规则，再对 3×3 或 5×5 小窗口进行局部搜索。Graph Cut 与 OR-Tools 小窗口整数优化进入对照实验。
+
+### 7.4 确定性与回滚
+
+每个局部调整记录：
+
+```ts
+interface GridEditRecord {
+  cell: GridPoint
+  fromColorId: string
+  toColorId: string
+  rule: string
+  energyBefore: number
+  energyAfter: number
+  featurePriority: number
+}
+```
+
+接受条件采用 `energyAfter < energyBefore`，平局按固定优先级处理。扫描顺序、候选顺序和随机种子写入算法版本元数据，保证同一输入稳定复现。
+
+### 7.5 工具与许可证
+
+| 工具 | 作用 | 当前许可判断 | 建议 |
+|---|---|---|---|
+| OpenCV | 连通域、形态学、滤波、颜色转换 | Apache-2.0 | 首版主工具 |
+| scikit-image | SLIC、区域属性、轮廓与形态学实验 | BSD 系 | 研究与交叉验证 |
+| OR-Tools | 小窗口整数优化 | Apache-2.0 | P1 对照 |
+| PyMaxflow | Graph Cut 实现 | GPL | 商业版本保持隔离 |
+
+## 8. 多候选生成与审美排序
+
+### 8.1 三层排序结构
+
+```text
+第一层：硬条件过滤
+  色号合法、关键特征完整、网格尺寸正确
+第二层：规则评分
+  辨识度、结构、配色、工艺、成本
+第三层：偏好排序
+  学习同一输入下候选 A 与候选 B 的人类选择
+```
+
+通用审美数据集与模型提供视觉质量先验。AVA 收集大规模美学评分，NIMA 预测评分分布，MUSIQ 在多尺度与原始分辨率上评估视觉质量。[AVA](https://doi.org/10.1109/CVPR.2012.6247954)，[NIMA](https://doi.org/10.1109/TIP.2018.2831899)，[MUSIQ](https://doi.org/10.1109/ICCV48922.2021.00510)
+
+拼豆结果同时受辨识度、材料与制作复杂度约束，最终排序器采用项目内偏好数据训练。CLIP 视觉语言先验可作为候选特征，任务分数继续由拼豆偏好数据校准。[CLIP Look and Feel](https://doi.org/10.1609/aaai.v37i2.25353)
+
+### 8.2 候选生成轴
+
+每张输入建议生成 4 至 6 个候选，变化来自以下参数：
+
+| 参数轴 | 候选值 |
+|---|---|
+| 结构细节预算 | 低、中、高 |
+| 阴影层数 | 2、3 |
+| 颜色数量 | 12、20、32 或尺寸对应上限 |
+| 轮廓权重 | 柔和、平衡、清楚 |
+| 对比度 | 柔和、标准、高对比 |
+| 工艺复杂度 | 低、标准 |
+
+候选差异需要集中在少数参数轴，便于解释用户选择并支持后续归因分析。
+
+### 8.3 偏好数据协议
+
+每一对候选来自同一输入图片、同一画布尺寸和同一材料色板。记录三类问题：
+
+1. 主体辨识度更高的候选。
+2. 整体观感更好的候选。
+3. 更愿意实际制作的候选。
+
+左、右位置随机交换，并允许平局。数据切分以原始输入图片为单位，同一图片的全部候选进入同一数据分区。该规则可以控制候选泄漏。
+
+建议记录：
+
+```ts
+interface PairwisePreference {
+  sourceImageId: string
+  candidateAId: string
+  candidateBId: string
+  question: 'recognition' | 'aesthetic' | 'craft'
+  choice: 'a' | 'b' | 'tie'
+  leftRightOrder: 'ab' | 'ba'
+  raterGroup: string
+  createdAt: string
+}
+```
+
+Pick-a-Pic 与 ImageReward 展示了利用真实用户成对选择训练图像排序模型的路径。两者面向文本生成图像，本项目采用其数据组织思想，并使用拼豆专属特征与问题设计。[Pick-a-Pic](https://doi.org/10.52202/075280-1594)，[ImageReward](https://doi.org/10.52202/075280-0700)
+
+### 8.4 模型升级顺序
+
+| 阶段 | 数据规模建议 | 模型 | 输入 |
+|---|---:|---|---|
+| R0 | 0 至 500 对 | 手工权重 | 自动指标 |
+| R1 | 500 至 2,000 对 | Bradley-Terry / 逻辑回归 | 自动指标与风格参数 |
+| R2 | 2,000 至 10,000 对 | XGBoost pairwise | 自动指标、区域统计、风格参数 |
+| R3 | 10,000 对以上 | 冻结视觉编码器 + 小型排序头 | 网格图、原图、自动指标 |
+
+这些数量属于工程启动阈值，真实学习曲线用于调整。Bradley-Terry 模型直接描述成对比较概率：
+
+```text
+P(A > B) = sigmoid(score(A) - score(B))
+```
+
+[Bradley-Terry paired comparison](https://doi.org/10.2307/2334029)
+
+### 8.5 评估与偏差控制
+
+排序器评估指标：
+
+- 成对选择准确率
+- Kendall tau 排序相关
+- 按人物、宠物、插画分组的胜率
+- 按画布尺寸分组的胜率
+- 平局校准与置信度校准
+- 推荐项被用户替换的比例
+- 用户后续修改单元数量
+
+偏差控制：左右随机、风格出现次数均衡、重复哨兵对、来源图片级切分、单个评分者贡献上限和分类型报告。
+
+## 9. 小程序与服务端计算分配
+
+### 9.1 微信小程序能力现状
+
+微信官方文档显示：
+
+- Worker 在独立线程与全局上下文运行，通过消息复制传输数据，最大并发数量为 1。
+- `wx.request`、`wx.uploadFile` 与 `wx.downloadFile` 最大并发数量为 10，默认网络超时为 60 秒。
+- 小程序进入后台后，持续超过 5 秒的网络请求会收到中断回调。
+- `wx.compressImage` 支持质量和目标宽高，iOS 的图片压缩格式范围以 JPG 为主。
+- 小程序 AI 推理能力处于 Beta，接收 ONNX 模型，并支持 CPU 与部分 NPU 路径；官方算子页显示 GPU 推理开放状态仍在推进。
+- 官方 INT8 示例同时支持 QAT 与 PTQ，MobileNetV2 在 iPhone 13 Pro Max 的示例耗时从约 10 ms 降到约 5 ms。
+
+来源：[Worker](https://developers.weixin.qq.com/miniprogram/dev/framework/workers.html)，[网络](https://developers.weixin.qq.com/miniprogram/dev/framework/ability/network.html)，[图片压缩](https://developers.weixin.qq.com/miniprogram/dev/api/media/image/wx.compressImage.html)，[AI 推理](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/inference/tutorial.html)，[INT8 量化](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/inference/tutorial_int8.html)，[算子列表](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/inference/supports.html)
+
+### 9.2 首版部署建议
+
+| 位置 | 工作 |
+|---|---|
+| 小程序主线程 | 选择图片、参数输入、上传进度、结果展示 |
+| 小程序 Worker | 图片方向修正、尺寸读取、轻量哈希、预览级统计 |
+| 服务端 | 主体分割、关键点、尺寸评分、结构简化、配色、网格优化、多候选排序 |
+| 端侧 AI 实验 | 图片类型分类、质量预检、轻量人脸存在性判断 |
+
+首版采用服务端主流程。人物与宠物模型、多个画布候选、结构优化和偏好排序共享一次标准化输入，便于统一版本、缓存与性能测量。端侧 ONNX 路线在 P1 阶段评估设备覆盖、算子兼容、模型体积与精度。
+
+### 9.3 任务与缓存
+
+建议任务键：
+
+```text
+SHA256(标准化图片)
++ algorithmVersion
++ paletteVersion
++ canvasOptions
++ styleOptions
++ modelVersions
+```
+
+同一任务键直接复用理解结果和候选结果。多尺寸、多风格候选共享主体分割、关键点与大部分区域统计。
+
+### 9.4 性能目标
+
+以下数值属于首轮工程目标：
+
+| 阶段 | P50 | P95 |
+|---|---:|---:|
+| 输入解码与标准化 | 0.2 s | 0.5 s |
+| 人物或宠物理解 | 1.5 s | 4.0 s |
+| 三尺寸结构与配色候选 | 2.5 s | 6.0 s |
+| 网格优化与排序 | 0.5 s | 1.5 s |
+| 服务端总耗时 | 5.0 s | 12.0 s |
+
+输入长边建议先归一化到 1,280 至 1,600 像素，模型推理使用各自固定输入尺寸，目标网格阶段只处理 32、48、64 的离散数据。性能报告同时记录 CPU 型号、GPU 型号、并发数、模型版本和候选数量。
+
+## 10. 最小验证实验
 
 ### 实验 E1：人物理解
 
@@ -381,7 +707,35 @@ ColorEnergy =
 - 对比：RGB 欧氏距离、ΔE76、ΔE00、区域全局优化
 - 通过条件：公式测试全量通过；人工比较中 ΔE00 与全局优化获得更高配色偏好
 
-## 7. 技术选择与实施顺序
+### 实验 E6：光影与扁平化
+
+- 样本：人物、宠物、插画各 8 张
+- 对比：S0、S1、S2、S3
+- 检查：区域亮暗顺序、跨语义区域泄漏、色偏、光晕、关键特征对比
+- 通过条件：至少一条区域级路线在观感盲评中胜过直接亮度量化，并保持关键特征完整
+
+### 实验 E7：网格局部美化
+
+- 样本：全部 60 张的 A3 候选
+- 对比：原始网格、规则整理、规则加局部搜索
+- 检查：孤立豆、小连通域、长条、2×2 对角歧义、轮廓折返、特征违反次数
+- 通过条件：工艺噪声达到首轮下降目标，关键区域违反次数保持为零或进入人工复核
+
+### 实验 E8：候选排序
+
+- 数据：同图候选成对选择，按原始图片划分训练、验证和测试
+- 对比：规则权重、Bradley-Terry、XGBoost pairwise、视觉特征排序头
+- 检查：选择准确率、Kendall tau、分类型胜率、置信度校准
+- 通过条件：学习型排序器在独立图片测试集上胜过规则权重，并保持分类型表现稳定
+
+### 实验 E9：部署与性能
+
+- 设备：两档手机、小程序开发工具、CPU 服务端与候选 GPU 服务端
+- 工作量：32、48、64 三尺寸与 4、6 个候选
+- 检查：端到端耗时、峰值内存、缓存命中、失败恢复、后台切换行为
+- 通过条件：P50 与 P95 达到首轮工程目标，算法版本与缓存键保持一致
+
+## 11. 技术选择与实施顺序
 
 | 优先级 | 工作 | 产物 |
 |---:|---|---|
@@ -391,13 +745,22 @@ ColorEnergy =
 | P0 | 实现 32/48/64 尺寸评分 | `CanvasPlan` 与 `FeatureBudget` |
 | P0 | Guided/SLIC/区域合并/栅格约束实验 | `StructurePlan` |
 | P0 | CIEDE2000 测试与 Artkal 参考色卡导入 | 颜色基础基准 |
+| P0 | 区域固有色与二至三档阴影 | `ShadeRamp` 与光影基线 |
+| P0 | 连通域、长条、2×2 拓扑与局部搜索 | 确定性网格优化器 |
+| P0 | 规则候选评分与成对选择记录 | `CandidateEvaluation` 与偏好数据 |
+| P0 | 服务端主流程、缓存键与阶段耗时 | 算法服务运行规范 |
 | P1 | 20 色实体测量样片 | `measuredLab` 首批数据 |
 | P1 | CatFLW/DogFLW 专用模型研究 | 猫狗耳朵与面部锚点增强 |
 | P1 | 全局材料色板优化 | `ColorPlan` |
+| P1 | L0、RTV 与 XDoG 对照 | 纹理压缩与轮廓证据 |
+| P1 | Bradley-Terry / XGBoost 排序 | 第一版学习型排序器 |
+| P1 | 小程序 ONNX INT8 轻模型实验 | 端侧能力报告 |
+| P2 | White-box / intrinsic 教师模型 | 学习型光影候选 |
+| P2 | 冻结视觉编码器与排序头 | 项目偏好模型 |
 
 算法入口 `PatternAlgorithm.generate(request)` 保持稳定。内部新增阶段数据即可，产品侧继续使用同一入口。
 
-## 8. 许可证与发布安排
+## 12. 许可证与发布安排
 
 | 项目 | 许可或状态 | 使用建议 |
 |---|---|---|
@@ -406,6 +769,14 @@ ColorEnergy =
 | AP-10K 仓库 | CC BY 4.0；源图片来自多套数据 | 研究与模型验证，发布前逐项复核来源 |
 | CatFLW / DogFLW | CC BY-NC 4.0 | 研究验证与方法比较 |
 | Colour | BSD-3-Clause | Python 颜色基准 |
+| OpenCV | Apache-2.0 | 首版滤波、颜色与连通域工具 |
+| scikit-image | BSD 系 | SLIC、区域属性与研究对照 |
+| OR-Tools | Apache-2.0 | 小窗口整数优化实验 |
+| ONNX Runtime | MIT | 服务端轻模型推理候选 |
+| XGBoost | Apache-2.0 | P1 偏好排序器候选 |
+| PyMaxflow | GPL | 研究隔离与许可证专项复核 |
+| White-box Cartoonization 实现 | 仓库条款按版本复核 | 论文方法研究与教师候选 |
+| CLIP / DINO 类视觉权重 | 模型与权重按版本复核 | P2 排序特征候选 |
 | Artkal / Hama 官方色卡 | 厂家发布资料，数据再分发采用单独授权 | 内部参考；公开品牌色库前取得授权或发布自测数据 |
 
 商业版本的训练图片、品牌色号和模型权重分别建立来源清单。每个条目记录来源、许可、版本、修改和归属说明。
@@ -440,7 +811,45 @@ ColorEnergy =
 - CIE. Colorimetry, 4th Edition. https://cie.co.at/publications/colorimetry-4th-edition
 - ICC. sRGB registry. https://www.color.org/chardata/rgb/srgb.xalter
 
-Scite 检查：以上有 DOI 的核心论文均完成题录与引用语境查询，返回的 `editorialNotices` 为空列表。部分 ACM 与 IEEE 原文采用出版社访问，方法结论同时由摘要、开放稿或作者稿交叉核对。
+### 光影与扁平化
+
+- Xu, L. et al. Image Smoothing via L0 Gradient Minimization. https://doi.org/10.1145/2024156.2024208
+- Xu, L. et al. Structure Extraction from Texture via Relative Total Variation. https://doi.org/10.1145/2366145.2366158
+- Jobson, D. J. et al. A Multiscale Retinex for Bridging the Gap Between Color Images and Human Observation. https://doi.org/10.1109/83.597272
+- Bell, S. et al. Intrinsic Images in the Wild. https://doi.org/10.1145/2601097.2601206
+- Wang, X., & Yu, J. Learning to Cartoonize Using White-Box Cartoon Representations. https://doi.org/10.1109/CVPR42600.2020.00811
+- Winnemöller, H. et al. XDoG. https://doi.org/10.1016/j.cag.2012.03.004
+
+### 网格与图优化
+
+- Boykov, Y. et al. Fast Approximate Energy Minimization via Graph Cuts. https://doi.org/10.1109/34.969114
+- Delong, A. et al. Fast Approximate Energy Minimization with Label Costs. https://doi.org/10.1007/s11263-011-0437-z
+- Kopf, J., & Lischinski, D. Depixelizing Pixel Art. https://doi.org/10.1145/1964921.1964994
+
+### 审美与偏好
+
+- Bradley, R. A., & Terry, M. E. Rank Analysis of Incomplete Block Designs: The Method of Paired Comparisons. https://doi.org/10.2307/2334029
+- Murray, N. et al. AVA: A Large-Scale Database for Aesthetic Visual Analysis. https://doi.org/10.1109/CVPR.2012.6247954
+- Talebi, H., & Milanfar, P. NIMA: Neural Image Assessment. https://doi.org/10.1109/TIP.2018.2831899
+- Ke, J. et al. MUSIQ: Multi-scale Image Quality Transformer. https://doi.org/10.1109/ICCV48922.2021.00510
+- Wang, J. et al. Exploring CLIP for Assessing the Look and Feel of Images. https://doi.org/10.1609/aaai.v37i2.25353
+- Kirstain, Y. et al. Pick-a-Pic. https://doi.org/10.52202/075280-1594
+- Xu, J. et al. ImageReward. https://doi.org/10.52202/075280-0700
+
+### 小程序与工具
+
+- 微信小程序多线程 Worker. https://developers.weixin.qq.com/miniprogram/dev/framework/workers.html
+- 微信小程序网络使用说明. https://developers.weixin.qq.com/miniprogram/dev/framework/ability/network.html
+- 微信小程序图片压缩. https://developers.weixin.qq.com/miniprogram/dev/api/media/image/wx.compressImage.html
+- 微信小程序 AI 推理能力. https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/inference/tutorial.html
+- 微信小程序 INT8 量化. https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/inference/tutorial_int8.html
+- 微信小程序 AI 算子支持列表. https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/inference/supports.html
+- OpenCV Python package. https://pypi.org/project/opencv-python/
+- scikit-image. https://pypi.org/project/scikit-image/
+- OR-Tools. https://pypi.org/project/ortools/
+- ONNX Runtime. https://pypi.org/project/onnxruntime/
+
+Scite 检查：主体理解、结构与颜色核心 DOI 已完成题录与引用语境查询。Graph Cuts、Label Costs 与 Depixelizing Pixel Art 完成全文摘要和引用语境核对，`editorialNotices` 为空列表。随后 Scite 免费额度耗尽，其余新增论文采用 Crossref、OpenAlex、arXiv 与官方文档交叉核对。
 
 ## 证据表
 
@@ -461,5 +870,20 @@ Scite 检查：以上有 DOI 的核心论文均完成题录与引用语境查询
 | 色差 | CIEDE2000, 10.1002/col.20070 | 实现说明、测试数据、连续性细节 | 主色差与 34 组单测 | 题录完成，作者页交叉核对 |
 | Artkal 色卡 | 官方 S-5mm RGB PDF | 225 色、显示参考声明、特殊材质 | 研究参考色 + 实测色 | 官方页面与 PDF 核对 |
 | Hama 色卡 | 官方 Midi PDF | 色号、名称、材质分类、颜色变化声明 | 实测前的编号目录 | 官方页面与 PDF 核对 |
+| L0 平滑 | 10.1145/2024156.2024208 | 稀疏梯度、主要边缘保持 | 强轮廓纹理压缩候选 | Crossref 与论文题录核对 |
+| RTV | 10.1145/2366145.2366158 | 结构与纹理变化度量、结构提取 | 长毛与重复纹理候选 | Crossref 摘要核对 |
+| Intrinsic 分解 | 10.1145/2601097.2601206 | reflectance/shading、真实场景挑战 | 首版采用区域级近似 | Crossref 摘要核对 |
+| White-box 卡通化 | 10.1109/CVPR42600.2020.00811 | 表面、结构、纹理三类表示 | 第二阶段教师候选 | Crossref 题录核对 |
+| Graph Cut | 10.1109/34.969114 | alpha-expansion、度量平滑项、近似界 | 两两平滑项对照 | Scite 摘要与引用语境完成 |
+| Label Costs | 10.1007/s11263-011-0437-z | 标签数量代价与空间平滑 | 全图色号数量代价 | Scite 摘要与引用语境完成 |
+| 像素拓扑 | 10.1145/1964921.1964994 | 对角连接歧义与特征连通 | 2×2 拓扑检查 | Scite 摘要与引用语境完成 |
+| 审美数据 | AVA, 10.1109/CVPR.2012.6247954 | 大规模主观美学评分 | 通用视觉先验参考 | Crossref 题录核对 |
+| 审美评分 | NIMA, 10.1109/TIP.2018.2831899 | 预测评分分布 | 通用质量特征候选 | Crossref 题录核对 |
+| 多尺度质量 | MUSIQ, 10.1109/ICCV48922.2021.00510 | 原始尺寸、多尺度质量表示 | 候选视觉特征参考 | Crossref 与 OpenAlex 核对 |
+| 成对偏好 | Bradley-Terry, 10.2307/2334029 | 成对选择概率模型 | R1 排序器 | Crossref 题录核对 |
+| 用户偏好数据 | Pick-a-Pic / ImageReward | 真实用户成对选择、排序模型 | 项目偏好数据协议参考 | Crossref 与 OpenAlex 摘要核对 |
+| 小程序 Worker | 微信官方文档 | 独立线程、复制传输、最大并发 1 | 轻量预处理与统计 | 官方页面核对 |
+| 小程序网络 | 微信官方文档 | 默认 60 秒、请求并发 10、后台 5 秒中断 | 服务端任务设计 | 官方页面核对 |
+| 小程序 AI | 微信官方文档 | ONNX、INT8、设备算子差异 | P1 端侧轻模型实验 | 官方页面核对 |
 
 所有证据查询日期为 2026-08-15。论文与官方资料的结论分别写入对应专题，项目权重、阈值和通过条件均标记为首轮工程设定。

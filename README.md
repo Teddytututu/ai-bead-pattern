@@ -17,12 +17,21 @@ docs/                  架构、隐私与路线说明
 
 当前阶段完成仓库骨架。功能开发将在后续里程碑启动。
 
+## 文档
+
+- [从绘画过程到拼豆图纸：生成方法论](docs/drawing-to-bead-method.md)
+- [拼豆生成算法完整调研](docs/algorithm-research.md)
+- [拼豆生成算法实现规划](docs/algorithm-implementation-plan.md)
+- [系统架构](docs/architecture.md)
+- [产品路线](docs/roadmap.md)
+- [隐私设计](docs/privacy.md)
+
 ## 方向
 
 - 原生微信小程序 + TypeScript
 - 平台无关的 `pattern-core`
 - Provider-agnostic AI 接口
-- 本地优先的图片处理与隐私设计
+- 服务端算法主流程与端侧轻量预处理
 - 面向真实制作的图纸、色号与材料统计
 
 ## License
