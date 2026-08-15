@@ -1,23 +1,47 @@
-export type { PatternAlgorithm } from './algorithm'
+export {
+  createPatternAlgorithm,
+  type PatternAlgorithm,
+  type PatternAlgorithmConfig,
+} from './algorithm.js'
+export {
+  colorDistance,
+  deltaE76,
+  deltaE2000,
+  rgbToLab,
+} from './color.js'
+export { optimizeGrid } from './grid.js'
 export type {
+  BaselineMode,
   BeadPattern,
+  BinaryMask,
+  CandidateEvaluation,
+  CandidateScore,
+  CanvasOptions,
   ColorDistanceMethod,
   CropRect,
   GenerationMetrics,
+  GridEditRecord,
+  GridSize,
   ImageAnalysis,
+  ImageLandmark,
   ImageType,
   ImportanceMap,
   Lab,
+  LandmarkKind,
+  LandmarkPriority,
   MaterialColor,
   MaterialCount,
   MaterialPalette,
   OptimizationOptions,
+  PatternCandidate,
   PatternCell,
   PatternGenerationRequest,
   PatternGenerationResult,
   PatternMetadata,
   PatternOptions,
+  PatternStyle,
   PixelImage,
   ResizeMethod,
   RGB,
-} from './types'
+  SemanticRegion,
+} from './types.js'

@@ -1,11 +1,19 @@
+import { DeterministicPatternAlgorithm } from './pipeline.js'
 import type {
   PatternGenerationRequest,
   PatternGenerationResult,
-} from './types'
+} from './types.js'
 
-/** Stable boundary between product code and the replaceable algorithm implementation. */
 export interface PatternAlgorithm {
   readonly version: string
-
   generate(request: PatternGenerationRequest): Promise<PatternGenerationResult>
+}
+
+export interface PatternAlgorithmConfig {
+  version?: string
+  clock?: () => number
+}
+
+export function createPatternAlgorithm(config: PatternAlgorithmConfig = {}): PatternAlgorithm {
+  return new DeterministicPatternAlgorithm(config)
 }

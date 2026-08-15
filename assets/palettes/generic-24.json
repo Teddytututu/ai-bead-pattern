@@ -1,0 +1,30 @@
+{
+  "id": "generic-24",
+  "name": "Generic 24",
+  "colors": [
+    { "id": "black", "name": "Black", "hex": "#111111", "rgb": [17, 17, 17] },
+    { "id": "charcoal", "name": "Charcoal", "hex": "#3A3A3A", "rgb": [58, 58, 58] },
+    { "id": "gray", "name": "Gray", "hex": "#777777", "rgb": [119, 119, 119] },
+    { "id": "silver", "name": "Silver", "hex": "#B8B8B8", "rgb": [184, 184, 184] },
+    { "id": "white", "name": "White", "hex": "#F5F5F2", "rgb": [245, 245, 242] },
+    { "id": "cream", "name": "Cream", "hex": "#F4E3B2", "rgb": [244, 227, 178] },
+    { "id": "skin", "name": "Skin", "hex": "#E8AE87", "rgb": [232, 174, 135] },
+    { "id": "tan", "name": "Tan", "hex": "#B98255", "rgb": [185, 130, 85] },
+    { "id": "brown", "name": "Brown", "hex": "#75452A", "rgb": [117, 69, 42] },
+    { "id": "red", "name": "Red", "hex": "#C92F35", "rgb": [201, 47, 53] },
+    { "id": "coral", "name": "Coral", "hex": "#EE6D68", "rgb": [238, 109, 104] },
+    { "id": "orange", "name": "Orange", "hex": "#EA862D", "rgb": [234, 134, 45] },
+    { "id": "yellow", "name": "Yellow", "hex": "#F2CF45", "rgb": [242, 207, 69] },
+    { "id": "lime", "name": "Lime", "hex": "#A9C84B", "rgb": [169, 200, 75] },
+    { "id": "green", "name": "Green", "hex": "#4A9B55", "rgb": [74, 155, 85] },
+    { "id": "teal", "name": "Teal", "hex": "#298E86", "rgb": [41, 142, 134] },
+    { "id": "cyan", "name": "Cyan", "hex": "#4FC3C8", "rgb": [79, 195, 200] },
+    { "id": "sky", "name": "Sky", "hex": "#78B8E6", "rgb": [120, 184, 230] },
+    { "id": "blue", "name": "Blue", "hex": "#356DB4", "rgb": [53, 109, 180] },
+    { "id": "navy", "name": "Navy", "hex": "#273B72", "rgb": [39, 59, 114] },
+    { "id": "purple", "name": "Purple", "hex": "#74519A", "rgb": [116, 81, 154] },
+    { "id": "magenta", "name": "Magenta", "hex": "#B94C91", "rgb": [185, 76, 145] },
+    { "id": "pink", "name": "Pink", "hex": "#E98CB2", "rgb": [233, 140, 178] },
+    { "id": "deep-pink", "name": "Deep Pink", "hex": "#C84D72", "rgb": [200, 77, 114] }
+  ]
+}

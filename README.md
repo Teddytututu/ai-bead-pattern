@@ -15,7 +15,7 @@ tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
 ```
 
-当前阶段完成仓库骨架。功能开发将在后续里程碑启动。
+当前阶段已完成算法 MVP。`pattern-core` 可以从标准 RGBA 像素生成固定或自动尺寸的拼豆候选，并输出材料统计、局部整理记录与规则评分。
 
 ## 文档
 
@@ -33,6 +33,24 @@ docs/                  架构、隐私与路线说明
 - Provider-agnostic AI 接口
 - 服务端算法主流程与端侧轻量预处理
 - 面向真实制作的图纸、色号与材料统计
+
+## 算法 MVP
+
+- A0/A1 对照基线
+- Lab 与 CIEDE2000 材料配色
+- 自动尺寸和五种风格候选
+- 关键点锁定与网格工艺整理
+- 推荐项、备选项、评分和材料统计
+
+运行验证：
+
+```bash
+pnpm install
+pnpm test
+pnpm typecheck
+pnpm build
+pnpm --filter @ai-bead-pattern/pattern-core example
+```
 
 ## License
 
