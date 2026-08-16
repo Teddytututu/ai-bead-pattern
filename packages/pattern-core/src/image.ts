@@ -78,6 +78,58 @@ function areaSample(
   ]
 }
 
+export interface CanvasFit {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface ResizedPixels {
+  pixels: readonly RGB[]
+  activeMask: Uint8Array
+  fit: CanvasFit
+}
+
+export function fitCropToCanvas(crop: CropRect, width: number, height: number): CanvasFit {
+  const scale = Math.min(width / crop.width, height / crop.height)
+  const fittedWidth = clamp(Math.round(crop.width * scale), 1, width)
+  const fittedHeight = clamp(Math.round(crop.height * scale), 1, height)
+  return {
+    x: Math.floor((width - fittedWidth) / 2),
+    y: Math.floor((height - fittedHeight) / 2),
+    width: fittedWidth,
+    height: fittedHeight,
+  }
+}
+
+export function sourcePointForGridCell(
+  crop: CropRect,
+  fit: CanvasFit,
+  x: number,
+  y: number,
+): readonly [sourceX: number, sourceY: number] | undefined {
+  if (x < fit.x || y < fit.y || x >= fit.x + fit.width || y >= fit.y + fit.height) {
+    return undefined
+  }
+  return [
+    crop.x + (x - fit.x + 0.5) * crop.width / fit.width - 0.5,
+    crop.y + (y - fit.y + 0.5) * crop.height / fit.height - 0.5,
+  ]
+}
+
+export function gridCellForSourcePoint(
+  crop: CropRect,
+  fit: CanvasFit,
+  sourceX: number,
+  sourceY: number,
+): readonly [gridX: number, gridY: number] {
+  return [
+    clamp(fit.x + Math.floor((sourceX - crop.x) / crop.width * fit.width), fit.x, fit.x + fit.width - 1),
+    clamp(fit.y + Math.floor((sourceY - crop.y) / crop.height * fit.height), fit.y, fit.y + fit.height - 1),
+  ]
+}
+
 export function resizePixels(
   image: PixelImage,
   crop: CropRect,
@@ -85,39 +137,50 @@ export function resizePixels(
   height: number,
   method: ResizeMethod,
   backgroundRgb: RGB = [255, 255, 255],
-): readonly RGB[] {
+): ResizedPixels {
   const pixels: RGB[] = []
-  const scaleX = crop.width / width
-  const scaleY = crop.height / height
+  const activeMask = new Uint8Array(width * height)
+  const fit = fitCropToCanvas(crop, width, height)
+  const scaleX = crop.width / fit.width
+  const scaleY = crop.height / fit.height
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
+      const index = y * width + x
+      const sourcePoint = sourcePointForGridCell(crop, fit, x, y)
+      if (sourcePoint === undefined) {
+        pixels.push(backgroundRgb)
+        continue
+      }
+      activeMask[index] = 1
+      const localX = x - fit.x
+      const localY = y - fit.y
       if (method === 'nearest') {
         pixels.push(nearestSample(
           image,
-          crop.x + (x + 0.5) * scaleX - 0.5,
-          crop.y + (y + 0.5) * scaleY - 0.5,
+          sourcePoint[0],
+          sourcePoint[1],
           backgroundRgb,
         ))
       } else if (method === 'bilinear' || scaleX < 1 || scaleY < 1) {
         pixels.push(bilinearSample(
           image,
-          crop.x + (x + 0.5) * scaleX - 0.5,
-          crop.y + (y + 0.5) * scaleY - 0.5,
+          sourcePoint[0],
+          sourcePoint[1],
           backgroundRgb,
         ))
       } else {
         pixels.push(areaSample(
           image,
-          crop.x + x * scaleX,
-          crop.y + y * scaleY,
-          crop.x + (x + 1) * scaleX,
-          crop.y + (y + 1) * scaleY,
+          clamp(crop.x + localX * scaleX, crop.x, crop.x + crop.width),
+          clamp(crop.y + localY * scaleY, crop.y, crop.y + crop.height),
+          clamp(crop.x + (localX + 1) * scaleX, crop.x, crop.x + crop.width),
+          clamp(crop.y + (localY + 1) * scaleY, crop.y, crop.y + crop.height),
           backgroundRgb,
         ))
       }
     }
   }
-  return pixels
+  return { pixels, activeMask, fit }
 }
 
 function transformChannel(value: number, contrast: number, brightness: number): number {

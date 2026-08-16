@@ -12,12 +12,17 @@ function indexOf(x: number, y: number, width: number): number {
   return y * width + x
 }
 
+function isActive(index: number, activeMask?: Uint8Array): boolean {
+  return activeMask === undefined || activeMask[index] === 1
+}
+
 function collectComponent(
   colorIds: readonly string[],
   width: number,
   height: number,
   start: number,
   visited: Uint8Array,
+  activeMask?: Uint8Array,
 ): readonly number[] {
   const colorId = colorIds[start]
   const queue = [start]
@@ -33,7 +38,7 @@ function collectComponent(
       const nextY = y + offsetY
       if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue
       const next = indexOf(nextX, nextY, width)
-      if (visited[next] === 0 && colorIds[next] === colorId) {
+      if (isActive(next, activeMask) && visited[next] === 0 && colorIds[next] === colorId) {
         visited[next] = 1
         queue.push(next)
       }
@@ -47,6 +52,7 @@ function chooseNeighborColor(
   width: number,
   height: number,
   component: readonly number[],
+  activeMask?: Uint8Array,
 ): string | undefined {
   const componentSet = new Set(component)
   const counts = new Map<string, number>()
@@ -58,7 +64,7 @@ function chooseNeighborColor(
       const nextY = y + offsetY
       if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue
       const next = indexOf(nextX, nextY, width)
-      if (componentSet.has(next)) continue
+      if (componentSet.has(next) || isActive(next, activeMask) === false) continue
       const colorId = colorIds[next]
       if (colorId !== undefined) counts.set(colorId, (counts.get(colorId) ?? 0) + 1)
     }
@@ -73,6 +79,7 @@ export function optimizeGrid(
   height: number,
   protectedCells: ReadonlySet<number>,
   options: OptimizationOptions = {},
+  activeMask?: Uint8Array,
 ): GridOptimizationResult {
   const sourceColorIds = [...inputColorIds]
   const colorIds = [...inputColorIds]
@@ -83,9 +90,13 @@ export function optimizeGrid(
   let removedSmallRegions = 0
   for (let start = 0; start < colorIds.length; start += 1) {
     if (visited[start] === 1) continue
-    const component = collectComponent(sourceColorIds, width, height, start, visited)
+    if (isActive(start, activeMask) === false) {
+      visited[start] = 1
+      continue
+    }
+    const component = collectComponent(sourceColorIds, width, height, start, visited, activeMask)
     if (component.length >= minimumRegionSize || component.some((cell) => protectedCells.has(cell))) continue
-    const replacement = chooseNeighborColor(sourceColorIds, width, height, component)
+    const replacement = chooseNeighborColor(sourceColorIds, width, height, component, activeMask)
     if (replacement === undefined || replacement === sourceColorIds[start]) continue
     removedSmallRegions += 1
     for (const cell of component) {
@@ -107,11 +118,17 @@ export function optimizeGrid(
     for (let y = 1; y < height - 1; y += 1) {
       for (let x = 1; x < width - 1; x += 1) {
         const current = indexOf(x, y, width)
-        if (protectedCells.has(current)) continue
-        const left = snapshot[indexOf(x - 1, y, width)]
-        const right = snapshot[indexOf(x + 1, y, width)]
-        const top = snapshot[indexOf(x, y - 1, width)]
-        const bottom = snapshot[indexOf(x, y + 1, width)]
+        const leftIndex = indexOf(x - 1, y, width)
+        const rightIndex = indexOf(x + 1, y, width)
+        const topIndex = indexOf(x, y - 1, width)
+        const bottomIndex = indexOf(x, y + 1, width)
+        if (protectedCells.has(current)
+          || [current, leftIndex, rightIndex, topIndex, bottomIndex]
+            .some((index) => isActive(index, activeMask) === false)) continue
+        const left = snapshot[leftIndex]
+        const right = snapshot[rightIndex]
+        const top = snapshot[topIndex]
+        const bottom = snapshot[bottomIndex]
         const replacement = left === right && left !== snapshot[current]
           ? left
           : top === bottom && top !== snapshot[current] ? top : undefined
@@ -126,17 +143,26 @@ export function optimizeGrid(
   return { colorIds, edits, removedSmallRegions }
 }
 
-export function countIsolatedCells(colorIds: readonly string[], width: number, height: number): number {
+export function countIsolatedCells(
+  colorIds: readonly string[],
+  width: number,
+  height: number,
+  activeMask?: Uint8Array,
+): number {
   let isolated = 0
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const current = colorIds[indexOf(x, y, width)]
+      const currentIndex = indexOf(x, y, width)
+      if (isActive(currentIndex, activeMask) === false) continue
+      const current = colorIds[currentIndex]
       let matches = 0
       for (const [offsetX, offsetY] of neighbors) {
         const nextX = x + offsetX
         const nextY = y + offsetY
-        if (nextX >= 0 && nextY >= 0 && nextX < width && nextY < height
-          && colorIds[indexOf(nextX, nextY, width)] === current) matches += 1
+        if (nextX >= 0 && nextY >= 0 && nextX < width && nextY < height) {
+          const next = indexOf(nextX, nextY, width)
+          if (isActive(next, activeMask) && colorIds[next] === current) matches += 1
+        }
       }
       if (matches === 0) isolated += 1
     }
@@ -144,15 +170,27 @@ export function countIsolatedCells(colorIds: readonly string[], width: number, h
   return isolated
 }
 
-export function countThinStripes(colorIds: readonly string[], width: number, height: number): number {
+export function countThinStripes(
+  colorIds: readonly string[],
+  width: number,
+  height: number,
+  activeMask?: Uint8Array,
+): number {
   let stripes = 0
   for (let y = 1; y < height - 1; y += 1) {
     for (let x = 1; x < width - 1; x += 1) {
-      const current = colorIds[indexOf(x, y, width)]
-      const horizontal = colorIds[indexOf(x - 1, y, width)] === colorIds[indexOf(x + 1, y, width)]
-        && colorIds[indexOf(x - 1, y, width)] !== current
-      const vertical = colorIds[indexOf(x, y - 1, width)] === colorIds[indexOf(x, y + 1, width)]
-        && colorIds[indexOf(x, y - 1, width)] !== current
+      const currentIndex = indexOf(x, y, width)
+      const leftIndex = indexOf(x - 1, y, width)
+      const rightIndex = indexOf(x + 1, y, width)
+      const topIndex = indexOf(x, y - 1, width)
+      const bottomIndex = indexOf(x, y + 1, width)
+      if ([currentIndex, leftIndex, rightIndex, topIndex, bottomIndex]
+        .some((index) => isActive(index, activeMask) === false)) continue
+      const current = colorIds[currentIndex]
+      const horizontal = colorIds[leftIndex] === colorIds[rightIndex]
+        && colorIds[leftIndex] !== current
+      const vertical = colorIds[topIndex] === colorIds[bottomIndex]
+        && colorIds[topIndex] !== current
       if (horizontal || vertical) stripes += 1
     }
   }

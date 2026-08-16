@@ -179,7 +179,57 @@ describe('deterministic pattern algorithm', () => {
 
     assert.equal(result.pattern.width, 2)
     assert.equal(result.pattern.height, 3)
-    assert.equal(result.pattern.cells.length, 6)
+    assert.equal(result.pattern.cells.length, 4)
+  })
+
+  it('keeps a wide image proportional and centers it inside a square grid', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const source = image(4, 2, Array.from({ length: 8 }, () => [255, 0, 0] as const))
+    const result = await algorithm.generate(fixedRequest(source, {
+      canvas: { mode: 'fixed', size: { width: 4, height: 4 } },
+      backgroundRgb: [255, 255, 255],
+      optimization: { minRegionSize: 1 },
+    }))
+
+    assert.equal(result.pattern.cells.length, 8)
+    assert.equal(result.pattern.metadata.totalBeads, 8)
+    assert.deepEqual([...new Set(result.pattern.cells.map((cell) => cell.y))], [1, 2])
+    assert.deepEqual(result.materialCounts, [{ colorId: 'red', count: 8 }])
+  })
+
+  it('maps protected landmarks into the centered content area', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const source = image(4, 1, [
+      [255, 0, 0], [0, 0, 255], [255, 0, 0], [255, 0, 0],
+    ])
+    const request = fixedRequest(source, {
+      canvas: { mode: 'fixed', size: { width: 4, height: 4 } },
+      optimization: { minRegionSize: 2, isolatedPixelPenalty: 1 },
+    })
+    request.analysis = {
+      landmarks: [
+        { id: 'eye', kind: 'eye', x: 1, y: 0, confidence: 1, priority: 'hard', radius: 0 },
+      ],
+    }
+
+    const result = await algorithm.generate(request)
+    const protectedCell = result.pattern.cells.find((cell) => cell.x === 1 && cell.y === 1)
+
+    assert.equal(result.pattern.cells.length, 4)
+    assert.equal(protectedCell?.colorId, 'blue')
+  })
+
+  it('keeps a tall image proportional and centers it inside a square grid', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const source = image(2, 4, Array.from({ length: 8 }, () => [0, 0, 255] as const))
+    const result = await algorithm.generate(fixedRequest(source, {
+      canvas: { mode: 'fixed', size: { width: 4, height: 4 } },
+      optimization: { minRegionSize: 1 },
+    }))
+
+    assert.equal(result.pattern.cells.length, 8)
+    assert.deepEqual([...new Set(result.pattern.cells.map((cell) => cell.x))], [1, 2])
+    assert.deepEqual(result.materialCounts, [{ colorId: 'blue', count: 8 }])
   })
 
   it('keeps the raw isolated cell in the A0 comparison route', async () => {

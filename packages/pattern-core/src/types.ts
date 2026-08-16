@@ -134,6 +134,7 @@ export interface PatternCell {
 export interface PatternMetadata {
   sourceWidth: number
   sourceHeight: number
+  /** Occupied grid cells. Blank fitted margins are excluded. */
   totalBeads: number
   generatedAt: number
   algorithmVersion: string
@@ -149,6 +150,7 @@ export interface BeadPattern {
   width: number
   height: number
   palette: readonly MaterialColor[]
+  /** Occupied beads only. Missing grid coordinates represent blank board space. */
   cells: readonly PatternCell[]
   metadata: PatternMetadata
 }

@@ -597,8 +597,13 @@
       buffer.height = sourceImage.height
       buffer.getContext('2d').putImageData(imageData, 0, 0)
       context.clearRect(0, 0, canvas.width, canvas.height)
+      context.fillStyle = '#f7f8f6'
+      context.fillRect(0, 0, canvas.width, canvas.height)
       context.imageSmoothingQuality = 'high'
-      context.drawImage(buffer, 0, 0, canvas.width, canvas.height)
+      const scale = Math.min(canvas.width / buffer.width, canvas.height / buffer.height)
+      const width = buffer.width * scale
+      const height = buffer.height * scale
+      context.drawImage(buffer, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
     }
 
     function buildImportanceMap(image) {

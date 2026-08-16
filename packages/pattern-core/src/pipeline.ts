@@ -10,7 +10,14 @@ import {
   countThinStripes,
   optimizeGrid,
 } from './grid.js'
-import { applyStyle, normalizeCrop, resizePixels } from './image.js'
+import {
+  applyStyle,
+  gridCellForSourcePoint,
+  normalizeCrop,
+  resizePixels,
+  sourcePointForGridCell,
+  type CanvasFit,
+} from './image.js'
 import type {
   BaselineMode,
   CandidateEvaluation,
@@ -45,7 +52,6 @@ interface CandidateContext {
 
 interface AssignedGrid {
   colorIds: readonly string[]
-  meanColorDistance: number
 }
 
 const defaultStyles: readonly PatternStyle[] = ['faithful', 'simple', 'high-contrast']
@@ -232,8 +238,10 @@ function buildImportanceWeights(
   crop: CropRect,
   width: number,
   height: number,
+  fit: CanvasFit,
+  activeMask: Uint8Array,
 ): readonly number[] {
-  const weights = new Array<number>(width * height).fill(1)
+  const weights: number[] = Array.from(activeMask, (active) => active === 1 ? 1 : 0)
   const importance = analysis?.importanceMap
   if (importance !== undefined
     && importance.weights.length === importance.width * importance.height
@@ -241,17 +249,20 @@ function buildImportanceWeights(
     && importance.height > 0) {
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
+        const index = y * width + x
+        const sourcePoint = sourcePointForGridCell(crop, fit, x, y)
+        if (sourcePoint === undefined) continue
         const sourceX = clamp(
-          Math.floor(crop.x + (x + 0.5) * crop.width / width),
+          Math.round(sourcePoint[0]),
           0,
           importance.width - 1,
         )
         const sourceY = clamp(
-          Math.floor(crop.y + (y + 0.5) * crop.height / height),
+          Math.round(sourcePoint[1]),
           0,
           importance.height - 1,
         )
-        weights[y * width + x] = 0.5 + 1.5 * clamp(
+        weights[index] = 0.5 + 1.5 * clamp(
           importance.weights[sourceY * importance.width + sourceX] ?? 0,
           0,
           1,
@@ -262,16 +273,16 @@ function buildImportanceWeights(
   for (const landmark of analysis?.landmarks ?? []) {
     if (landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) continue
-    const gridX = clamp(Math.floor((landmark.x - crop.x) / crop.width * width), 0, width - 1)
-    const gridY = clamp(Math.floor((landmark.y - crop.y) / crop.height * height), 0, height - 1)
+    const [gridX, gridY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
     const radius = Math.max(0, Math.round(landmark.radius ?? 1))
     for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
       for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
         const x = gridX + offsetX
         const y = gridY + offsetY
-        if (x >= 0 && y >= 0 && x < width && y < height) {
-          weights[y * width + x] = Math.max(
-            weights[y * width + x] ?? 1,
+        const index = y * width + x
+        if (x >= 0 && y >= 0 && x < width && y < height && activeMask[index] === 1) {
+          weights[index] = Math.max(
+            weights[index] ?? 1,
             landmark.priority === 'hard' ? 3 : 2,
           )
         }
@@ -285,15 +296,14 @@ function protectedCells(
   analysis: ImageAnalysis | undefined,
   crop: CropRect,
   width: number,
-  height: number,
+  fit: CanvasFit,
 ): ReadonlySet<number> {
   const cells = new Set<number>()
   for (const landmark of analysis?.landmarks ?? []) {
     if (landmark.priority !== 'hard' || landmark.confidence <= 0) continue
     if (landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) continue
-    const x = clamp(Math.floor((landmark.x - crop.x) / crop.width * width), 0, width - 1)
-    const y = clamp(Math.floor((landmark.y - crop.y) / crop.height * height), 0, height - 1)
+    const [x, y] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
     cells.add(y * width + x)
   }
   return cells
@@ -350,7 +360,6 @@ function assignGrid(
   distanceMethod: ColorDistanceMethod,
 ): AssignedGrid {
   const colorIds: string[] = []
-  let totalDistance = 0
   for (let index = 0; index < pixels.length; index += 1) {
     let bestColor = colors[0]!
     let bestDistance = Number.POSITIVE_INFINITY
@@ -364,16 +373,21 @@ function assignGrid(
       }
     }
     colorIds.push(bestColor.id)
-    totalDistance += baseline === 'a0'
-      ? colorDistance(pixelLabs[index]!, bestColor.lab, 'delta-e-2000')
-      : bestDistance
   }
-  return { colorIds, meanColorDistance: totalDistance / pixels.length }
+  return { colorIds }
 }
 
-function materialCounts(colorIds: readonly string[], palette: readonly PreparedColor[]): readonly MaterialCount[] {
+function materialCounts(
+  colorIds: readonly string[],
+  palette: readonly PreparedColor[],
+  activeMask: Uint8Array,
+): readonly MaterialCount[] {
   const counts = new Map<string, number>()
-  for (const colorId of colorIds) counts.set(colorId, (counts.get(colorId) ?? 0) + 1)
+  for (let index = 0; index < colorIds.length; index += 1) {
+    if (activeMask[index] !== 1) continue
+    const colorId = colorIds[index]!
+    counts.set(colorId, (counts.get(colorId) ?? 0) + 1)
+  }
   return palette
     .filter((color) => counts.has(color.id))
     .map((color) => ({ colorId: color.id, count: counts.get(color.id)! }))
@@ -383,15 +397,19 @@ function finalMeanColorDistance(
   pixelLabs: readonly Lab[],
   colorIds: readonly string[],
   palette: readonly PreparedColor[],
+  activeMask: Uint8Array,
 ): number {
   const colorsById = new Map(palette.map((color) => [color.id, color]))
   let total = 0
+  let count = 0
   for (let index = 0; index < colorIds.length; index += 1) {
+    if (activeMask[index] !== 1) continue
     const color = colorsById.get(colorIds[index]!)
     if (color === undefined) throw new RangeError('Generated grid references an unknown palette color')
     total += colorDistance(pixelLabs[index]!, color.lab, 'delta-e-2000')
+    count += 1
   }
-  return total / Math.max(1, colorIds.length)
+  return total / Math.max(1, count)
 }
 
 function boundaryAgreement(
@@ -399,10 +417,12 @@ function boundaryAgreement(
   colorIds: readonly string[],
   width: number,
   height: number,
+  activeMask: Uint8Array,
 ): number {
   let agreements = 0
   let comparisons = 0
   const compare = (first: number, second: number): void => {
+    if (activeMask[first] !== 1 || activeMask[second] !== 1) return
     const sourceEdge = colorDistance(pixelLabs[first]!, pixelLabs[second]!, 'delta-e-76') >= 12
     const patternEdge = colorIds[first] !== colorIds[second]
     if (sourceEdge === patternEdge) agreements += 1
@@ -420,7 +440,7 @@ function boundaryAgreement(
 
 function scoreCandidate(
   style: PatternStyle,
-  size: GridSize,
+  totalCells: number,
   maxColors: number,
   meanColorDistance: number,
   structure: number,
@@ -429,7 +449,6 @@ function scoreCandidate(
   thinStripes: number,
   uniqueColors: number,
 ): CandidateScore {
-  const totalCells = size.width * size.height
   const colorFidelity = 1 / (1 + meanColorDistance / 15)
   const featureProtection = hardFeatureCount > 0 ? 1 : 0.85
   const cleanliness = clamp(1 - (isolatedCells * 2 + thinStripes) / Math.max(1, totalCells), 0, 1)
@@ -495,7 +514,7 @@ function generateCandidate(
 ): PatternCandidate {
   const startedAt = performance.now()
   const { request, crop, size, style, baseline, resizeMethod, distanceMethod } = context
-  const rawPixels = resizePixels(
+  const resized = resizePixels(
     request.image,
     crop,
     size.width,
@@ -503,9 +522,16 @@ function generateCandidate(
     resizeMethod,
     request.options.backgroundRgb,
   )
-  const pixels = rawPixels.map((pixel) => applyStyle(pixel, style))
+  const pixels = resized.pixels.map((pixel) => applyStyle(pixel, style))
   const pixelLabs = pixels.map(rgbToLab)
-  const weights = buildImportanceWeights(request.analysis, crop, size.width, size.height)
+  const weights = buildImportanceWeights(
+    request.analysis,
+    crop,
+    size.width,
+    size.height,
+    resized.fit,
+    resized.activeMask,
+  )
   const maximumColors = styleColorLimit(
     style,
     Math.min(request.options.maxColors, context.preparedPalette.length),
@@ -518,7 +544,7 @@ function generateCandidate(
     distanceMethod,
   )
   const assigned = assignGrid(pixels, pixelLabs, selectedPalette, baseline, distanceMethod)
-  const protectedSet = protectedCells(request.analysis, crop, size.width, size.height)
+  const protectedSet = protectedCells(request.analysis, crop, size.width, resized.fit)
   const optimization = baseline === 'a0'
     ? { colorIds: assigned.colorIds, edits: [], removedSmallRegions: 0 }
     : optimizeGrid(
@@ -527,26 +553,49 @@ function generateCandidate(
       size.height,
       protectedSet,
       request.options.optimization,
+      resized.activeMask,
     )
-  const counts = materialCounts(optimization.colorIds, selectedPalette)
+  const counts = materialCounts(optimization.colorIds, selectedPalette, resized.activeMask)
   const usedIds = new Set(counts.map((entry) => entry.colorId))
   const usedPalette = selectedPalette.filter((color) => usedIds.has(color.id))
-  const cells: PatternCell[] = optimization.colorIds.map((colorId, index) => ({
-    x: index % size.width,
-    y: Math.floor(index / size.width),
-    colorId,
-  }))
-  const isolatedCells = countIsolatedCells(optimization.colorIds, size.width, size.height)
-  const thinStripes = countThinStripes(optimization.colorIds, size.width, size.height)
-  const structure = boundaryAgreement(pixelLabs, optimization.colorIds, size.width, size.height)
+  const cells: PatternCell[] = []
+  for (let index = 0; index < optimization.colorIds.length; index += 1) {
+    if (resized.activeMask[index] !== 1) continue
+    cells.push({
+      x: index % size.width,
+      y: Math.floor(index / size.width),
+      colorId: optimization.colorIds[index]!,
+    })
+  }
+  const isolatedCells = countIsolatedCells(
+    optimization.colorIds,
+    size.width,
+    size.height,
+    resized.activeMask,
+  )
+  const thinStripes = countThinStripes(
+    optimization.colorIds,
+    size.width,
+    size.height,
+    resized.activeMask,
+  )
+  const structure = boundaryAgreement(
+    pixelLabs,
+    optimization.colorIds,
+    size.width,
+    size.height,
+    resized.activeMask,
+  )
   const meanColorDistance = finalMeanColorDistance(
     pixelLabs,
     optimization.colorIds,
     selectedPalette,
+    resized.activeMask,
   )
+  const totalBeads = cells.length
   const score = scoreCandidate(
     style,
-    size,
+    totalBeads,
     request.options.maxColors,
     meanColorDistance,
     structure,
@@ -555,7 +604,6 @@ function generateCandidate(
     thinStripes,
     counts.length,
   )
-  const totalBeads = size.width * size.height
   return {
     id: `${size.width}x${size.height}-${style}-${baseline}`,
     style,
