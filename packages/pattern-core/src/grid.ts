@@ -4,6 +4,7 @@ export interface GridOptimizationResult {
   colorIds: readonly string[]
   edits: readonly GridEditRecord[]
   removedSmallRegions: number
+  topologyEdits: number
 }
 
 const neighbors = [[-1, 0], [1, 0], [0, -1], [0, 1]] as const
@@ -88,6 +89,7 @@ export function optimizeGrid(
   const minimumRegionSize = Math.max(1, Math.floor(options.minRegionSize ?? 2))
   const visited = new Uint8Array(colorIds.length)
   let removedSmallRegions = 0
+  let topologyEdits = 0
   for (let start = 0; start < colorIds.length; start += 1) {
     if (visited[start] === 1) continue
     if (isActive(start, activeMask) === false) {
@@ -140,7 +142,38 @@ export function optimizeGrid(
       }
     }
   }
-  return { colorIds, edits, removedSmallRegions }
+  if ((options.aliasPenalty ?? 0) > 0) {
+    const snapshot = [...colorIds]
+    for (let y = 1; y < height - 1; y += 1) {
+      for (let x = 1; x < width - 1; x += 1) {
+        const current = indexOf(x, y, width)
+        if (protectedCells.has(current) || isActive(current, activeMask) === false) continue
+        const counts = new Map<string, number>()
+        let matchingOrthogonal = 0
+        for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+          for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+            if (offsetX === 0 && offsetY === 0) continue
+            const next = indexOf(x + offsetX, y + offsetY, width)
+            if (isActive(next, activeMask) === false) continue
+            const colorId = snapshot[next]!
+            counts.set(colorId, (counts.get(colorId) ?? 0) + 1)
+            if (Math.abs(offsetX) + Math.abs(offsetY) === 1 && colorId === snapshot[current]) {
+              matchingOrthogonal += 1
+            }
+          }
+        }
+        const dominant = [...counts.entries()]
+          .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0]
+        if (dominant === undefined || dominant[0] === snapshot[current]
+          || dominant[1] < 6 || matchingOrthogonal > 1) continue
+        const fromColorId = colorIds[current]!
+        colorIds[current] = dominant[0]
+        edits.push({ x, y, fromColorId, toColorId: dominant[0], reason: 'topology' })
+        topologyEdits += 1
+      }
+    }
+  }
+  return { colorIds, edits, removedSmallRegions, topologyEdits }
 }
 
 export function countIsolatedCells(

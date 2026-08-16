@@ -10,6 +10,7 @@ export {
   rgbToLab,
 } from './color.js'
 export { optimizeGrid } from './grid.js'
+export { adaptPattern } from './adaptation.js'
 export type {
   BaselineMode,
   BeadPattern,
@@ -33,10 +34,15 @@ export type {
   MaterialCount,
   MaterialPalette,
   OptimizationOptions,
+  StructureOptions,
   PatternCandidate,
   PatternCell,
   PatternGenerationRequest,
   PatternGenerationResult,
+  PatternAdaptationRequest,
+  PatternAdaptationResult,
+  PatternAdaptationChange,
+  MaterialDelta,
   PatternMetadata,
   PatternOptions,
   PatternStyle,

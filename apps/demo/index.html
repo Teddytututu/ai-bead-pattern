@@ -166,6 +166,8 @@
       overflow: hidden;
     }
 
+    .segmented.three { grid-template-columns: repeat(3, 1fr); }
+
     .segmented button {
       height: 34px;
       border: 0;
@@ -177,6 +179,7 @@
 
     .segmented button:last-child { border-right: 0; }
     .segmented button[aria-pressed="true"] { background: var(--text); color: #fff; font-weight: 700; }
+    .segmented button:disabled { opacity: 0.45; cursor: default; }
 
     input[type="range"] { width: 100%; accent-color: var(--accent); }
 
@@ -314,7 +317,7 @@
 
     @media (max-width: 760px) {
       .app-header { padding: 0 12px; }
-      .status span:last-child { display: none; }
+      .status { font-size: 11px; }
       .workspace { display: block; }
       .sidebar, .inspector { border: 0; overflow: visible; }
       .sidebar { border-bottom: 1px solid var(--border); }
@@ -384,6 +387,22 @@
           <label class="control-label" for="maxColors"><span>颜色</span><span class="control-value" id="colorValue">20 色</span></label>
           <input id="maxColors" type="range" min="6" max="24" step="1" value="20">
         </div>
+        <div class="control-group">
+          <div class="control-label"><span>算法</span><span class="control-value" id="baselineValue">结构版</span></div>
+          <div class="segmented three" id="baselineControl" aria-label="算法模式">
+            <button type="button" data-baseline="mvp" aria-pressed="true">结构</button>
+            <button type="button" data-baseline="a1" aria-pressed="false">面积</button>
+            <button type="button" data-baseline="a0" aria-pressed="false">最近邻</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <div class="control-label"><span>明暗</span><span class="control-value" id="valueLevelsValue">3 档</span></div>
+          <div class="segmented three" id="valueLevelsControl" aria-label="明暗层级">
+            <button type="button" data-levels="2" aria-pressed="false">2</button>
+            <button type="button" data-levels="3" aria-pressed="true">3</button>
+            <button type="button" data-levels="4" aria-pressed="false">4</button>
+          </div>
+        </div>
       </section>
 
       <section class="section">
@@ -448,6 +467,9 @@
           <div class="summary-item"><span class="summary-value" id="beadCount">0</span><span class="summary-label">豆数</span></div>
           <div class="summary-item"><span class="summary-value" id="uniqueColors">0</span><span class="summary-label">颜色</span></div>
           <div class="summary-item"><span class="summary-value" id="qualityScore">0</span><span class="summary-label">评分</span></div>
+          <div class="summary-item"><span class="summary-value" id="featureScore">0</span><span class="summary-label">特征</span></div>
+          <div class="summary-item"><span class="summary-value" id="paletteChanges">0</span><span class="summary-label">配色调整</span></div>
+          <div class="summary-item"><span class="summary-value" id="gridEdits">0</span><span class="summary-label">网格整理</span></div>
         </div>
       </section>
 
@@ -479,6 +501,10 @@
       sizeValue: document.querySelector('#sizeValue'),
       maxColors: document.querySelector('#maxColors'),
       colorValue: document.querySelector('#colorValue'),
+      baselineControl: document.querySelector('#baselineControl'),
+      baselineValue: document.querySelector('#baselineValue'),
+      valueLevelsControl: document.querySelector('#valueLevelsControl'),
+      valueLevelsValue: document.querySelector('#valueLevelsValue'),
       styleControl: document.querySelector('#styleControl'),
       protectFeatures: document.querySelector('#protectFeatures'),
       cleanGrid: document.querySelector('#cleanGrid'),
@@ -494,12 +520,17 @@
       beadCount: document.querySelector('#beadCount'),
       uniqueColors: document.querySelector('#uniqueColors'),
       qualityScore: document.querySelector('#qualityScore'),
+      featureScore: document.querySelector('#featureScore'),
+      paletteChanges: document.querySelector('#paletteChanges'),
+      gridEdits: document.querySelector('#gridEdits'),
     }
 
     let sourceImage = createSampleImage()
     let candidates = []
     let selectedCandidate = null
     let selectedSize = 'auto'
+    let selectedBaseline = 'mvp'
+    let selectedValueLevels = 3
     let showGrid = true
 
     function setStatus(text, state = 'ready') {
@@ -665,10 +696,31 @@
             maxColors: Number(elements.maxColors.value),
             maxCandidates: 5,
             styles: selectedStyles(),
+            baseline: selectedBaseline,
             backgroundRgb: [245, 245, 242],
+            structure: {
+              importanceStrength: elements.protectFeatures.checked ? 4 : 0,
+              edgeStrength: elements.protectFeatures.checked ? 1.25 : 0,
+              valueLevels: selectedValueLevels,
+            },
             optimization: elements.cleanGrid.checked
-              ? { minRegionSize: 2, isolatedPixelPenalty: 1, stripePenalty: 0.7 }
-              : { minRegionSize: 1, isolatedPixelPenalty: 0, stripePenalty: 0 },
+              ? {
+                minRegionSize: 2,
+                isolatedPixelPenalty: 1,
+                stripePenalty: 1,
+                aliasPenalty: 1,
+                paletteCoherence: 1.15,
+                localSearchIterations: 2,
+                edgeProtection: 0.8,
+              }
+              : {
+                minRegionSize: 1,
+                isolatedPixelPenalty: 0,
+                stripePenalty: 0,
+                aliasPenalty: 0,
+                paletteCoherence: 0,
+                localSearchIterations: 0,
+              },
           },
           ...(analysis === undefined ? {} : { analysis }),
         })
@@ -676,7 +728,8 @@
         selectCandidate(result.recommended.id)
         renderCandidates()
         elements.downloadButton.disabled = false
-        setStatus(`完成 · ${Math.round(result.metrics.processingTimeMs)} ms`)
+        const modeName = { mvp: '结构版', a1: '面积缩放', a0: '最近邻' }[selectedBaseline]
+        setStatus(`${modeName} · ${Math.round(result.metrics.processingTimeMs)} ms`)
       } catch (error) {
         console.error(error)
         setStatus(error instanceof Error ? error.message : '生成失败', 'error')
@@ -699,13 +752,20 @@
       return { faithful: '还原', simple: '简洁', 'high-contrast': '高对比', soft: '柔和', cute: '可爱' }[style] ?? style
     }
 
+    function baselineName(baseline) {
+      return { mvp: '结构', a1: '面积', a0: '最近邻' }[baseline] ?? baseline
+    }
+
     function renderPattern(candidate) {
       drawPattern(elements.patternCanvas, candidate.pattern, { grid: showGrid, beads: true })
-      elements.patternTitle.textContent = `${styleName(candidate.style)}方案`
+      elements.patternTitle.textContent = `${baselineName(candidate.pattern.metadata.baseline)} · ${styleName(candidate.style)}方案`
       elements.patternDetail.textContent = `${candidate.pattern.width} × ${candidate.pattern.height} · ${candidate.materialCounts.length} 色`
       elements.beadCount.textContent = candidate.pattern.metadata.totalBeads.toLocaleString('zh-CN')
       elements.uniqueColors.textContent = String(candidate.materialCounts.length)
       elements.qualityScore.textContent = String(Math.round(candidate.score.total * 100))
+      elements.featureScore.textContent = String(Math.round(candidate.metrics.featureExpressibility * 100))
+      elements.paletteChanges.textContent = String(candidate.metrics.paletteOptimizationChanges)
+      elements.gridEdits.textContent = String(candidate.edits.length - candidate.metrics.paletteOptimizationChanges)
     }
 
     function drawPattern(canvas, pattern, options = {}) {
@@ -760,12 +820,12 @@
         button.className = 'candidate'
         button.dataset.id = candidate.id
         button.setAttribute('aria-pressed', String(candidate.id === selectedCandidate?.id))
-        button.setAttribute('aria-label', `${styleName(candidate.style)} ${candidate.pattern.width}乘${candidate.pattern.height}`)
+        button.setAttribute('aria-label', `${baselineName(candidate.pattern.metadata.baseline)} ${styleName(candidate.style)} ${candidate.pattern.width}乘${candidate.pattern.height}`)
         const canvas = document.createElement('canvas')
         drawPattern(canvas, candidate.pattern, { maximum: 160 })
         const label = document.createElement('span')
         label.className = 'candidate-name'
-        label.textContent = `${styleName(candidate.style)} ${candidate.pattern.width}`
+        label.textContent = `${baselineName(candidate.pattern.metadata.baseline)} ${styleName(candidate.style)} ${candidate.pattern.width}`
         button.append(canvas, label)
         button.addEventListener('click', () => selectCandidate(candidate.id))
         elements.candidateList.append(button)
@@ -832,6 +892,27 @@
     })
     elements.maxColors.addEventListener('input', () => {
       elements.colorValue.textContent = `${elements.maxColors.value} 色`
+    })
+    elements.baselineControl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-baseline]')
+      if (button === null) return
+      selectedBaseline = button.dataset.baseline
+      elements.baselineValue.textContent = { mvp: '结构版', a1: '面积缩放', a0: '最近邻' }[selectedBaseline]
+      for (const item of elements.baselineControl.querySelectorAll('button')) {
+        item.setAttribute('aria-pressed', String(item === button))
+      }
+      for (const item of elements.valueLevelsControl.querySelectorAll('button')) {
+        item.disabled = selectedBaseline !== 'mvp'
+      }
+    })
+    elements.valueLevelsControl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-levels]')
+      if (button === null) return
+      selectedValueLevels = Number(button.dataset.levels)
+      elements.valueLevelsValue.textContent = `${selectedValueLevels} 档`
+      for (const item of elements.valueLevelsControl.querySelectorAll('button')) {
+        item.setAttribute('aria-pressed', String(item === button))
+      }
     })
     elements.fileInput.addEventListener('change', async () => {
       const file = elements.fileInput.files?.[0]

@@ -1,3 +1,4 @@
+import type { SourceGuidance } from './structure.js'
 import type { CropRect, PatternStyle, PixelImage, ResizeMethod, RGB } from './types.js'
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -78,6 +79,65 @@ function areaSample(
   ]
 }
 
+export interface SamplingGuidance {
+  source: SourceGuidance
+  importanceStrength: number
+  edgeStrength: number
+}
+
+function guidedAreaSample(
+  image: PixelImage,
+  sourceLeft: number,
+  sourceTop: number,
+  sourceRight: number,
+  sourceBottom: number,
+  backgroundRgb: RGB,
+  guidance: SamplingGuidance,
+): RGB {
+  const totals: [number, number, number] = [0, 0, 0]
+  let totalWeight = 0
+  let importanceTotal = 0
+  let sampleCount = 0
+  let peakScore = -1
+  let peakImportance = 0
+  let peakPixel: RGB | undefined
+  for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
+    const overlapY = Math.max(0, Math.min(sourceBottom, sourceY + 1) - Math.max(sourceTop, sourceY))
+    for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
+      const overlapX = Math.max(0, Math.min(sourceRight, sourceX + 1) - Math.max(sourceLeft, sourceX))
+      const overlap = overlapX * overlapY
+      const safeX = clamp(sourceX, 0, image.width - 1)
+      const safeY = clamp(sourceY, 0, image.height - 1)
+      const index = safeY * image.width + safeX
+      const importance = guidance.source.importance[index] ?? 0
+      const edge = guidance.source.edge[index] ?? 0
+      const score = importance * guidance.importanceStrength + edge * guidance.edgeStrength
+      const weight = overlap * (1 + score)
+      const pixel = pixelAt(image, sourceX, sourceY, backgroundRgb)
+      totals[0] += pixel[0] * weight
+      totals[1] += pixel[1] * weight
+      totals[2] += pixel[2] * weight
+      totalWeight += weight
+      importanceTotal += importance
+      sampleCount += 1
+      if (score > peakScore) {
+        peakScore = score
+        peakImportance = importance
+        peakPixel = pixel
+      }
+    }
+  }
+  const averageImportance = importanceTotal / Math.max(1, sampleCount)
+  if (peakPixel !== undefined && peakImportance >= 0.85 && peakImportance - averageImportance >= 0.25) {
+    return peakPixel
+  }
+  return [
+    Math.round(totals[0]! / totalWeight),
+    Math.round(totals[1]! / totalWeight),
+    Math.round(totals[2]! / totalWeight),
+  ]
+}
+
 export interface CanvasFit {
   x: number
   y: number
@@ -137,6 +197,7 @@ export function resizePixels(
   height: number,
   method: ResizeMethod,
   backgroundRgb: RGB = [255, 255, 255],
+  guidance?: SamplingGuidance,
 ): ResizedPixels {
   const pixels: RGB[] = []
   const activeMask = new Uint8Array(width * height)
@@ -169,14 +230,21 @@ export function resizePixels(
           backgroundRgb,
         ))
       } else {
-        pixels.push(areaSample(
-          image,
-          clamp(crop.x + localX * scaleX, crop.x, crop.x + crop.width),
-          clamp(crop.y + localY * scaleY, crop.y, crop.y + crop.height),
-          clamp(crop.x + (localX + 1) * scaleX, crop.x, crop.x + crop.width),
-          clamp(crop.y + (localY + 1) * scaleY, crop.y, crop.y + crop.height),
-          backgroundRgb,
-        ))
+        const sourceLeft = clamp(crop.x + localX * scaleX, crop.x, crop.x + crop.width)
+        const sourceTop = clamp(crop.y + localY * scaleY, crop.y, crop.y + crop.height)
+        const sourceRight = clamp(crop.x + (localX + 1) * scaleX, crop.x, crop.x + crop.width)
+        const sourceBottom = clamp(crop.y + (localY + 1) * scaleY, crop.y, crop.y + crop.height)
+        pixels.push(guidance === undefined
+          ? areaSample(image, sourceLeft, sourceTop, sourceRight, sourceBottom, backgroundRgb)
+          : guidedAreaSample(
+            image,
+            sourceLeft,
+            sourceTop,
+            sourceRight,
+            sourceBottom,
+            backgroundRgb,
+            guidance,
+          ))
       }
     }
   }

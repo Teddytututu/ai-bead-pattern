@@ -43,6 +43,15 @@ export interface OptimizationOptions {
   isolatedPixelPenalty?: number
   edgeProtection?: number
   stripePenalty?: number
+  paletteCoherence?: number
+  localSearchIterations?: number
+  aliasPenalty?: number
+}
+
+export interface StructureOptions {
+  importanceStrength?: number
+  edgeStrength?: number
+  valueLevels?: 2 | 3 | 4
 }
 
 export interface PatternOptions {
@@ -59,6 +68,7 @@ export interface PatternOptions {
   baseline?: BaselineMode
   backgroundRgb?: RGB
   aiEnhancement?: boolean
+  structure?: StructureOptions
   optimization?: OptimizationOptions
   beadDiameterMm?: number
 }
@@ -165,7 +175,7 @@ export interface GridEditRecord {
   y: number
   fromColorId: string
   toColorId: string
-  reason: 'small-region' | 'isolated-cell' | 'stripe' | 'topology'
+  reason: 'small-region' | 'isolated-cell' | 'stripe' | 'topology' | 'palette-coherence'
 }
 
 export interface GenerationMetrics {
@@ -176,6 +186,9 @@ export interface GenerationMetrics {
   meanColorDistance: number
   isolatedCells: number
   thinStripes: number
+  featureExpressibility: number
+  paletteOptimizationChanges: number
+  topologyEdits: number
 }
 
 export interface CandidateScore {
@@ -218,4 +231,35 @@ export interface PatternGenerationResult {
   recommended: PatternCandidate
   alternatives: readonly PatternCandidate[]
   evaluation: CandidateEvaluation
+}
+
+export interface PatternAdaptationRequest {
+  pattern: BeadPattern
+  palette: MaterialPalette
+  /** Actual colors in cells that have already been fabricated. */
+  fixedCells: readonly PatternCell[]
+  /** Values above 0.5 mark cells that may be replanned. */
+  editableMask?: BinaryMask
+  maxChangedCells?: number
+  coherence?: number
+}
+
+export interface PatternAdaptationChange {
+  x: number
+  y: number
+  fromColorId: string
+  toColorId: string
+}
+
+export interface MaterialDelta {
+  colorId: string
+  delta: number
+}
+
+export interface PatternAdaptationResult {
+  pattern: BeadPattern
+  changes: readonly PatternAdaptationChange[]
+  fixedCellsPreserved: number
+  visualDeviation: number
+  materialDelta: readonly MaterialDelta[]
 }

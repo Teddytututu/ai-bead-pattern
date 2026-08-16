@@ -300,6 +300,20 @@ describe('deterministic pattern algorithm', () => {
     }), /Landmark/)
   })
 
+  it('rejects non-finite importance weights from analysis adapters', async () => {
+    const algorithm = createPatternAlgorithm()
+    const source = image(1, 1, [[255, 0, 0]])
+
+    await assert.rejects(() => algorithm.generate({
+      image: source,
+      palette,
+      options: { width: 1, height: 1, maxColors: 2 },
+      analysis: {
+        importanceMap: { width: 1, height: 1, weights: new Float32Array([Number.NaN]) },
+      },
+    }), /Importance map values/)
+  })
+
   it('rejects palette channels outside the sRGB byte range', async () => {
     const algorithm = createPatternAlgorithm()
     const source = image(1, 1, [[255, 0, 0]])
@@ -316,5 +330,115 @@ describe('deterministic pattern algorithm', () => {
       palette: invalidPalette,
       options: { width: 1, height: 1, maxColors: 1 },
     }), /sRGB/)
+  })
+
+  it('uses importance-guided sampling to preserve a tiny hard feature', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const red = [255, 0, 0] as const
+    const blue = [0, 0, 255] as const
+    const source = image(4, 4, [
+      red, red, red, red,
+      red, blue, red, red,
+      red, red, red, red,
+      red, red, red, red,
+    ])
+    const importance = new Float32Array(16)
+    importance[5] = 1
+    const analysis = {
+      importanceMap: { width: 4, height: 4, weights: importance },
+      landmarks: [
+        { id: 'eye', kind: 'eye' as const, x: 1, y: 1, confidence: 1, priority: 'hard' as const, radius: 0 },
+      ],
+    }
+    const baseOptions = {
+      canvas: { mode: 'fixed' as const, size: { width: 2, height: 2 } },
+      maxColors: 2,
+      styles: ['faithful'] as const,
+      optimization: { minRegionSize: 1 },
+    }
+
+    const area = await algorithm.generate({ image: source, palette, analysis, options: { ...baseOptions, baseline: 'a1' } })
+    const structural = await algorithm.generate({ image: source, palette, analysis, options: { ...baseOptions, baseline: 'mvp' } })
+
+    assert.equal(area.pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'red')
+    assert.equal(structural.pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'blue')
+  })
+
+  it('reduces a semantic gradient to a controlled three-level value design', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const grayscalePalette: MaterialPalette = {
+      id: 'gray',
+      name: 'Gray',
+      colors: [20, 70, 120, 180, 240].map((value) => ({
+        id: `gray-${value}`,
+        name: `Gray ${value}`,
+        hex: `#${value.toString(16).padStart(2, '0').repeat(3)}`,
+        rgb: [value, value, value] as const,
+      })),
+    }
+    const source = image(5, 1, [[20, 20, 20], [70, 70, 70], [120, 120, 120], [180, 180, 180], [240, 240, 240]])
+
+    const result = await algorithm.generate({
+      image: source,
+      palette: grayscalePalette,
+      analysis: {
+        semanticRegions: [{
+          id: 'face',
+          label: 'face',
+          confidence: 1,
+          mask: { width: 5, height: 1, values: new Float32Array([1, 1, 1, 1, 1]) },
+        }],
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 5, height: 1 } },
+        maxColors: 5,
+        styles: ['faithful'],
+        structure: { valueLevels: 3 },
+        optimization: { minRegionSize: 1 },
+      },
+    })
+
+    assert.ok(result.metrics.uniqueColors >= 2)
+    assert.ok(result.metrics.uniqueColors <= 3)
+  })
+
+  it('scores canvas candidates by landmark expressibility', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const source = image(8, 2, Array.from({ length: 16 }, () => [255, 0, 0] as const))
+    const result = await algorithm.generate({
+      image: source,
+      palette,
+      analysis: {
+        landmarks: [
+          { id: 'left-eye', kind: 'eye', x: 2.1, y: 0.5, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+          { id: 'right-eye', kind: 'eye', x: 3.9, y: 0.5, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+        ],
+      },
+      options: {
+        canvas: { mode: 'auto', candidates: [{ width: 2, height: 2 }, { width: 8, height: 8 }] },
+        maxColors: 2,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        optimization: { minRegionSize: 1 },
+      },
+    })
+
+    assert.equal(result.recommended.pattern.width, 8)
+    assert.ok(result.recommended.metrics.featureExpressibility > result.alternatives[0]!.metrics.featureExpressibility)
+  })
+
+  it('uses neighborhood-aware palette optimization to absorb a weak isolated color', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const red = [255, 0, 0] as const
+    const purple = [120, 0, 135] as const
+    const source = image(3, 3, [red, red, red, red, purple, red, red, red, red])
+
+    const result = await algorithm.generate(fixedRequest(source, {
+      maxColors: 2,
+      optimization: { minRegionSize: 1, paletteCoherence: 3, localSearchIterations: 3 },
+    }))
+
+    assert.equal(result.pattern.cells[4]?.colorId, 'red')
+    assert.ok(result.metrics.paletteOptimizationChanges >= 1)
   })
 })

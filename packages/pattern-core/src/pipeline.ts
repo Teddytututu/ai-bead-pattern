@@ -5,6 +5,7 @@ import {
   rgbToLab,
   type PreparedColor,
 } from './color.js'
+import { adaptPattern } from './adaptation.js'
 import {
   countIsolatedCells,
   countThinStripes,
@@ -18,6 +19,8 @@ import {
   sourcePointForGridCell,
   type CanvasFit,
 } from './image.js'
+import { optimizePaletteAssignments } from './palette-optimization.js'
+import { buildSourceGuidance, designRegionValues, type SourceGuidance } from './structure.js'
 import type {
   BaselineMode,
   CandidateEvaluation,
@@ -35,6 +38,8 @@ import type {
   PatternMetadata,
   PatternOptions,
   PatternStyle,
+  PatternAdaptationRequest,
+  PatternAdaptationResult,
   ResizeMethod,
   RGB,
 } from './types.js'
@@ -48,6 +53,7 @@ interface CandidateContext {
   resizeMethod: ResizeMethod
   distanceMethod: ColorDistanceMethod
   preparedPalette: readonly PreparedColor[]
+  sourceGuidance: SourceGuidance
 }
 
 interface AssignedGrid {
@@ -80,13 +86,19 @@ function validateRgb(rgb: RGB, label: string): void {
 function validateMask(
   width: number,
   height: number,
-  valuesLength: number,
+  values: ArrayLike<number>,
   imageWidth: number,
   imageHeight: number,
   label: string,
 ): void {
-  if (width !== imageWidth || height !== imageHeight || valuesLength !== width * height) {
+  if (width !== imageWidth || height !== imageHeight || values.length !== width * height) {
     throw new RangeError(`${label} must align with the source image`)
+  }
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index]
+    if (value === undefined || Number.isFinite(value) === false || value < 0 || value > 1) {
+      throw new RangeError(`${label} values must stay within 0..1`)
+    }
   }
 }
 
@@ -124,7 +136,7 @@ function validateRequest(request: PatternGenerationRequest): void {
     validateMask(
       analysis.subjectMask.width,
       analysis.subjectMask.height,
-      analysis.subjectMask.values.length,
+      analysis.subjectMask.values,
       request.image.width,
       request.image.height,
       'Subject mask',
@@ -134,7 +146,7 @@ function validateRequest(request: PatternGenerationRequest): void {
     validateMask(
       analysis.importanceMap.width,
       analysis.importanceMap.height,
-      analysis.importanceMap.weights.length,
+      analysis.importanceMap.weights,
       request.image.width,
       request.image.height,
       'Importance map',
@@ -144,7 +156,7 @@ function validateRequest(request: PatternGenerationRequest): void {
     validateMask(
       region.mask.width,
       region.mask.height,
-      region.mask.values.length,
+      region.mask.values,
       request.image.width,
       request.image.height,
       `Semantic region ${region.id}`,
@@ -235,6 +247,7 @@ function styleColorLimit(style: PatternStyle, maximum: number): number {
 
 function buildImportanceWeights(
   analysis: ImageAnalysis | undefined,
+  sourceGuidance: SourceGuidance,
   crop: CropRect,
   width: number,
   height: number,
@@ -242,32 +255,18 @@ function buildImportanceWeights(
   activeMask: Uint8Array,
 ): readonly number[] {
   const weights: number[] = Array.from(activeMask, (active) => active === 1 ? 1 : 0)
-  const importance = analysis?.importanceMap
-  if (importance !== undefined
-    && importance.weights.length === importance.width * importance.height
-    && importance.width > 0
-    && importance.height > 0) {
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const index = y * width + x
-        const sourcePoint = sourcePointForGridCell(crop, fit, x, y)
-        if (sourcePoint === undefined) continue
-        const sourceX = clamp(
-          Math.round(sourcePoint[0]),
-          0,
-          importance.width - 1,
-        )
-        const sourceY = clamp(
-          Math.round(sourcePoint[1]),
-          0,
-          importance.height - 1,
-        )
-        weights[index] = 0.5 + 1.5 * clamp(
-          importance.weights[sourceY * importance.width + sourceX] ?? 0,
-          0,
-          1,
-        )
-      }
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x
+      const sourcePoint = sourcePointForGridCell(crop, fit, x, y)
+      if (sourcePoint === undefined) continue
+      const sourceX = clamp(Math.round(sourcePoint[0]), 0, sourceGuidance.width - 1)
+      const sourceY = clamp(Math.round(sourcePoint[1]), 0, sourceGuidance.height - 1)
+      weights[index] = 0.75 + 1.25 * clamp(
+        sourceGuidance.importance[sourceY * sourceGuidance.width + sourceX] ?? 0,
+        0,
+        1,
+      )
     }
   }
   for (const landmark of analysis?.landmarks ?? []) {
@@ -290,6 +289,38 @@ function buildImportanceWeights(
     }
   }
   return weights
+}
+
+function gridRegionIds(
+  analysis: ImageAnalysis | undefined,
+  crop: CropRect,
+  width: number,
+  height: number,
+  fit: CanvasFit,
+  activeMask: Uint8Array,
+): readonly (string | undefined)[] {
+  const ids: Array<string | undefined> = new Array(width * height)
+  const regions = analysis?.semanticRegions ?? []
+  if (regions.length === 0) return ids
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x
+      if (activeMask[index] !== 1) continue
+      const sourcePoint = sourcePointForGridCell(crop, fit, x, y)
+      if (sourcePoint === undefined) continue
+      const sourceX = clamp(Math.round(sourcePoint[0]), 0, regions[0]!.mask.width - 1)
+      const sourceY = clamp(Math.round(sourcePoint[1]), 0, regions[0]!.mask.height - 1)
+      let bestScore = 0.4
+      for (const region of regions) {
+        const score = (region.mask.values[sourceY * region.mask.width + sourceX] ?? 0) * region.confidence
+        if (score > bestScore) {
+          bestScore = score
+          ids[index] = region.id
+        }
+      }
+    }
+  }
+  return ids
 }
 
 function protectedCells(
@@ -438,19 +469,52 @@ function boundaryAgreement(
   return comparisons === 0 ? 1 : agreements / comparisons
 }
 
+function featureExpressibility(
+  analysis: ImageAnalysis | undefined,
+  crop: CropRect,
+  width: number,
+  fit: CanvasFit,
+): number {
+  const landmarks = (analysis?.landmarks ?? []).filter((landmark) =>
+    landmark.confidence > 0
+      && landmark.x >= crop.x && landmark.y >= crop.y
+      && landmark.x < crop.x + crop.width && landmark.y < crop.y + crop.height,
+  )
+  if (landmarks.length === 0) return 0.85
+  const mapped = landmarks.map((landmark) => {
+    const [x, y] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
+    return { landmark, x, y, cell: y * width + x }
+  })
+  const uniqueRatio = new Set(mapped.map((entry) => entry.cell)).size / mapped.length
+  const symmetryGroups = new Map<string, typeof mapped>()
+  for (const entry of mapped) {
+    if (entry.landmark.symmetryGroup === undefined) continue
+    const group = symmetryGroups.get(entry.landmark.symmetryGroup) ?? []
+    group.push(entry)
+    symmetryGroups.set(entry.landmark.symmetryGroup, group)
+  }
+  let groupScore = uniqueRatio
+  if (symmetryGroups.size > 0) {
+    groupScore = [...symmetryGroups.values()].reduce((sum, group) =>
+      sum + new Set(group.map((entry) => entry.cell)).size / group.length,
+    0) / symmetryGroups.size
+  }
+  return clamp(uniqueRatio * 0.65 + groupScore * 0.35, 0, 1)
+}
+
 function scoreCandidate(
   style: PatternStyle,
   totalCells: number,
   maxColors: number,
   meanColorDistance: number,
   structure: number,
-  hardFeatureCount: number,
+  featureExpressibilityScore: number,
   isolatedCells: number,
   thinStripes: number,
   uniqueColors: number,
 ): CandidateScore {
   const colorFidelity = 1 / (1 + meanColorDistance / 15)
-  const featureProtection = hardFeatureCount > 0 ? 1 : 0.85
+  const featureProtection = featureExpressibilityScore
   const cleanliness = clamp(1 - (isolatedCells * 2 + thinStripes) / Math.max(1, totalCells), 0, 1)
   const craftEase = clamp(
     1 - uniqueColors / Math.max(1, maxColors) * 0.25 - isolatedCells / Math.max(1, totalCells),
@@ -514,6 +578,7 @@ function generateCandidate(
 ): PatternCandidate {
   const startedAt = performance.now()
   const { request, crop, size, style, baseline, resizeMethod, distanceMethod } = context
+  const structureOptions = request.options.structure ?? {}
   const resized = resizePixels(
     request.image,
     crop,
@@ -521,17 +586,34 @@ function generateCandidate(
     size.height,
     resizeMethod,
     request.options.backgroundRgb,
+    baseline === 'mvp' ? {
+      source: context.sourceGuidance,
+      importanceStrength: Math.max(0, structureOptions.importanceStrength ?? 4),
+      edgeStrength: Math.max(0, structureOptions.edgeStrength ?? 1.25),
+    } : undefined,
   )
-  const pixels = resized.pixels.map((pixel) => applyStyle(pixel, style))
-  const pixelLabs = pixels.map(rgbToLab)
   const weights = buildImportanceWeights(
     request.analysis,
+    context.sourceGuidance,
     crop,
     size.width,
     size.height,
     resized.fit,
     resized.activeMask,
   )
+  const styledPixels = resized.pixels.map((pixel) => applyStyle(pixel, style))
+  const valueLevels = structureOptions.valueLevels
+    ?? (style === 'simple' ? 2 : 3)
+  const pixels = baseline === 'mvp'
+    ? designRegionValues(
+      styledPixels,
+      resized.activeMask,
+      valueLevels,
+      weights,
+      gridRegionIds(request.analysis, crop, size.width, size.height, resized.fit, resized.activeMask),
+    )
+    : styledPixels
+  const pixelLabs = pixels.map(rgbToLab)
   const maximumColors = styleColorLimit(
     style,
     Math.min(request.options.maxColors, context.preparedPalette.length),
@@ -545,14 +627,48 @@ function generateCandidate(
   )
   const assigned = assignGrid(pixels, pixelLabs, selectedPalette, baseline, distanceMethod)
   const protectedSet = protectedCells(request.analysis, crop, size.width, resized.fit)
+  const paletteOptimization = baseline === 'mvp'
+    ? optimizePaletteAssignments({
+      pixelLabs,
+      initialColorIds: assigned.colorIds,
+      colors: selectedPalette,
+      width: size.width,
+      height: size.height,
+      activeMask: resized.activeMask,
+      importance: weights,
+      protectedCells: protectedSet,
+      coherence: Math.max(0, request.options.optimization?.paletteCoherence ?? 1.15),
+      edgeProtection: clamp(request.options.optimization?.edgeProtection ?? 0.8, 0, 1),
+      iterations: Math.max(0, Math.floor(request.options.optimization?.localSearchIterations ?? 2)),
+      distanceMethod,
+    })
+    : { colorIds: assigned.colorIds, changedCells: 0 }
+  const paletteEdits = paletteOptimization.colorIds.flatMap((colorId, index) => {
+    const fromColorId = assigned.colorIds[index]
+    if (resized.activeMask[index] !== 1 || fromColorId === undefined || fromColorId === colorId) return []
+    return [{
+      x: index % size.width,
+      y: Math.floor(index / size.width),
+      fromColorId,
+      toColorId: colorId,
+      reason: 'palette-coherence' as const,
+    }]
+  })
+  const optimizationOptions = baseline === 'mvp'
+    ? {
+      ...request.options.optimization,
+      stripePenalty: request.options.optimization?.stripePenalty ?? 1,
+      aliasPenalty: request.options.optimization?.aliasPenalty ?? 1,
+    }
+    : request.options.optimization
   const optimization = baseline === 'a0'
-    ? { colorIds: assigned.colorIds, edits: [], removedSmallRegions: 0 }
+    ? { colorIds: assigned.colorIds, edits: [], removedSmallRegions: 0, topologyEdits: 0 }
     : optimizeGrid(
-      assigned.colorIds,
+      paletteOptimization.colorIds,
       size.width,
       size.height,
       protectedSet,
-      request.options.optimization,
+      optimizationOptions,
       resized.activeMask,
     )
   const counts = materialCounts(optimization.colorIds, selectedPalette, resized.activeMask)
@@ -593,13 +709,14 @@ function generateCandidate(
     resized.activeMask,
   )
   const totalBeads = cells.length
+  const expressibility = featureExpressibility(request.analysis, crop, size.width, resized.fit)
   const score = scoreCandidate(
     style,
     totalBeads,
     request.options.maxColors,
     meanColorDistance,
     structure,
-    protectedSet.size,
+    expressibility,
     isolatedCells,
     thinStripes,
     counts.length,
@@ -623,9 +740,12 @@ function generateCandidate(
       meanColorDistance,
       isolatedCells,
       thinStripes,
+      featureExpressibility: expressibility,
+      paletteOptimizationChanges: paletteOptimization.changedCells,
+      topologyEdits: optimization.topologyEdits,
     },
     score,
-    edits: optimization.edits,
+    edits: [...paletteEdits, ...optimization.edits],
   }
 }
 
@@ -641,7 +761,7 @@ export class DeterministicPatternAlgorithm {
   readonly #clock: () => number
 
   constructor(config: { version?: string; clock?: () => number }) {
-    this.version = config.version ?? '0.1.0-mvp'
+    this.version = config.version ?? '0.2.0-structure'
     this.#clock = config.clock ?? Date.now
   }
 
@@ -652,6 +772,11 @@ export class DeterministicPatternAlgorithm {
     const styles = resolveStyles(request.options, baseline)
     const crop = normalizeCrop(request.image, request.analysis?.suggestedCrop)
     const preparedPalette = prepareColors(request.palette.colors)
+    const sourceGuidance = buildSourceGuidance(
+      request.image,
+      request.analysis,
+      request.options.backgroundRgb,
+    )
     const resizeMethod = resolveResizeMethod(request.options, baseline)
     const distanceMethod = resolveDistanceMethod(request.options, baseline)
     const candidates: PatternCandidate[] = []
@@ -666,6 +791,7 @@ export class DeterministicPatternAlgorithm {
           resizeMethod,
           distanceMethod,
           preparedPalette,
+          sourceGuidance,
         }, this.version, this.#clock))
       }
     }
@@ -681,5 +807,9 @@ export class DeterministicPatternAlgorithm {
       alternatives: ranked.slice(1),
       evaluation: evaluateCandidates(ranked),
     }
+  }
+
+  async adapt(request: PatternAdaptationRequest): Promise<PatternAdaptationResult> {
+    return adaptPattern(request, this.version, this.#clock())
   }
 }
