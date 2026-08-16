@@ -2,7 +2,8 @@ import { performance } from 'node:perf_hooks'
 
 import { createPatternAlgorithm } from '../dist/index.js'
 
-const size = 64
+const maximumLoad = process.argv.includes('--max')
+const size = maximumLoad ? 2000 : 64
 const data = new Uint8ClampedArray(size * size * 4)
 for (let y = 0; y < size; y += 1) {
   for (let x = 0; x < size; x += 1) {
@@ -14,11 +15,12 @@ for (let y = 0; y < size; y += 1) {
   }
 }
 
+const paletteSize = maximumLoad ? 128 : 24
 const palette = {
-  id: 'benchmark-24',
-  name: 'Benchmark 24',
-  colors: Array.from({ length: 24 }, (_, index) => {
-    const rgb = [index % 4 * 85, Math.floor(index / 4) % 3 * 127, Math.floor(index / 12) * 255]
+  id: `benchmark-${paletteSize}`,
+  name: `Benchmark ${paletteSize}`,
+  colors: Array.from({ length: paletteSize }, (_, index) => {
+    const rgb = [index * 53 % 256, index * 97 % 256, index * 193 % 256]
     return {
       id: `c-${index}`,
       name: `Color ${index}`,
@@ -34,17 +36,30 @@ const result = await createPatternAlgorithm().generate({
   image: { width: size, height: size, data },
   palette,
   options: {
-    canvas: { mode: 'fixed', size: { width: size, height: size } },
-    maxColors: 24,
-    maxCandidates: 1,
-    styles: ['faithful'],
-    optimization: { localSearchIterations: 1 },
+    canvas: maximumLoad
+      ? {
+        mode: 'auto',
+        candidates: [48, 64, 80, 96].map((side) => ({ width: side, height: side })),
+      }
+      : { mode: 'fixed', size: { width: size, height: size } },
+    maxColors: maximumLoad ? 48 : 24,
+    maxCandidates: maximumLoad ? 20 : 1,
+    styles: maximumLoad
+      ? ['faithful', 'cute', 'simple', 'high-contrast', 'soft']
+      : ['faithful'],
+    optimization: { localSearchIterations: maximumLoad ? 2 : 1 },
   },
 })
 
+const primary = result.recommended ?? result.bestEffort
+if (primary === undefined) throw new Error('Benchmark produced no candidate')
+
 console.log(JSON.stringify({
+  mode: maximumLoad ? 'maximum' : 'representative',
+  status: result.status,
   elapsedMs: Math.round(performance.now() - startedAt),
   rssGrowthMiB: Math.round(Math.max(0, process.memoryUsage().rss - beforeRss) / 1024 / 1024),
-  beads: result.pattern.metadata.totalBeads,
-  colors: result.metrics.uniqueColors,
+  candidates: result.evaluation.rankedCandidateIds.length,
+  beads: primary.pattern.metadata.totalBeads,
+  colors: primary.metrics.uniqueColors,
 }, null, 2))

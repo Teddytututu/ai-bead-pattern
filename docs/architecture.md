@@ -6,13 +6,13 @@
 WeChat Mini App
       |
       v
-Pattern Core <---- Material Palettes
+AI Gateway
       |
       v
-AI Gateway
+Pattern Core <---- Material Palettes
 ```
 
-`pattern-core` 保持平台无关，微信小程序负责界面和平台适配，AI Gateway 负责外部视觉能力接入。
+`pattern-core` 保持平台无关，微信小程序负责界面和平台适配，AI Gateway 负责外部视觉能力接入。当前 gateway 通过 rembg HTTP 服务调用 BiRefNet，并把主体掩码、边界重要度、建议裁剪和模型版本写入 `ImageAnalysis`。
 
 ## Pattern Core 0.2
 

@@ -41,10 +41,15 @@ const result = await createPatternAlgorithm().generate({
   }
 })
 
+const primary = result.recommended ?? result.bestEffort
+if (primary === undefined) throw new Error('Generation produced no candidate')
+
 console.log(JSON.stringify({
-  recommended: result.recommended.id,
-  size: [result.pattern.width, result.pattern.height],
-  colors: result.materialCounts,
+  status: result.status,
+  recommended: result.recommended?.id,
+  bestEffort: result.bestEffort?.id,
+  size: [primary.pattern.width, primary.pattern.height],
+  colors: primary.materialCounts,
   alternatives: result.alternatives.map((candidate) => candidate.id),
-  score: result.recommended.score
+  score: primary.score
 }, null, 2))

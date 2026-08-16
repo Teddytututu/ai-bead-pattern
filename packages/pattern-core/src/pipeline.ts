@@ -34,6 +34,8 @@ import type {
   CropRect,
   GridSize,
   ImageAnalysis,
+  ImageLandmark,
+  LandmarkKind,
   Lab,
   MaterialCount,
   PatternCandidate,
@@ -88,12 +90,79 @@ function stableSerialize(value: unknown): string {
 }
 
 function stableHash(value: string): string {
-  let hash = 0x811c9dc5
+  let first = 0x811c9dc5
+  let second = 0x9e3779b9
   for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
+    const code = value.charCodeAt(index)
+    first ^= code
+    first = Math.imul(first, 0x01000193)
+    second ^= code + index
+    second = Math.imul(second, 0x85ebca6b)
   }
-  return (hash >>> 0).toString(36).padStart(7, '0')
+  return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`
+}
+
+async function sha256Hex(data: ArrayBufferView): Promise<string> {
+  const bytes = new Uint8Array(data.byteLength)
+  bytes.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength))
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes.buffer)
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+async function sha256Text(value: string): Promise<string> {
+  return sha256Hex(new TextEncoder().encode(value))
+}
+
+async function arrayFingerprint(values: ArrayLike<number> | undefined): Promise<string | undefined> {
+  if (values === undefined) return undefined
+  const normalized = new Float64Array(values.length)
+  for (let index = 0; index < values.length; index += 1) normalized[index] = values[index] ?? 0
+  return sha256Hex(normalized)
+}
+
+async function generationFingerprint(
+  request: PatternGenerationRequest,
+  version: string,
+): Promise<string> {
+  const sourceBytes = new Uint8Array(
+    request.image.data.buffer,
+    request.image.data.byteOffset,
+    request.image.data.byteLength,
+  )
+  const analysis = request.analysis
+  const semanticRegions = await Promise.all((analysis?.semanticRegions ?? []).map(async (region) => ({
+    id: region.id,
+    label: region.label,
+    confidence: region.confidence,
+    importance: region.importance,
+    mask: await arrayFingerprint(region.mask.values),
+  })))
+  const identity = {
+    engine: 'baseline',
+    version,
+    source: {
+      width: request.image.width,
+      height: request.image.height,
+      hash: await sha256Hex(sourceBytes),
+    },
+    palette: request.palette,
+    analysis: analysis === undefined ? undefined : {
+      confidence: analysis.confidence,
+      imageType: analysis.imageType,
+      modelVersions: analysis.modelVersions,
+      suggestedCrop: analysis.suggestedCrop,
+      suggestedCropConfidence: analysis.suggestedCropConfidence,
+      suggestedCropSource: analysis.suggestedCropSource,
+      subjectMask: await arrayFingerprint(analysis.subjectMask?.values),
+      importanceMap: await arrayFingerprint(analysis.importanceMap?.weights),
+      semanticRegions,
+      landmarks: analysis.landmarks,
+    },
+    options: request.options,
+  }
+  return (await sha256Text(stableSerialize(identity))).slice(0, 32)
 }
 
 function validatePositiveInteger(value: number, label: string): void {
@@ -105,6 +174,18 @@ function validatePositiveInteger(value: number, label: string): void {
 function validateRgb(rgb: RGB, label: string): void {
   if (rgb.some((channel) => Number.isFinite(channel) === false || channel < 0 || channel > 255)) {
     throw new RangeError(`${label} must contain sRGB byte values`)
+  }
+}
+
+function validateEnum(value: string | undefined, allowed: ReadonlySet<string>, label: string): void {
+  if (value !== undefined && allowed.has(value) === false) {
+    throw new RangeError(`${label} has an unsupported value`)
+  }
+}
+
+function validateUnitInterval(value: number | undefined, label: string): void {
+  if (value !== undefined && (Number.isFinite(value) === false || value < 0 || value > 1)) {
+    throw new RangeError(`${label} must stay within 0..1`)
   }
 }
 
@@ -128,6 +209,26 @@ function validateMask(
 }
 
 function validateRequest(request: PatternGenerationRequest): void {
+  validateEnum(request.options.baseline, new Set(['a0', 'a1', 'mvp']), 'baseline')
+  validateEnum(request.options.resizeMethod, new Set(['area', 'bilinear', 'nearest']), 'resizeMethod')
+  validateEnum(
+    request.options.colorDistanceMethod,
+    new Set(['delta-e-76', 'delta-e-2000']),
+    'colorDistanceMethod',
+  )
+  validateEnum(request.options.imageType, new Set(['portrait', 'pet', 'illustration', 'landscape', 'general']), 'imageType')
+  for (const style of request.options.styles ?? []) {
+    validateEnum(style, new Set(['faithful', 'cute', 'simple', 'high-contrast', 'soft']), 'style')
+  }
+  if (request.options.structure?.valueLevels !== undefined
+    && [2, 3, 4].includes(request.options.structure.valueLevels) === false) {
+    throw new RangeError('valueLevels must be 2, 3, or 4')
+  }
+  if (request.options.beadDiameterMm !== undefined
+    && (Number.isFinite(request.options.beadDiameterMm) === false
+      || request.options.beadDiameterMm <= 0)) {
+    throw new RangeError('beadDiameterMm must be a finite positive number')
+  }
   validatePositiveInteger(request.image.width, 'Image width')
   validatePositiveInteger(request.image.height, 'Image height')
   if (request.image.data.length !== request.image.width * request.image.height * 4) {
@@ -178,7 +279,14 @@ function validateRequest(request: PatternGenerationRequest): void {
       'Importance map',
     )
   }
+  const semanticRegionIds = new Set<string>()
   for (const region of analysis?.semanticRegions ?? []) {
+    if (region.id.trim().length === 0 || semanticRegionIds.has(region.id)) {
+      throw new RangeError('Semantic region ids must be unique and non-empty')
+    }
+    semanticRegionIds.add(region.id)
+    validateUnitInterval(region.confidence, `Semantic region ${region.id} confidence`)
+    validateUnitInterval(region.importance, `Semantic region ${region.id} importance`)
     validateMask(
       region.mask.width,
       region.mask.height,
@@ -188,7 +296,23 @@ function validateRequest(request: PatternGenerationRequest): void {
       `Semantic region ${region.id}`,
     )
   }
+  const landmarkIds = new Set<string>()
   for (const landmark of analysis?.landmarks ?? []) {
+    if (landmark.id.trim().length === 0 || landmarkIds.has(landmark.id)) {
+      throw new RangeError('Landmark ids must be unique and non-empty')
+    }
+    landmarkIds.add(landmark.id)
+    validateEnum(
+      landmark.kind,
+      new Set(['eye', 'mouth', 'nose', 'ear', 'face-contour', 'body', 'identity-mark', 'custom']),
+      `Landmark ${landmark.id} kind`,
+    )
+    validateEnum(landmark.priority, new Set(['hard', 'soft']), `Landmark ${landmark.id} priority`)
+    for (const regionId of [landmark.featureRegionId, landmark.carrierRegionId]) {
+      if (regionId !== undefined && semanticRegionIds.has(regionId) === false) {
+        throw new RangeError(`Landmark ${landmark.id} references an unknown semantic region`)
+      }
+    }
     if ([landmark.x, landmark.y, landmark.confidence, landmark.radius ?? 0,
       landmark.sourceRadiusPx ?? 0, landmark.gridRadiusCells ?? 0]
       .some((value) => Number.isFinite(value) === false)) {
@@ -207,10 +331,11 @@ function validateRequest(request: PatternGenerationRequest): void {
       throw new RangeError(`Landmark ${landmark.id} radius exceeds the processing limit`)
     }
   }
-  if (analysis?.confidence !== undefined
-    && (Number.isFinite(analysis.confidence) === false
-      || analysis.confidence < 0 || analysis.confidence > 1)) {
-    throw new RangeError('Analysis confidence must stay within 0..1')
+  validateUnitInterval(analysis?.confidence, 'Analysis confidence')
+  for (const [name, modelVersion] of Object.entries(analysis?.modelVersions ?? {})) {
+    if (name.trim().length === 0 || typeof modelVersion !== 'string' || modelVersion.trim().length === 0) {
+      throw new RangeError('Analysis model versions require non-empty names and versions')
+    }
   }
   if (analysis?.suggestedCrop !== undefined
     && [analysis.suggestedCrop.x, analysis.suggestedCrop.y,
@@ -231,6 +356,10 @@ function validateRequest(request: PatternGenerationRequest): void {
     && (Number.isFinite(analysis.suggestedCropConfidence) === false
       || analysis.suggestedCropConfidence < 0 || analysis.suggestedCropConfidence > 1)) {
     throw new RangeError('Suggested crop confidence must stay within 0..1')
+  }
+  if (analysis?.suggestedCropSource === 'automatic'
+    && analysis.suggestedCropConfidence === undefined) {
+    throw new RangeError('Automatic crop confidence is required')
   }
   validatePositiveInteger(request.options.maxColors, 'maxColors')
   if (request.options.maxColors > maxSelectedColors) {
@@ -280,7 +409,7 @@ function resolvedCrop(request: PatternGenerationRequest): CropRect | undefined {
     || analysis.suggestedCropConfidence !== undefined
     || analysis.confidence !== undefined
   if (hasAutomaticMetadata === false) return crop
-  const confidence = (analysis.suggestedCropConfidence ?? 1) * (analysis.confidence ?? 1)
+  const confidence = (analysis.suggestedCropConfidence ?? 0) * (analysis.confidence ?? 1)
   return confidence >= 0.5 ? crop : undefined
 }
 
@@ -579,6 +708,67 @@ function boundaryAgreement(
   return comparisons === 0 ? 1 : agreements / comparisons
 }
 
+interface ReferenceMetrics {
+  meanColorDistance: number
+  boundaryAgreement: number
+}
+
+function referenceMetrics(
+  request: PatternGenerationRequest,
+  crop: CropRect,
+  fit: CanvasFit,
+  width: number,
+  height: number,
+  colorIds: readonly string[],
+  palette: readonly PreparedColor[],
+  activeMask: Uint8Array,
+): ReferenceMetrics {
+  const referenceSize = 96
+  const source = resizePixels(
+    request.image,
+    crop,
+    referenceSize,
+    referenceSize,
+    crop.width <= referenceSize && crop.height <= referenceSize ? 'nearest' : 'area',
+    request.options.backgroundRgb,
+  )
+  const colorsById = new Map(palette.map((color) => [color.id, color]))
+  const candidateIds = Array.from({ length: referenceSize * referenceSize }, () => '')
+  const referenceActiveMask = new Uint8Array(referenceSize * referenceSize)
+  let totalDistance = 0
+  let count = 0
+  for (let y = 0; y < referenceSize; y += 1) {
+    for (let x = 0; x < referenceSize; x += 1) {
+      const index = y * referenceSize + x
+      if (source.activeMask[index] !== 1) continue
+      const normalizedX = (x - source.fit.x + 0.5) / source.fit.width
+      const normalizedY = (y - source.fit.y + 0.5) / source.fit.height
+      const candidateX = clamp(fit.x + Math.floor(normalizedX * fit.width), fit.x, fit.x + fit.width - 1)
+      const candidateY = clamp(fit.y + Math.floor(normalizedY * fit.height), fit.y, fit.y + fit.height - 1)
+      const candidateIndex = candidateY * width + candidateX
+      if (activeMask[candidateIndex] !== 1) continue
+      const colorId = colorIds[candidateIndex]
+      if (colorId === undefined) continue
+      const color = colorsById.get(colorId)
+      if (color === undefined) continue
+      candidateIds[index] = colorId
+      referenceActiveMask[index] = 1
+      totalDistance += colorDistance(rgbToLab(source.pixels[index]!), color.lab, 'delta-e-2000')
+      count += 1
+    }
+  }
+  return {
+    meanColorDistance: count === 0 ? 0 : totalDistance / count,
+    boundaryAgreement: boundaryAgreement(
+      source.pixels.map(rgbToLab),
+      candidateIds,
+      referenceSize,
+      referenceSize,
+      referenceActiveMask,
+    ),
+  }
+}
+
 interface FeatureVisibilityResult {
   score: number
   confidence: number
@@ -588,6 +778,51 @@ interface FeatureVisibilityResult {
   localContrast: number
   valid: boolean
   rejectionReasons: readonly string[]
+}
+
+interface FeatureEvaluationProfile {
+  metric: 'blob' | 'template' | 'contour' | 'geometry'
+  kindWeight: number
+  minimumCoverage: number
+  minimumPurity: number
+  minimumConnectivity: number
+  minimumContrast: number
+  minimumBoundary: number
+}
+
+const featureProfiles: Readonly<Record<LandmarkKind, FeatureEvaluationProfile>> = {
+  eye: {
+    metric: 'blob', kindWeight: 1.4, minimumCoverage: 0.75, minimumPurity: 0.35,
+    minimumConnectivity: 0.75, minimumContrast: 0.2, minimumBoundary: 0,
+  },
+  nose: {
+    metric: 'blob', kindWeight: 1, minimumCoverage: 0.5, minimumPurity: 0.25,
+    minimumConnectivity: 0.5, minimumContrast: 0.08, minimumBoundary: 0,
+  },
+  'identity-mark': {
+    metric: 'blob', kindWeight: 1.3, minimumCoverage: 0.6, minimumPurity: 0.3,
+    minimumConnectivity: 0.6, minimumContrast: 0.12, minimumBoundary: 0,
+  },
+  custom: {
+    metric: 'blob', kindWeight: 0.8, minimumCoverage: 0.5, minimumPurity: 0.25,
+    minimumConnectivity: 0.5, minimumContrast: 0.1, minimumBoundary: 0,
+  },
+  mouth: {
+    metric: 'template', kindWeight: 1.2, minimumCoverage: 0.45, minimumPurity: 0,
+    minimumConnectivity: 0.45, minimumContrast: 0.08, minimumBoundary: 0,
+  },
+  ear: {
+    metric: 'contour', kindWeight: 0.9, minimumCoverage: 0, minimumPurity: 0,
+    minimumConnectivity: 0, minimumContrast: 0, minimumBoundary: 0.12,
+  },
+  'face-contour': {
+    metric: 'contour', kindWeight: 1.1, minimumCoverage: 0, minimumPurity: 0,
+    minimumConnectivity: 0, minimumContrast: 0, minimumBoundary: 0.12,
+  },
+  body: {
+    metric: 'geometry', kindWeight: 0.7, minimumCoverage: 0, minimumPurity: 0,
+    minimumConnectivity: 0, minimumContrast: 0, minimumBoundary: 0,
+  },
 }
 
 function connectedFeatureRatio(
@@ -661,15 +896,18 @@ function featureVisibility(
   }
   const colorsById = new Map(palette.map((color) => [color.id, color]))
   const evaluated = landmarks.map((landmark) => {
+    const profile = featureProfiles[landmark.kind]
+    const effectiveConfidence = landmarkEffectiveConfidence(landmark, analysisConfidence)
     const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
     const center = centerY * width + centerX
     const colorId = colorIds[center]
     const color = colorId === undefined ? undefined : colorsById.get(colorId)
     if (activeMask[center] !== 1 || color === undefined) {
-      const enforced = landmark.priority === 'hard'
-        && landmarkEffectiveConfidence(landmark, analysisConfidence) >= 0.5
+      const enforced = landmark.priority === 'hard' && effectiveConfidence >= 0.5
       return {
         landmark,
+        profile,
+        effectiveConfidence,
         cell: center,
         area: 0,
         score: 0,
@@ -677,6 +915,7 @@ function featureVisibility(
         purity: 0,
         connectivity: 0,
         contrastScore: 0,
+        boundaryScore: 0,
         sourceMatch: 0,
         valid: enforced === false,
         rejectionReasons: enforced ? ['hard-feature-missing'] : [],
@@ -685,8 +924,7 @@ function featureVisibility(
     const radius = landmarkGridRadiusCells(landmark, crop, fit)
     const regionCells: number[] = []
     const matchingCells = new Set<number>()
-    const neighborCells: number[] = []
-    const carrierRegionId = regionIds[center]
+    const ringCells: number[] = []
     for (let offsetY = -radius - 1; offsetY <= radius + 1; offsetY += 1) {
       for (let offsetX = -radius - 1; offsetX <= radius + 1; offsetX += 1) {
         const x = centerX + offsetX
@@ -698,11 +936,21 @@ function featureVisibility(
         if (insideFeature) {
           regionCells.push(index)
           if (colorIds[index] === colorId) matchingCells.add(index)
-        } else if (carrierRegionId === undefined || regionIds[index] === carrierRegionId) {
-          neighborCells.push(index)
-        }
+        } else ringCells.push(index)
       }
     }
+    const regionCounts = new Map<string, number>()
+    for (const index of ringCells) {
+      const regionId = regionIds[index]
+      if (regionId === undefined || regionId === landmark.featureRegionId) continue
+      regionCounts.set(regionId, (regionCounts.get(regionId) ?? 0) + 1)
+    }
+    const inferredCarrierRegionId = [...regionCounts.entries()]
+      .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0]?.[0]
+    const carrierRegionId = landmark.carrierRegionId ?? inferredCarrierRegionId ?? regionIds[center]
+    const neighborCells = carrierRegionId === undefined
+      ? ringCells
+      : ringCells.filter((index) => regionIds[index] === carrierRegionId)
     const minimumCells = radius === 0 ? 1 : Math.max(2, Math.ceil(regionCells.length * 0.4))
     const coverage = clamp(matchingCells.size / minimumCells, 0, 1)
     const purity = matchingCells.size / Math.max(1, regionCells.length)
@@ -712,39 +960,62 @@ function featureVisibility(
       return sum + (neighbor === undefined ? 0 : colorDistance(color.lab, neighbor.lab, 'delta-e-2000'))
     }, 0) / neighborCells.length
     const contrastScore = clamp(contrast / 24, 0, 1)
+    const boundaryScore = ringCells.length === 0 ? 0 : ringCells.reduce(
+      (sum, index) => sum + Number(colorIds[index] !== colorId),
+      0,
+    ) / ringCells.length
     const sourceMatch = 1 / (1 + colorDistance(
       rgbToLab(sourceRgbAt(request, landmark.x, landmark.y)),
       color.lab,
       'delta-e-2000',
     ) / 15)
     const rejectionReasons: string[] = []
-    if (landmark.priority === 'hard'
-      && landmarkEffectiveConfidence(landmark, analysisConfidence) >= 0.5) {
-      if (coverage < 0.75 || purity < 0.35) rejectionReasons.push('hard-feature-area')
-      if (connectivity < 0.75) rejectionReasons.push('hard-feature-fragmented')
-      if (contrastScore < 0.2) rejectionReasons.push('hard-feature-low-contrast')
-      if (sourceMatch < 0.35) rejectionReasons.push('hard-feature-source-mismatch')
+    if (landmark.priority === 'hard' && effectiveConfidence >= 0.5) {
+      if (coverage < profile.minimumCoverage || purity < profile.minimumPurity) {
+        rejectionReasons.push('hard-feature-area')
+      }
+      if (connectivity < profile.minimumConnectivity) rejectionReasons.push('hard-feature-fragmented')
+      if (contrastScore < profile.minimumContrast) rejectionReasons.push('hard-feature-low-contrast')
+      if (boundaryScore < profile.minimumBoundary) rejectionReasons.push('hard-feature-boundary')
+      if (profile.metric !== 'geometry' && sourceMatch < 0.35) {
+        rejectionReasons.push('hard-feature-source-mismatch')
+      }
     }
+    const profileScore = profile.metric === 'geometry'
+      ? 1
+      : profile.metric === 'contour'
+        ? sourceMatch * (boundaryScore * 0.75 + contrastScore * 0.25)
+        : profile.metric === 'template'
+          ? sourceMatch * (coverage * 0.2 + connectivity * 0.3 + contrastScore * 0.25 + boundaryScore * 0.25)
+          : sourceMatch * (coverage * 0.25 + purity * 0.2 + connectivity * 0.2 + contrastScore * 0.35)
     return {
       landmark,
+      profile,
+      effectiveConfidence,
       cell: center,
       area: matchingCells.size,
-      score: sourceMatch * (
-        coverage * 0.25
-        + purity * 0.2
-        + connectivity * 0.2
-        + contrastScore * 0.35
-      ),
+      score: profileScore,
       coverage,
       purity,
       connectivity,
       contrastScore,
+      boundaryScore,
       sourceMatch,
       valid: rejectionReasons.length === 0,
       rejectionReasons,
     }
   })
-  const baseScore = evaluated.reduce((sum, entry) => sum + entry.score, 0) / evaluated.length
+  const evaluationWeight = (entry: typeof evaluated[number]): number =>
+    entry.effectiveConfidence
+      * (entry.landmark.priority === 'hard' ? 1.5 : 1)
+      * entry.profile.kindWeight
+  const totalWeight = evaluated.reduce((sum, entry) => sum + evaluationWeight(entry), 0)
+  const weightedAverage = (select: (entry: typeof evaluated[number]) => number): number =>
+    totalWeight === 0 ? 0 : evaluated.reduce(
+      (sum, entry) => sum + select(entry) * evaluationWeight(entry),
+      0,
+    ) / totalWeight
+  const baseScore = weightedAverage((entry) => entry.score)
   const symmetryGroups = new Map<string, typeof evaluated>()
   for (const entry of evaluated) {
     if (entry.landmark.symmetryGroup === undefined) continue
@@ -752,10 +1023,12 @@ function featureVisibility(
     group.push(entry)
     symmetryGroups.set(entry.landmark.symmetryGroup, group)
   }
-  const hardCollision = [...symmetryGroups.values()].some((group) =>
-    group.some((entry) => entry.landmark.priority === 'hard'
-      && landmarkEffectiveConfidence(entry.landmark, analysisConfidence) >= 0.5)
-      && new Set(group.map((entry) => entry.cell)).size < group.length)
+  const hardCollision = [...symmetryGroups.values()].some((group) => {
+    const enforcedMembers = group.filter((entry) => entry.landmark.priority === 'hard'
+      && entry.effectiveConfidence >= 0.5)
+    return enforcedMembers.length > 1
+      && new Set(enforcedMembers.map((entry) => entry.cell)).size < enforcedMembers.length
+  })
   const groupScores = [...symmetryGroups.values()]
     .filter((group) => group.length > 1)
     .map((group) => {
@@ -768,17 +1041,16 @@ function featureVisibility(
   const symmetryScore = groupScores.length === 0
     ? baseScore
     : groupScores.reduce((sum, score) => sum + score, 0) / groupScores.length
-  const confidence = evaluated.reduce((sum, entry) =>
-    sum + landmarkEffectiveConfidence(entry.landmark, analysisConfidence), 0) / evaluated.length
+  const confidence = weightedAverage((entry) => entry.effectiveConfidence)
   const rejectionReasons = new Set(evaluated.flatMap((entry) => entry.rejectionReasons))
   if (hardCollision) rejectionReasons.add('hard-feature-collision')
   return {
     score: clamp(baseScore * 0.85 + symmetryScore * 0.15, 0, 1),
     confidence: clamp(confidence, 0, 1),
-    coverage: evaluated.reduce((sum, entry) => sum + entry.coverage, 0) / evaluated.length,
-    purity: evaluated.reduce((sum, entry) => sum + entry.purity, 0) / evaluated.length,
-    connectivity: evaluated.reduce((sum, entry) => sum + entry.connectivity, 0) / evaluated.length,
-    localContrast: evaluated.reduce((sum, entry) => sum + entry.contrastScore, 0) / evaluated.length,
+    coverage: weightedAverage((entry) => entry.coverage),
+    purity: weightedAverage((entry) => entry.purity),
+    connectivity: weightedAverage((entry) => entry.connectivity),
+    localContrast: weightedAverage((entry) => entry.contrastScore),
     valid: evaluated.every((entry) => entry.valid) && hardCollision === false,
     rejectionReasons: [...rejectionReasons].sort(),
   }
@@ -789,6 +1061,7 @@ function scoreCandidate(
   totalCells: number,
   maxColors: number,
   sourceMeanColorDistance: number,
+  referenceMeanColorDistance: number,
   planMeanColorDistance: number,
   structure: number,
   feature: FeatureVisibilityResult,
@@ -796,7 +1069,7 @@ function scoreCandidate(
   thinStripes: number,
   uniqueColors: number,
 ): CandidateScore {
-  const sourceFidelity = 1 / (1 + sourceMeanColorDistance / 15)
+  const sourceFidelity = 1 / (1 + (sourceMeanColorDistance * 0.35 + referenceMeanColorDistance * 0.65) / 15)
   const planFidelity = 1 / (1 + planMeanColorDistance / 15)
   const colorFidelity = planFidelity
   const featureProtection = feature.score
@@ -815,13 +1088,15 @@ function scoreCandidate(
     'high-contrast': 0.005,
     soft: 0,
   }
+  const fidelityWeight = style === 'faithful' ? 0.24 : 0.18
+  const craftWeight = style === 'faithful' ? 0.05 : 0.11
   const featureWeight = 0.18 * feature.confidence
-  const weightedTotal = sourceFidelity * 0.18
+  const weightedTotal = sourceFidelity * fidelityWeight
     + planFidelity * 0.09
     + structure * 0.22
     + featureProtection * featureWeight
     + cleanliness * 0.14
-    + craftEase * 0.11
+    + craftEase * craftWeight
     + canvasFit * 0.08
   const total = clamp(weightedTotal / (0.82 + featureWeight) + styleBias[style], 0, 1)
   return {
@@ -865,6 +1140,7 @@ function metadata(
 
 function generateCandidate(
   context: CandidateContext,
+  generationId: string,
   version: string,
   clock: () => number,
 ): PatternCandidate {
@@ -1027,7 +1303,19 @@ function generateCandidate(
     size.height,
     resized.activeMask,
   )
-  const structure = sourceBoundaryAgreement * 0.65 + planBoundaryAgreement * 0.35
+  const reference = referenceMetrics(
+    request,
+    crop,
+    resized.fit,
+    size.width,
+    size.height,
+    optimization.colorIds,
+    selectedPalette,
+    resized.activeMask,
+  )
+  const structure = sourceBoundaryAgreement * 0.3
+    + planBoundaryAgreement * 0.2
+    + reference.boundaryAgreement * 0.5
   const planMeanColorDistance = finalMeanColorDistance(
     pixelLabs,
     optimization.colorIds,
@@ -1058,6 +1346,7 @@ function generateCandidate(
     totalBeads,
     request.options.maxColors,
     sourceMeanColorDistance,
+    reference.meanColorDistance,
     planMeanColorDistance,
     structure,
     visibility,
@@ -1065,9 +1354,7 @@ function generateCandidate(
     thinStripes,
     counts.length,
   )
-  const identity = stableSerialize({
-    engine: 'baseline',
-    version,
+  const variantIdentity = stableSerialize({
     size,
     style,
     baseline,
@@ -1075,8 +1362,8 @@ function generateCandidate(
     resizeMethod,
     distanceMethod,
     maxColors: request.options.maxColors,
-    palette: selectedPalette.map((color) => color.id),
-    landmarks: request.analysis?.landmarks?.map((landmark) => ({
+    palette: selectedPalette.map((color) => ({ id: color.id, lab: color.lab })),
+    landmarks: request.analysis?.landmarks?.map((landmark: ImageLandmark) => ({
       id: landmark.id,
       kind: landmark.kind,
       x: landmark.x,
@@ -1084,12 +1371,17 @@ function generateCandidate(
       priority: landmark.priority,
       sourceRadiusPx: landmark.sourceRadiusPx ?? landmark.radius ?? 0,
       gridRadiusCells: landmark.gridRadiusCells ?? landmark.radius ?? 0,
+      featureRegionId: landmark.featureRegionId,
+      carrierRegionId: landmark.carrierRegionId,
     })) ?? [],
     structure: request.options.structure ?? {},
     optimization: request.options.optimization ?? {},
   })
+  const variantId = stableHash(variantIdentity)
   return {
-    id: `${size.width}x${size.height}-${style}-${baseline}-${stableHash(identity)}`,
+    id: `${generationId}-${variantId}`,
+    generationId,
+    variantId,
     style,
     valid: visibility.valid,
     rejectionReasons: visibility.rejectionReasons,
@@ -1119,6 +1411,8 @@ function generateCandidate(
       featureLocalContrast: visibility.localContrast,
       sourceBoundaryAgreement,
       planBoundaryAgreement,
+      referenceMeanColorDistance: reference.meanColorDistance,
+      referenceBoundaryAgreement: reference.boundaryAgreement,
       paletteOptimizationChanges: paletteOptimization.changedCells,
       topologyEdits: optimization.topologyEdits,
     },
@@ -1141,7 +1435,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.2.2-baseline'
+    this.version = config.version ?? '0.2.3-baseline'
     this.#clock = config.clock ?? Date.now
   }
 
@@ -1159,6 +1453,7 @@ export class DeterministicPatternAlgorithm {
     )
     const resizeMethod = resolveResizeMethod(request.options, baseline)
     const distanceMethod = resolveDistanceMethod(request.options, baseline)
+    const generationId = await generationFingerprint(request, this.version)
     const candidates: PatternCandidate[] = []
     for (const size of sizes) {
       for (const style of styles) {
@@ -1172,7 +1467,7 @@ export class DeterministicPatternAlgorithm {
           distanceMethod,
           preparedPalette,
           sourceGuidance,
-        }, this.version, this.#clock))
+        }, generationId, this.version, this.#clock))
       }
     }
     candidates.sort((first, second) => Number(second.valid) - Number(first.valid)
@@ -1180,14 +1475,40 @@ export class DeterministicPatternAlgorithm {
       || first.id.localeCompare(second.id))
     const maximumCandidates = Math.max(1, Math.floor(request.options.maxCandidates ?? 5))
     const ranked = candidates.slice(0, maximumCandidates)
-    const recommended = ranked[0]!
+    const validCandidates = ranked.filter((candidate) => candidate.valid)
+    const rejectedCandidates = ranked.filter((candidate) => candidate.valid === false)
+    const recommended = validCandidates[0]
+    const evaluation = evaluateCandidates(ranked)
+    if (recommended !== undefined) {
+      return {
+        status: 'success',
+        generationId,
+        pattern: recommended.pattern,
+        materialCounts: recommended.materialCounts,
+        metrics: recommended.metrics,
+        recommended,
+        alternatives: ranked.filter((candidate) => candidate.id !== recommended.id),
+        rejectedCandidates,
+        evaluation,
+      }
+    }
+    const bestEffort = ranked[0]
+    if (bestEffort !== undefined) {
+      return {
+        status: 'best-effort',
+        generationId,
+        bestEffort,
+        alternatives: ranked.slice(1),
+        rejectedCandidates,
+        evaluation,
+      }
+    }
     return {
-      pattern: recommended.pattern,
-      materialCounts: recommended.materialCounts,
-      metrics: recommended.metrics,
-      recommended,
-      alternatives: ranked.slice(1),
-      evaluation: evaluateCandidates(ranked),
+      status: 'no-valid-candidate',
+      generationId,
+      alternatives: [],
+      rejectedCandidates: [],
+      evaluation,
     }
   }
 

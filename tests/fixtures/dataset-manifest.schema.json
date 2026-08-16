@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Teddytututu/ai-bead-pattern/tests/fixtures/dataset-manifest.schema.json",
+  "title": "AI Bead Pattern Evaluation Dataset Manifest",
+  "type": "object",
+  "required": ["version", "samples"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "samples": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sample" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sample": {
+      "type": "object",
+      "required": [
+        "sampleId",
+        "imageType",
+        "source",
+        "authorizationStatus",
+        "contentSha256",
+        "publicRedistribution",
+        "evaluationDimensions"
+      ],
+      "properties": {
+        "sampleId": { "type": "string", "minLength": 1 },
+        "imageType": {
+          "enum": ["portrait", "pet", "illustration", "landscape", "general"]
+        },
+        "source": { "type": "string", "minLength": 1 },
+        "authorizationStatus": {
+          "enum": ["owned", "licensed", "consented-private", "public-domain", "pending"]
+        },
+        "contentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "publicRedistribution": { "type": "boolean" },
+        "localPath": { "type": "string", "minLength": 1 },
+        "objectKey": { "type": "string", "minLength": 1 },
+        "landmarkAnnotation": { "type": "string", "minLength": 1 },
+        "subjectMaskAnnotation": { "type": "string", "minLength": 1 },
+        "evaluationDimensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "feature-visibility",
+              "canvas-selection",
+              "silhouette",
+              "palette",
+              "value-design",
+              "grid-cleanliness",
+              "craft-complexity"
+            ]
+          }
+        },
+        "notes": { "type": "string" }
+      },
+      "anyOf": [
+        { "required": ["localPath"] },
+        { "required": ["objectKey"] }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

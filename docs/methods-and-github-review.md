@@ -12,6 +12,17 @@
 GitHub 活跃度、Stars 和许可证均为查询日快照。模型权重许可证按官方仓库、模型卡和
 发布页单独核对。
 
+## 已进入产品
+
+- `services/ai-gateway` 已实现 rembg HTTP `SegmentationProvider`，默认模型为
+  `birefnet-general-lite`。
+- 模型输出已映射为主体软掩码、边界重要度、自动裁剪、分析置信度和模型版本。
+- `pattern-core` v0.2.3 已接收这些字段，并增加成功、best-effort、稳定候选 ID、
+  分类型特征评估和 V2 合同校验。
+
+下一批实现聚焦 MediaPipe / MMPose 语义锚点与 PIA-lite。OR-Tools、DINOv2、
+通用奖励模型继续按实验门槛推进。
+
 ## 结论
 
 下一阶段采用下面这套组合，工程收益最高：

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { createPatternAlgorithm } from '../src/index.js'
+import { createPatternAlgorithm, type PatternGenerationResult, type PatternGenerationSuccess } from '../src/index.js'
 import {
   baselineGoldenPalette,
   featureGoldenAnalysis,
@@ -15,6 +15,11 @@ import {
 } from './fixtures/baseline-golden.js'
 
 const algorithm = createPatternAlgorithm({ clock: () => 123 })
+
+function success(result: PatternGenerationResult): PatternGenerationSuccess {
+  if (result.status !== 'success') throw new Error(`Expected success, received ${result.status}`)
+  return result
+}
 
 describe('baseline-specific golden fixtures', () => {
   it('keeps nearest-neighbor and area sampling behavior distinct', async () => {
@@ -38,10 +43,10 @@ describe('baseline-specific golden fixtures', () => {
         },
       })
 
-      assert.deepEqual(result.pattern.cells, samplingGoldenCells[baseline])
-      assert.equal(result.recommended.edits.length, 0)
-      assert.equal(result.pattern.width, 2)
-      assert.equal(result.pattern.height, 1)
+      assert.deepEqual(success(result).pattern.cells, samplingGoldenCells[baseline])
+      assert.equal(success(result).recommended.edits.length, 0)
+      assert.equal(success(result).pattern.width, 2)
+      assert.equal(success(result).pattern.height, 1)
     }
   })
 
@@ -66,9 +71,9 @@ describe('baseline-specific golden fixtures', () => {
         },
       })
 
-      assert.deepEqual(result.pattern.cells, structureGoldenCells[baseline])
-      assert.equal(result.recommended.edits.length, baseline === 'mvp' ? 1 : 0)
-      assert.equal(result.metrics.isolatedCells, baseline === 'mvp' ? 0 : 2)
+      assert.deepEqual(success(result).pattern.cells, structureGoldenCells[baseline])
+      assert.equal(success(result).recommended.edits.length, baseline === 'mvp' ? 1 : 0)
+      assert.equal(success(result).metrics.isolatedCells, baseline === 'mvp' ? 0 : 2)
     }
   })
 
@@ -86,10 +91,10 @@ describe('baseline-specific golden fixtures', () => {
       },
     })
 
-    assert.deepEqual(result.pattern.cells, protectedFeatureGoldenCells)
-    assert.equal(result.recommended.edits.length, 0)
-    assert.equal(result.metrics.featureExpressibility, 1)
-    assert.equal(result.metrics.featureConnectivity, 1)
-    assert.equal(result.recommended.valid, true)
+    assert.deepEqual(success(result).pattern.cells, protectedFeatureGoldenCells)
+    assert.equal(success(result).recommended.edits.length, 0)
+    assert.equal(success(result).metrics.featureExpressibility, 1)
+    assert.equal(success(result).metrics.featureConnectivity, 1)
+    assert.equal(success(result).recommended.valid, true)
   })
 })

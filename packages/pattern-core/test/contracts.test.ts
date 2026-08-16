@@ -5,11 +5,15 @@ import {
   createPatternAlgorithm,
 } from '../src/index.js'
 import {
+  validateCandidateMetricsV2,
   validateCanvasPlan,
+  validatePalettePlan,
   validateStructurePlan,
+  validateValuePlan,
   type CanvasPlan,
   type FeatureConstraint,
   type PalettePlan,
+  type CandidateMetricsV2,
   type StructurePlan,
   type ValuePlan,
 } from '../src/experimental.js'
@@ -20,7 +24,7 @@ describe('V2 planning contracts', () => {
       id: 'left-eye',
       kind: 'eye',
       sourceCenter: [10, 12],
-      targetCenter: [4, 5],
+      targetCenter: [0, 0],
       candidateTemplates: ['eye-1x1'],
       minimumCells: 1,
       maximumCells: 2,
@@ -72,6 +76,8 @@ describe('V2 planning contracts', () => {
     assert.deepEqual(palette.selectedColorIds, [])
     assert.doesNotThrow(() => validateCanvasPlan(canvas))
     assert.doesNotThrow(() => validateStructurePlan(structure))
+    assert.doesNotThrow(() => validateValuePlan(value))
+    assert.doesNotThrow(() => validatePalettePlan(palette))
   })
 
   it('rejects inconsistent staged planning contracts', () => {
@@ -120,5 +126,74 @@ describe('V2 planning contracts', () => {
 
   it('exposes only the implemented baseline engine', () => {
     assert.equal(createPatternAlgorithm().engine, 'baseline')
+  })
+
+  it('rejects inconsistent region graphs and feature constraints', () => {
+    const structure: StructurePlan = {
+      width: 2,
+      height: 1,
+      occupancy: { width: 2, height: 1, values: new Float32Array([1, 1]) },
+      sourceMapping: new Float32Array([0, 0, 1, 0]),
+      regionIds: new Int32Array([0, 1]),
+      boundaryStrength: new Float32Array([1, 1]),
+      regions: [
+        { id: 0, importance: 1, cellIndices: [0, 1], adjacentRegionIds: [0, 1] },
+        { id: 1, importance: 1, cellIndices: [1], adjacentRegionIds: [] },
+      ],
+      featureConstraints: [
+        {
+          id: 'eye',
+          kind: 'eye',
+          sourceCenter: [0, 0],
+          targetCenter: [2, 0],
+          candidateTemplates: [],
+          minimumCells: 1,
+          maximumCells: 1,
+          allowedShiftCells: -1,
+          minimumContrastDeltaE: -1,
+          hard: true,
+        },
+      ],
+      confidence: 1,
+    }
+
+    assert.throws(() => validateStructurePlan(structure), /region|cell|adjacen|template|target|shift|contrast/i)
+  })
+
+  it('validates value, palette, and candidate metric contracts', () => {
+    const invalidValue: ValuePlan = {
+      roles: [{
+        id: 'base',
+        regionId: 'face',
+        kind: 'base',
+        targetLightness: Number.NaN,
+        minimumSeparation: 0,
+        importance: 1,
+      }],
+    }
+    const invalidPalette: PalettePlan = {
+      selectedColorIds: ['red', 'red'],
+      assignments: { base: 'blue' },
+      allowedColorIdsByRole: { base: ['red'] },
+      totalCost: -1,
+    }
+    const metric = { value: 0.5, confidence: 1, available: true }
+    const invalidMetrics: CandidateMetricsV2 = {
+      sourceFidelity: metric,
+      featureVisibility: metric,
+      silhouetteQuality: metric,
+      semanticBoundaryQuality: metric,
+      regionAdjacencyPreservation: metric,
+      valueOrderAccuracy: metric,
+      paletteRoleConsistency: metric,
+      clusterCleanliness: metric,
+      symmetryQuality: metric,
+      craftComplexity: metric,
+      estimatedBuildMinutes: { value: -1, confidence: 1, available: true },
+    }
+
+    assert.throws(() => validateValuePlan(invalidValue), /Value role/)
+    assert.throws(() => validatePalettePlan(invalidPalette), /Palette/)
+    assert.throws(() => validateCandidateMetricsV2(invalidMetrics), /metric/)
   })
 })

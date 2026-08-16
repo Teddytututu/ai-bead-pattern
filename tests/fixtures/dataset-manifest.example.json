@@ -1,0 +1,23 @@
+{
+  "version": "1",
+  "samples": [
+    {
+      "sampleId": "private-pet-001",
+      "imageType": "pet",
+      "source": "owner-provided evaluation image",
+      "authorizationStatus": "consented-private",
+      "contentSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "publicRedistribution": false,
+      "localPath": "private-dataset/pet-001.jpg",
+      "landmarkAnnotation": "private-dataset/pet-001.landmarks.json",
+      "subjectMaskAnnotation": "private-dataset/pet-001.mask.png",
+      "evaluationDimensions": [
+        "feature-visibility",
+        "canvas-selection",
+        "silhouette",
+        "grid-cleanliness"
+      ],
+      "notes": "Replace the placeholder hash after the authorized file is registered."
+    }
+  ]
+}

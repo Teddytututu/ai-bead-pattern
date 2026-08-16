@@ -122,6 +122,10 @@ export interface ImageLandmark {
   /** @deprecated Prefer sourceRadiusPx and gridRadiusCells. */
   radius?: number
   symmetryGroup?: string
+  /** Semantic region occupied by the feature itself. */
+  featureRegionId?: string
+  /** Semantic region that visually carries the feature, such as face around an eye. */
+  carrierRegionId?: string
 }
 
 export interface ImageAnalysis {
@@ -134,6 +138,8 @@ export interface ImageAnalysis {
   suggestedCropSource?: 'automatic' | 'manual'
   imageType?: ImageType
   confidence?: number
+  /** Stable model names and versions used to produce this analysis. */
+  modelVersions?: Readonly<Record<string, string>>
 }
 
 export interface CropRect {
@@ -205,6 +211,8 @@ export interface GenerationMetrics {
   featureLocalContrast: number
   sourceBoundaryAgreement: number
   planBoundaryAgreement: number
+  referenceMeanColorDistance: number
+  referenceBoundaryAgreement: number
   paletteOptimizationChanges: number
   topologyEdits: number
 }
@@ -224,6 +232,8 @@ export interface CandidateScore {
 
 export interface PatternCandidate {
   id: string
+  generationId: string
+  variantId: string
   style: PatternStyle
   valid: boolean
   rejectionReasons: readonly string[]
@@ -246,15 +256,43 @@ export interface PatternGenerationRequest {
   analysis?: ImageAnalysis
 }
 
-export interface PatternGenerationResult {
-  /** Compatibility aliases for the recommended candidate. */
+export type GenerationStatus = 'success' | 'best-effort' | 'no-valid-candidate'
+
+interface PatternGenerationResultBase {
+  status: GenerationStatus
+  generationId: string
+  /** Compatibility aliases exist only when a valid recommendation exists. */
+  pattern?: BeadPattern
+  materialCounts?: readonly MaterialCount[]
+  metrics?: GenerationMetrics
+  recommended?: PatternCandidate
+  bestEffort?: PatternCandidate
+  alternatives: readonly PatternCandidate[]
+  rejectedCandidates: readonly PatternCandidate[]
+  evaluation: CandidateEvaluation
+}
+
+export interface PatternGenerationSuccess extends PatternGenerationResultBase {
+  status: 'success'
   pattern: BeadPattern
   materialCounts: readonly MaterialCount[]
   metrics: GenerationMetrics
   recommended: PatternCandidate
-  alternatives: readonly PatternCandidate[]
-  evaluation: CandidateEvaluation
 }
+
+export interface PatternGenerationBestEffort extends PatternGenerationResultBase {
+  status: 'best-effort'
+  bestEffort: PatternCandidate
+}
+
+export interface PatternGenerationNoValidCandidate extends PatternGenerationResultBase {
+  status: 'no-valid-candidate'
+}
+
+export type PatternGenerationResult =
+  | PatternGenerationSuccess
+  | PatternGenerationBestEffort
+  | PatternGenerationNoValidCandidate
 
 export interface PatternAdaptationRequest {
   pattern: BeadPattern

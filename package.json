@@ -3,11 +3,12 @@
   "private": true,
   "packageManager": "pnpm@11.19.0",
   "scripts": {
-    "build": "pnpm --filter @ai-bead-pattern/pattern-core build",
+    "build": "pnpm --filter @ai-bead-pattern/pattern-core build && pnpm --filter @ai-bead-pattern/ai-gateway build",
     "benchmark": "pnpm --filter @ai-bead-pattern/pattern-core benchmark",
+    "benchmark:max": "pnpm --filter @ai-bead-pattern/pattern-core benchmark:max",
     "demo": "pnpm build && node scripts/serve-demo.mjs",
-    "test": "pnpm --filter @ai-bead-pattern/pattern-core test",
-    "typecheck": "pnpm --filter @ai-bead-pattern/pattern-core typecheck"
+    "test": "pnpm --filter @ai-bead-pattern/pattern-core test && pnpm --filter @ai-bead-pattern/ai-gateway test",
+    "typecheck": "pnpm --filter @ai-bead-pattern/pattern-core typecheck && pnpm --filter @ai-bead-pattern/pattern-core build && pnpm --filter @ai-bead-pattern/ai-gateway typecheck"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

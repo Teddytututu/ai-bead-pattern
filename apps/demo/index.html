@@ -91,6 +91,7 @@
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); }
     .status[data-state="busy"] .status-dot { background: var(--yellow); animation: pulse 0.9s ease-in-out infinite alternate; }
     .status[data-state="error"] .status-dot { background: var(--accent); }
+    .status[data-state="warning"] .status-dot { background: #c47b18; }
 
     @keyframes pulse { to { opacity: 0.35; } }
 
@@ -689,12 +690,18 @@
               },
           },
         })
-        candidates = [result.recommended, ...result.alternatives]
-        selectCandidate(result.recommended.id)
+        const primary = result.recommended ?? result.bestEffort
+        if (primary === undefined) throw new Error('当前参数没有生成候选方案')
+        candidates = [primary, ...result.alternatives]
+        selectCandidate(primary.id)
         renderCandidates()
-        elements.downloadButton.disabled = false
+        elements.downloadButton.disabled = result.status !== 'success'
         const modeName = { mvp: '结构版', a1: '面积缩放', a0: '最近邻' }[selectedBaseline]
-        setStatus(`${modeName} · ${Math.round(result.metrics.processingTimeMs)} ms`)
+        if (result.status === 'success') {
+          setStatus(`${modeName} · ${Math.round(primary.metrics.processingTimeMs)} ms`)
+        } else {
+          setStatus('关键特征表达不足，请扩大画布、缩小主体范围或调整关键点', 'warning')
+        }
       } catch (error) {
         console.error(error)
         setStatus(error instanceof Error ? error.message : '生成失败', 'error')
@@ -789,7 +796,7 @@
         drawPattern(canvas, candidate.pattern, { maximum: 160 })
         const label = document.createElement('span')
         label.className = 'candidate-name'
-        label.textContent = `${baselineName(candidate.pattern.metadata.baseline)} ${styleName(candidate.style)} ${candidate.pattern.width}`
+        label.textContent = `${baselineName(candidate.pattern.metadata.baseline)} ${styleName(candidate.style)} ${candidate.pattern.width}${candidate.valid ? '' : ' · 需调整'}`
         button.append(canvas, label)
         button.addEventListener('click', () => selectCandidate(candidate.id))
         elements.candidateList.append(button)

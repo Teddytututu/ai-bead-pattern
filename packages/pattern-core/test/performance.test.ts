@@ -50,7 +50,38 @@ it('stays inside the representative online time and memory budget', async () => 
   const elapsedMs = performance.now() - startedAt
   const rssGrowth = Math.max(0, process.memoryUsage().rss - beforeRss)
 
-  assert.equal(result.pattern.cells.length, 4096)
+  assert.equal(result.status, 'success')
+  assert.equal(result.pattern?.cells.length, 4096)
   assert.ok(elapsedMs < 10_000, `Representative generation took ${elapsedMs.toFixed(0)} ms`)
   assert.ok(rssGrowth < 256 * 1024 * 1024, `RSS grew by ${Math.round(rssGrowth / 1024 / 1024)} MiB`)
+})
+
+it('keeps an ordinary nine-candidate load inside the CI budget', async () => {
+  const beforeRss = process.memoryUsage().rss
+  const startedAt = performance.now()
+  const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+    image: benchmarkImage(1024),
+    palette: benchmarkPalette,
+    options: {
+      canvas: {
+        mode: 'auto',
+        candidates: [
+          { width: 32, height: 32 },
+          { width: 48, height: 48 },
+          { width: 64, height: 64 },
+        ],
+      },
+      maxColors: 24,
+      maxCandidates: 9,
+      styles: ['faithful', 'simple', 'high-contrast'],
+      optimization: { localSearchIterations: 1 },
+    },
+  })
+  const elapsedMs = performance.now() - startedAt
+  const rssGrowth = Math.max(0, process.memoryUsage().rss - beforeRss)
+
+  assert.equal(result.status, 'success')
+  assert.equal(result.evaluation.rankedCandidateIds.length, 9)
+  assert.ok(elapsedMs < 30_000, `Nine-candidate generation took ${elapsedMs.toFixed(0)} ms`)
+  assert.ok(rssGrowth < 512 * 1024 * 1024, `RSS grew by ${Math.round(rssGrowth / 1024 / 1024)} MiB`)
 })

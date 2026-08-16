@@ -5,6 +5,9 @@ import {
   createPatternAlgorithm,
   optimizeGrid,
   type MaterialPalette,
+  type PatternGenerationResult,
+  type PatternGenerationSuccess,
+  type PatternCandidate,
   type PatternGenerationRequest,
   type PixelImage,
 } from '../src/index.js'
@@ -44,6 +47,17 @@ function fixedRequest(source: PixelImage, overrides: Partial<PatternGenerationRe
       ...overrides,
     },
   }
+}
+
+function success(result: PatternGenerationResult): PatternGenerationSuccess {
+  if (result.status !== 'success') throw new Error(`Expected success, received ${result.status}`)
+  return result
+}
+
+function candidate(result: PatternGenerationResult): PatternCandidate {
+  const value = result.recommended ?? result.bestEffort
+  if (value === undefined) throw new Error('Expected a generated candidate')
+  return value
 }
 
 describe('deterministic pattern algorithm', () => {
@@ -139,7 +153,22 @@ describe('deterministic pattern algorithm', () => {
       aliasPenalty: 0,
     })
 
-    assert.equal(result.colorIds[4], 'blue')
+    assert.equal(result.colorIds[4], 'green')
+  })
+
+  it('keeps the current cell when stripe directions have equal support', () => {
+    const result = optimizeGrid([
+      'green', 'zebra', 'green',
+      'amber', 'green', 'amber',
+      'green', 'zebra', 'green',
+    ], 3, 3, new Set(), {
+      minRegionSize: 1,
+      stripePenalty: 1,
+      aliasPenalty: 0,
+    })
+
+    assert.equal(result.colorIds[4], 'green')
+    assert.equal(result.edits.length, 0)
   })
 
   it('generates the requested grid with legal colors and accurate material counts', async () => {
@@ -151,16 +180,16 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(fixedRequest(source, { maxColors: 2 }))
 
-    assert.equal(result.pattern.width, 2)
-    assert.equal(result.pattern.height, 2)
-    assert.equal(result.pattern.cells.length, 4)
-    assert.ok(result.pattern.palette.length <= 2)
+    assert.equal(success(result).pattern.width, 2)
+    assert.equal(success(result).pattern.height, 2)
+    assert.equal(success(result).pattern.cells.length, 4)
+    assert.ok(success(result).pattern.palette.length <= 2)
     assert.deepEqual(
-      result.materialCounts.map((entry) => entry.count).reduce((sum, count) => sum + count, 0),
+      success(result).materialCounts.map((entry) => entry.count).reduce((sum, count) => sum + count, 0),
       4,
     )
-    assert.deepEqual(result.pattern, result.recommended.pattern)
-    assert.deepEqual(result.materialCounts, result.recommended.materialCounts)
+    assert.deepEqual(success(result).pattern, success(result).recommended.pattern)
+    assert.deepEqual(success(result).materialCounts, success(result).recommended.materialCounts)
   })
 
   it('produces stable cells for repeated input', async () => {
@@ -174,7 +203,7 @@ describe('deterministic pattern algorithm', () => {
     const first = await algorithm.generate(request)
     const second = await algorithm.generate(request)
 
-    assert.deepEqual(first.pattern.cells, second.pattern.cells)
+    assert.deepEqual(success(first).pattern.cells, success(second).pattern.cells)
     assert.deepEqual(first.materialCounts, second.materialCounts)
   })
 
@@ -188,9 +217,9 @@ describe('deterministic pattern algorithm', () => {
       optimization: { minRegionSize: 2, isolatedPixelPenalty: 1 },
     }))
 
-    assert.equal(result.pattern.cells[4]?.colorId, 'red')
-    assert.ok(result.metrics.removedSmallRegions >= 1)
-    assert.ok(result.metrics.meanColorDistance > 0)
+    assert.equal(success(result).pattern.cells[4]?.colorId, 'red')
+    assert.ok(success(result).metrics.removedSmallRegions >= 1)
+    assert.ok(success(result).metrics.meanColorDistance > 0)
   })
 
   it('keeps a hard landmark cell during local cleanup', async () => {
@@ -209,7 +238,7 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(request)
 
-    assert.equal(result.pattern.cells[4]?.colorId, 'blue')
+    assert.equal(success(result).pattern.cells[4]?.colorId, 'blue')
   })
 
   it('locks the full hard-feature grid radius during cleanup', async () => {
@@ -246,8 +275,8 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(request)
 
-    assert.equal(result.pattern.cells.find((cell) => cell.x === 1 && cell.y === 1)?.colorId, 'blue')
-    assert.equal(result.pattern.cells.find((cell) => cell.x === 2 && cell.y === 2)?.colorId, 'blue')
+    assert.equal(candidate(result).pattern.cells.find((cell) => cell.x === 1 && cell.y === 1)?.colorId, 'blue')
+    assert.equal(candidate(result).pattern.cells.find((cell) => cell.x === 2 && cell.y === 2)?.colorId, 'blue')
   })
 
   it('keeps hard-feature labels fixed during palette coherence optimization', async () => {
@@ -281,7 +310,7 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(request)
 
-    assert.equal(result.pattern.cells.find((cell) => cell.x === 1 && cell.y === 1)?.colorId, 'blue')
+    assert.equal(success(result).pattern.cells.find((cell) => cell.x === 1 && cell.y === 1)?.colorId, 'blue')
   })
 
   it('returns ranked candidates for automatic canvas and style options', async () => {
@@ -310,10 +339,10 @@ describe('deterministic pattern algorithm', () => {
 
     assert.ok(result.alternatives.length >= 1)
     assert.ok(result.alternatives.length <= 3)
-    assert.equal(result.evaluation.rankedCandidateIds[0], result.recommended.id)
+    assert.equal(result.evaluation.rankedCandidateIds[0], success(result).recommended.id)
     assert.equal(new Set(result.evaluation.rankedCandidateIds).size, result.evaluation.rankedCandidateIds.length)
     assert.equal(Object.keys(result.evaluation.scores).length, result.evaluation.rankedCandidateIds.length)
-    assert.ok([2, 4].includes(result.pattern.width))
+    assert.ok([2, 4].includes(success(result).pattern.width))
   })
 
   it('composites transparent pixels onto the configured background', async () => {
@@ -329,7 +358,7 @@ describe('deterministic pattern algorithm', () => {
       maxColors: 2,
     }))
 
-    assert.equal(result.pattern.cells[0]?.colorId, 'white')
+    assert.equal(success(result).pattern.cells[0]?.colorId, 'white')
   })
 
   it('supports the legacy width and height contract', async () => {
@@ -341,9 +370,9 @@ describe('deterministic pattern algorithm', () => {
       options: { width: 2, height: 3, maxColors: 2, styles: ['faithful'] },
     })
 
-    assert.equal(result.pattern.width, 2)
-    assert.equal(result.pattern.height, 3)
-    assert.equal(result.pattern.cells.length, 4)
+    assert.equal(success(result).pattern.width, 2)
+    assert.equal(success(result).pattern.height, 3)
+    assert.equal(success(result).pattern.cells.length, 4)
   })
 
   it('keeps a wide image proportional and centers it inside a square grid', async () => {
@@ -355,10 +384,10 @@ describe('deterministic pattern algorithm', () => {
       optimization: { minRegionSize: 1 },
     }))
 
-    assert.equal(result.pattern.cells.length, 8)
-    assert.equal(result.pattern.metadata.totalBeads, 8)
-    assert.deepEqual([...new Set(result.pattern.cells.map((cell) => cell.y))], [1, 2])
-    assert.deepEqual(result.materialCounts, [{ colorId: 'red', count: 8 }])
+    assert.equal(success(result).pattern.cells.length, 8)
+    assert.equal(success(result).pattern.metadata.totalBeads, 8)
+    assert.deepEqual([...new Set(success(result).pattern.cells.map((cell) => cell.y))], [1, 2])
+    assert.deepEqual(success(result).materialCounts, [{ colorId: 'red', count: 8 }])
   })
 
   it('maps protected landmarks into the centered content area', async () => {
@@ -377,9 +406,9 @@ describe('deterministic pattern algorithm', () => {
     }
 
     const result = await algorithm.generate(request)
-    const protectedCell = result.pattern.cells.find((cell) => cell.x === 1 && cell.y === 1)
+    const protectedCell = success(result).pattern.cells.find((cell) => cell.x === 1 && cell.y === 1)
 
-    assert.equal(result.pattern.cells.length, 4)
+    assert.equal(success(result).pattern.cells.length, 4)
     assert.equal(protectedCell?.colorId, 'blue')
   })
 
@@ -391,9 +420,9 @@ describe('deterministic pattern algorithm', () => {
       optimization: { minRegionSize: 1 },
     }))
 
-    assert.equal(result.pattern.cells.length, 8)
-    assert.deepEqual([...new Set(result.pattern.cells.map((cell) => cell.x))], [1, 2])
-    assert.deepEqual(result.materialCounts, [{ colorId: 'blue', count: 8 }])
+    assert.equal(success(result).pattern.cells.length, 8)
+    assert.deepEqual([...new Set(success(result).pattern.cells.map((cell) => cell.x))], [1, 2])
+    assert.deepEqual(success(result).materialCounts, [{ colorId: 'blue', count: 8 }])
   })
 
   it('keeps the raw isolated cell in the A0 comparison route', async () => {
@@ -404,8 +433,8 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(fixedRequest(source, { baseline: 'a0' }))
 
-    assert.equal(result.pattern.cells[4]?.colorId, 'blue')
-    assert.equal(result.metrics.removedSmallRegions, 0)
+    assert.equal(success(result).pattern.cells[4]?.colorId, 'blue')
+    assert.equal(success(result).metrics.removedSmallRegions, 0)
   })
 
   it('applies the analysis crop before grid generation', async () => {
@@ -418,7 +447,7 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(request)
 
-    assert.equal(result.pattern.cells[0]?.colorId, 'blue')
+    assert.equal(success(result).pattern.cells[0]?.colorId, 'blue')
   })
 
   it('ignores an automatic crop when analysis confidence is zero', async () => {
@@ -432,11 +461,12 @@ describe('deterministic pattern algorithm', () => {
       confidence: 0,
       suggestedCrop: { x: 0, y: 0, width: 1, height: 1 },
       suggestedCropSource: 'automatic',
+      suggestedCropConfidence: 1,
     }
 
     const result = await algorithm.generate(request)
 
-    assert.equal(result.pattern.cells[0]?.colorId, 'blue')
+    assert.equal(success(result).pattern.cells[0]?.colorId, 'blue')
   })
 
   it('rejects malformed crop metadata from analysis adapters', async () => {
@@ -621,8 +651,8 @@ describe('deterministic pattern algorithm', () => {
     const area = await algorithm.generate({ image: source, palette, analysis, options: { ...baseOptions, baseline: 'a1' } })
     const structural = await algorithm.generate({ image: source, palette, analysis, options: { ...baseOptions, baseline: 'mvp' } })
 
-    assert.equal(area.pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'red')
-    assert.equal(structural.pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'blue')
+    assert.equal(candidate(area).pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'red')
+    assert.equal(candidate(structural).pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'blue')
   })
 
   it('reports zero feature confidence when visual analysis is absent', async () => {
@@ -631,8 +661,8 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(fixedRequest(source))
 
-    assert.equal(result.metrics.featureExpressibility, 0)
-    assert.equal(result.metrics.featureVisibilityConfidence, 0)
+    assert.equal(success(result).metrics.featureExpressibility, 0)
+    assert.equal(success(result).metrics.featureVisibilityConfidence, 0)
   })
 
   it('ignores hard landmarks when total analysis confidence is zero', async () => {
@@ -653,9 +683,9 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(request)
 
-    assert.equal(result.recommended.valid, true)
-    assert.equal(result.metrics.featureExpressibility, 0)
-    assert.equal(result.metrics.featureVisibilityConfidence, 0)
+    assert.equal(success(result).recommended.valid, true)
+    assert.equal(success(result).metrics.featureExpressibility, 0)
+    assert.equal(success(result).metrics.featureVisibilityConfidence, 0)
   })
 
   it('scores feature visibility from the final grid colors', async () => {
@@ -689,8 +719,8 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(request)
 
-    assert.equal(result.metrics.featureVisibilityConfidence, 1)
-    assert.ok(result.metrics.featureExpressibility < 0.2)
+    assert.equal(candidate(result).metrics.featureVisibilityConfidence, 1)
+    assert.ok(candidate(result).metrics.featureExpressibility < 0.2)
   })
 
   it('reports source fidelity separately from design-plan fidelity', async () => {
@@ -714,9 +744,9 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(request)
 
-    assert.notEqual(result.metrics.sourceMeanColorDistance, result.metrics.planMeanColorDistance)
-    assert.equal(result.recommended.score.colorFidelity, result.recommended.score.planFidelity)
-    assert.notEqual(result.recommended.score.sourceFidelity, result.recommended.score.planFidelity)
+    assert.notEqual(success(result).metrics.sourceMeanColorDistance, success(result).metrics.planMeanColorDistance)
+    assert.equal(success(result).recommended.score.colorFidelity, success(result).recommended.score.planFidelity)
+    assert.notEqual(success(result).recommended.score.sourceFidelity, success(result).recommended.score.planFidelity)
   })
 
   it('keeps every public candidate score within zero and one', async () => {
@@ -725,8 +755,8 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(fixedRequest(source))
 
-    assert.ok(result.recommended.score.total >= 0)
-    assert.ok(result.recommended.score.total <= 1)
+    assert.ok(success(result).recommended.score.total >= 0)
+    assert.ok(success(result).recommended.score.total <= 1)
   })
 
   it('ignores semantic regions when total analysis confidence is zero', async () => {
@@ -768,7 +798,7 @@ describe('deterministic pattern algorithm', () => {
       },
     })
 
-    assert.deepEqual(zeroConfidence.pattern.cells, withoutAnalysis.pattern.cells)
+    assert.deepEqual(success(zeroConfidence).pattern.cells, success(withoutAnalysis).pattern.cells)
   })
 
   it('reduces a semantic gradient to a controlled three-level value design', async () => {
@@ -805,8 +835,8 @@ describe('deterministic pattern algorithm', () => {
       },
     })
 
-    assert.ok(result.metrics.uniqueColors >= 2)
-    assert.ok(result.metrics.uniqueColors <= 3)
+    assert.ok(success(result).metrics.uniqueColors >= 2)
+    assert.ok(success(result).metrics.uniqueColors <= 3)
   })
 
   it('scores canvas candidates by landmark expressibility', async () => {
@@ -830,8 +860,37 @@ describe('deterministic pattern algorithm', () => {
       },
     })
 
-    assert.equal(result.recommended.pattern.width, 8)
-    assert.ok(result.recommended.metrics.featureExpressibility > result.alternatives[0]!.metrics.featureExpressibility)
+    assert.equal(result.status, 'best-effort')
+    assert.equal(result.bestEffort?.pattern.width, 8)
+    assert.ok(result.bestEffort!.metrics.featureExpressibility > result.alternatives[0]!.metrics.featureExpressibility)
+  })
+
+  it('uses a shared reference scale when ranking canvas detail', async () => {
+    const detailCells = new Set([3, 11, 19, 27, 35, 43, 51, 59])
+    const pixels = Array.from({ length: 64 }, (_, index) => detailCells.has(index)
+      ? [0, 0, 0] as const
+      : [255, 255, 255] as const)
+    const result = await createPatternAlgorithm().generate({
+      image: image(8, 8, pixels),
+      palette: {
+        id: 'mono',
+        name: 'Monochrome',
+        colors: [palette.colors[0]!, palette.colors[1]!],
+      },
+      options: {
+        canvas: { mode: 'auto', candidates: [{ width: 2, height: 2 }, { width: 8, height: 8 }] },
+        maxColors: 2,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        baseline: 'a1',
+        optimization: { minRegionSize: 1, stripePenalty: 0, aliasPenalty: 0 },
+      },
+    })
+
+    assert.equal(result.status, 'success')
+    assert.equal(result.recommended?.pattern.width, 8)
+    assert.ok(result.recommended!.metrics.referenceBoundaryAgreement
+      > result.alternatives[0]!.metrics.referenceBoundaryAgreement)
   })
 
   it('vetoes a canvas candidate that merges hard paired features', async () => {
@@ -869,8 +928,8 @@ describe('deterministic pattern algorithm', () => {
       },
     })
 
-    assert.equal(result.recommended.pattern.width, 8)
-    assert.equal(result.recommended.valid, true)
+    assert.equal(success(result).recommended.pattern.width, 8)
+    assert.equal(success(result).recommended.valid, true)
     assert.equal(result.alternatives[0]?.valid, false)
     assert.ok(result.alternatives[0]?.rejectionReasons.includes('hard-feature-collision'))
   })
@@ -910,9 +969,9 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(request)
 
-    assert.ok(result.metrics.featurePurity < 0.3)
-    assert.ok(result.metrics.featureConnectivity < 1)
-    assert.ok(result.metrics.featureExpressibility < 0.65)
+    assert.ok(candidate(result).metrics.featurePurity < 0.3)
+    assert.ok(candidate(result).metrics.featureConnectivity < 1)
+    assert.ok(candidate(result).metrics.featureExpressibility < 0.65)
   })
 
   it('creates stable candidate ids from the full candidate identity', async () => {
@@ -920,7 +979,223 @@ describe('deterministic pattern algorithm', () => {
     const first = await createPatternAlgorithm({ version: 'first' }).generate(fixedRequest(source))
     const second = await createPatternAlgorithm({ version: 'second' }).generate(fixedRequest(source))
 
-    assert.notEqual(first.recommended.id, second.recommended.id)
+    assert.notEqual(success(first).recommended.id, success(second).recommended.id)
+  })
+
+  it('separates generation and variant identities across source, palette, and candidates', async () => {
+    const algorithm = createPatternAlgorithm({ version: 'identity-test' })
+    const redSource = image(2, 1, [[255, 0, 0], [255, 0, 0]])
+    const blueSource = image(2, 1, [[0, 0, 255], [0, 0, 255]])
+    const request = fixedRequest(redSource, {
+      canvas: { mode: 'auto', candidates: [{ width: 2, height: 1 }, { width: 4, height: 2 }] },
+      maxCandidates: 2,
+    })
+    const first = await algorithm.generate(request)
+    const changedSource = await algorithm.generate({ ...request, image: blueSource })
+    const changedPalette = await algorithm.generate({
+      ...request,
+      palette: {
+        ...palette,
+        colors: palette.colors.map((color) => color.id === 'red'
+          ? { ...color, rgb: [254, 0, 0] as const }
+          : color),
+      },
+    })
+
+    assert.equal(first.status, 'success')
+    assert.ok(first.recommended)
+    assert.equal(first.alternatives.length, 1)
+    assert.equal(first.recommended.generationId, first.alternatives[0]!.generationId)
+    assert.notEqual(first.recommended.variantId, first.alternatives[0]!.variantId)
+    assert.notEqual(first.generationId, changedSource.generationId)
+    assert.notEqual(first.generationId, changedPalette.generationId)
+    assert.match(first.generationId, /^[a-f0-9]{32}$/)
+  })
+
+  it('returns best-effort semantics when every candidate violates hard features', async () => {
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+    const request = fixedRequest(source, { maxColors: 1 })
+    request.palette = {
+      id: 'red-only',
+      name: 'Red only',
+      colors: [{ id: 'red', name: 'Red', hex: '#ff0000', rgb: [255, 0, 0] }],
+    }
+    request.analysis = {
+      landmarks: [{
+        id: 'eye',
+        kind: 'eye',
+        x: 0,
+        y: 0,
+        confidence: 1,
+        priority: 'hard',
+      }],
+    }
+
+    const result = await createPatternAlgorithm().generate(request)
+
+    assert.equal(result.status, 'best-effort')
+    assert.equal(result.recommended, undefined)
+    assert.equal(result.pattern, undefined)
+    assert.ok(result.bestEffort)
+    assert.equal(result.bestEffort.valid, false)
+    assert.equal(result.rejectedCandidates.length, 1)
+  })
+
+  it('evaluates body landmarks as geometry instead of high-contrast blobs', async () => {
+    const source = image(3, 3, Array.from({ length: 9 }, () => [255, 0, 0] as const))
+    const request = fixedRequest(source, { maxColors: 1 })
+    request.analysis = {
+      landmarks: [{
+        id: 'shoulder',
+        kind: 'body',
+        x: 1,
+        y: 1,
+        confidence: 1,
+        priority: 'hard',
+      }],
+    }
+
+    const result = await createPatternAlgorithm().generate(request)
+
+    assert.equal(result.status, 'success')
+    assert.equal(result.recommended?.valid, true)
+  })
+
+  it('infers a feature carrier from the surrounding semantic region', async () => {
+    const skin = [240, 190, 160] as const
+    const black = [0, 0, 0] as const
+    const pixels: Array<readonly [number, number, number]> = Array.from({ length: 9 }, () => skin)
+    pixels[4] = black
+    const source = image(3, 3, pixels)
+    const request = fixedRequest(source, { maxColors: 2, optimization: { minRegionSize: 1 } })
+    request.palette = {
+      id: 'face',
+      name: 'Face',
+      colors: [
+        { id: 'black', name: 'Black', hex: '#000000', rgb: black },
+        { id: 'skin', name: 'Skin', hex: '#f0bea0', rgb: skin },
+      ],
+    }
+    request.analysis = {
+      semanticRegions: [
+        {
+          id: 'eye-region',
+          label: 'eye',
+          confidence: 1,
+          mask: { width: 3, height: 3, values: new Float32Array([0, 0, 0, 0, 1, 0, 0, 0, 0]) },
+        },
+        {
+          id: 'face-region',
+          label: 'face',
+          confidence: 1,
+          mask: { width: 3, height: 3, values: new Float32Array([1, 1, 1, 1, 0, 1, 1, 1, 1]) },
+        },
+      ],
+      landmarks: [{
+        id: 'eye',
+        kind: 'eye',
+        x: 1,
+        y: 1,
+        confidence: 1,
+        priority: 'hard',
+        featureRegionId: 'eye-region',
+        carrierRegionId: 'face-region',
+      }],
+    }
+
+    const result = await createPatternAlgorithm().generate(request)
+
+    assert.equal(result.status, 'success')
+    assert.ok((result.metrics?.featureLocalContrast ?? 0) > 0.2)
+  })
+
+  it('limits hard symmetry collisions to enforced group members', async () => {
+    const skin = [240, 190, 160] as const
+    const black = [0, 0, 0] as const
+    const pixels: Array<readonly [number, number, number]> = Array.from({ length: 15 }, () => skin)
+    pixels[6] = black
+    pixels[8] = black
+    const request = fixedRequest(image(5, 3, pixels), { maxColors: 2, optimization: { minRegionSize: 1 } })
+    request.palette = {
+      id: 'face',
+      name: 'Face',
+      colors: [
+        { id: 'black', name: 'Black', hex: '#000000', rgb: black },
+        { id: 'skin', name: 'Skin', hex: '#f0bea0', rgb: skin },
+      ],
+    }
+    request.analysis = {
+      landmarks: [
+        { id: 'left-eye', kind: 'eye', x: 1, y: 1, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+        { id: 'right-eye', kind: 'eye', x: 3, y: 1, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+        { id: 'highlight', kind: 'custom', x: 1, y: 1, confidence: 0.2, priority: 'soft', symmetryGroup: 'eyes' },
+      ],
+    }
+
+    const result = await createPatternAlgorithm().generate(request)
+
+    assert.equal(result.status, 'success')
+    assert.equal(result.recommended?.valid, true)
+  })
+
+  it('rejects invalid runtime enums, duplicate analysis ids, and malformed adapter confidence', async () => {
+    const source = image(1, 1, [[255, 0, 0]])
+    const algorithm = createPatternAlgorithm()
+
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      baseline: 'future' as never,
+    })), /baseline/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      styles: ['neon' as never],
+    })), /style/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      resizeMethod: 'lanczos' as never,
+    })), /resizeMethod/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      colorDistanceMethod: 'rgb' as never,
+    })), /colorDistanceMethod/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      structure: { valueLevels: 5 as never },
+    })), /valueLevels/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      beadDiameterMm: Number.NaN,
+    })), /beadDiameterMm/)
+
+    const duplicateIds = fixedRequest(source)
+    duplicateIds.analysis = {
+      semanticRegions: [
+        { id: 'face', label: 'face', confidence: 1, mask: { width: 1, height: 1, values: new Float32Array([1]) } },
+        { id: 'face', label: 'face-2', confidence: 1, mask: { width: 1, height: 1, values: new Float32Array([1]) } },
+      ],
+      landmarks: [
+        { id: 'eye', kind: 'eye', x: 0, y: 0, confidence: 1, priority: 'hard' },
+        { id: 'eye', kind: 'eye', x: 0, y: 0, confidence: 1, priority: 'hard' },
+      ],
+    }
+    await assert.rejects(() => algorithm.generate(duplicateIds), /unique/)
+
+    const invalidConfidence = fixedRequest(source)
+    invalidConfidence.analysis = {
+      semanticRegions: [{
+        id: 'face',
+        label: 'face',
+        confidence: Number.NaN,
+        importance: 2,
+        mask: { width: 1, height: 1, values: new Float32Array([1]) },
+      }],
+    }
+    await assert.rejects(() => algorithm.generate(invalidConfidence), /Semantic region/)
+  })
+
+  it('requires confidence for automatic crop metadata', async () => {
+    const source = image(2, 1, [[255, 0, 0], [0, 0, 255]])
+    const request = fixedRequest(source)
+    request.analysis = {
+      suggestedCrop: { x: 0, y: 0, width: 1, height: 1 },
+      suggestedCropSource: 'automatic',
+    }
+
+    await assert.rejects(() => createPatternAlgorithm().generate(request), /crop confidence/)
   })
 
   it('uses neighborhood-aware palette optimization to absorb a weak isolated color', async () => {
@@ -934,7 +1209,7 @@ describe('deterministic pattern algorithm', () => {
       optimization: { minRegionSize: 1, paletteCoherence: 3, localSearchIterations: 3 },
     }))
 
-    assert.equal(result.pattern.cells[4]?.colorId, 'red')
-    assert.ok(result.metrics.paletteOptimizationChanges >= 1)
+    assert.equal(success(result).pattern.cells[4]?.colorId, 'red')
+    assert.ok(success(result).metrics.paletteOptimizationChanges >= 1)
   })
 })

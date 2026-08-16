@@ -1,4 +1,10 @@
-export { validateCanvasPlan, validateStructurePlan } from './contracts.js'
+export {
+  validateCandidateMetricsV2,
+  validateCanvasPlan,
+  validatePalettePlan,
+  validateStructurePlan,
+  validateValuePlan,
+} from './contracts.js'
 export type {
   CandidateMetricsV2,
   CanvasPlan,

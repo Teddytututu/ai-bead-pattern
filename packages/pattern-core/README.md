@@ -44,7 +44,11 @@ const result = await algorithm.generate({
   },
 })
 
-console.log(result.recommended.pattern)
+if (result.status === 'success') {
+  console.log(result.recommended.pattern)
+} else {
+  console.log(result.status, result.bestEffort?.rejectionReasons)
+}
 console.log(result.alternatives)
 ```
 

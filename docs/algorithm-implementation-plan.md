@@ -85,8 +85,12 @@ type CanvasOptions =
 
 ```ts
 interface PatternGenerationResult {
-  recommended: PatternCandidate
+  status: 'success' | 'best-effort' | 'no-valid-candidate'
+  generationId: string
+  recommended?: PatternCandidate
+  bestEffort?: PatternCandidate
   alternatives: readonly PatternCandidate[]
+  rejectedCandidates: readonly PatternCandidate[]
   evaluation: CandidateEvaluation
 }
 ```
