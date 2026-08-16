@@ -20,6 +20,8 @@ Thumbs.db
 
 # Logs
 *.log
+output/
+.playwright-cli/
 
 # Local planning workspace
 .planning/

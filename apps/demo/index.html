@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 9'%3E%3Cpath fill='%23d6534d' d='M0 0h3v3H0zM6 0h3v3H6zM3 3h3v3H3zM0 6h3v3H0zM6 6h3v3H6z'/%3E%3Cpath fill='%23287d73' d='M3 0h3v3H3zM0 3h3v3H0zM6 3h3v3H6zM3 6h3v3H3z'/%3E%3C/svg%3E">
+  <title>拼豆工作台</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef0ed;
+      --surface: #ffffff;
+      --surface-alt: #f7f8f6;
+      --text: #1e2224;
+      --muted: #697176;
+      --border: #d8ddda;
+      --border-strong: #b9c1bd;
+      --accent: #d6534d;
+      --accent-hover: #bd413c;
+      --teal: #287d73;
+      --yellow: #e3b83f;
+      --focus: #176f9c;
+      --radius: 6px;
+      --shadow: 0 8px 28px rgba(28, 36, 34, 0.08);
+      font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-synthesis: none;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { margin: 0; min-height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    button, input { font: inherit; }
+
+    button, label, input[type="range"] { -webkit-tap-highlight-color: transparent; }
+
+    button:focus-visible,
+    input:focus-visible,
+    label:has(input:focus-visible) {
+      outline: 3px solid color-mix(in srgb, var(--focus) 35%, transparent);
+      outline-offset: 2px;
+    }
+
+    .app-header {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+    }
+
+    .brand-mark span { border-radius: 2px; }
+    .brand-mark span:nth-child(1), .brand-mark span:nth-child(5), .brand-mark span:nth-child(9) { background: var(--accent); }
+    .brand-mark span:nth-child(2), .brand-mark span:nth-child(6), .brand-mark span:nth-child(7) { background: var(--teal); }
+    .brand-mark span:nth-child(3), .brand-mark span:nth-child(4), .brand-mark span:nth-child(8) { background: var(--yellow); }
+
+    h1 { font-size: 17px; line-height: 1.2; margin: 0; font-weight: 700; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); }
+    .status[data-state="busy"] .status-dot { background: var(--yellow); animation: pulse 0.9s ease-in-out infinite alternate; }
+    .status[data-state="error"] .status-dot { background: var(--accent); }
+
+    @keyframes pulse { to { opacity: 0.35; } }
+
+    .workspace {
+      min-height: calc(100vh - 58px);
+      display: grid;
+      grid-template-columns: 286px minmax(390px, 1fr) 306px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .sidebar, .inspector {
+      background: var(--surface);
+      min-width: 0;
+      overflow: auto;
+    }
+
+    .sidebar { border-right: 1px solid var(--border); }
+    .inspector { border-left: 1px solid var(--border); }
+
+    .section { padding: 16px; border-bottom: 1px solid var(--border); }
+    .section:last-child { border-bottom: 0; }
+
+    .section-title {
+      margin: 0 0 11px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .upload-row { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: center; }
+
+    .source-preview {
+      width: 72px;
+      height: 72px;
+      display: block;
+      object-fit: cover;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .file-meta { min-width: 0; }
+    .file-name { margin: 0 0 8px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .file-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      padding: 0 11px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    .file-button:hover { background: var(--surface-alt); }
+    .file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+    .control-group { display: grid; gap: 8px; margin-top: 15px; }
+    .control-group:first-child { margin-top: 0; }
+    .control-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 650; }
+    .control-value { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .segmented button {
+      height: 34px;
+      border: 0;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .segmented button:last-child { border-right: 0; }
+    .segmented button[aria-pressed="true"] { background: var(--text); color: #fff; font-weight: 700; }
+
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+    .check-list { display: grid; gap: 8px; }
+    .check-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; }
+    .check-item input { width: 17px; height: 17px; accent-color: var(--teal); }
+
+    .switch {
+      width: 40px;
+      height: 22px;
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .switch input { position: absolute; opacity: 0; }
+    .switch-track { position: absolute; inset: 0; border-radius: 11px; background: #c8cecb; transition: background 140ms ease; }
+    .switch-track::after { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform 140ms ease; }
+    .switch input:checked + .switch-track { background: var(--teal); }
+    .switch input:checked + .switch-track::after { transform: translateX(18px); }
+
+    .generate-button {
+      width: 100%;
+      height: 42px;
+      border: 0;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: #fff;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    .generate-button:hover { background: var(--accent-hover); }
+    .generate-button:disabled { opacity: 0.55; cursor: wait; }
+
+    .stage {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background: #dfe3df;
+    }
+
+    .stage-toolbar {
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 14px;
+      background: var(--surface-alt);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stage-meta { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+    .stage-title { margin: 0; font-size: 15px; }
+    .stage-detail { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+    .toolbar-actions { display: flex; align-items: center; gap: 8px; }
+
+    .icon-button {
+      width: 34px;
+      height: 34px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .icon-button:hover { background: var(--surface-alt); }
+    .icon-button:disabled { opacity: 0.4; cursor: default; }
+
+    .canvas-shell {
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      overflow: auto;
+    }
+
+    .pattern-frame {
+      width: min(100%, 760px);
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      background: #f8f8f5;
+      border: 1px solid #cbd0cc;
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    #patternCanvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+    .stage[data-busy="true"] #patternCanvas { opacity: 0.38; }
+
+    .candidate-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+
+    .candidate {
+      min-width: 0;
+      padding: 5px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+    }
+
+    .candidate:hover { border-color: var(--border-strong); }
+    .candidate[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .candidate canvas { width: 100%; aspect-ratio: 1; display: block; background: var(--surface-alt); image-rendering: pixelated; }
+    .candidate-name { display: block; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; text-align: center; }
+
+    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .summary-item { min-width: 0; padding: 9px 7px; background: var(--surface-alt); text-align: center; }
+    .summary-value { display: block; font-size: 15px; font-weight: 750; font-variant-numeric: tabular-nums; }
+    .summary-label { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
+
+    .material-list { display: grid; gap: 1px; max-height: 330px; overflow: auto; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .material-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 9px; align-items: center; min-height: 34px; padding: 5px 2px; border-bottom: 1px solid var(--border); }
+    .material-row:last-child { border-bottom: 0; }
+    .swatch { width: 18px; height: 18px; border: 1px solid rgba(0,0,0,.18); border-radius: 3px; }
+    .material-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .material-count { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+    .empty { min-height: 92px; display: grid; place-items: center; color: var(--muted); text-align: center; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 1120px) {
+      .workspace { grid-template-columns: 260px minmax(360px, 1fr); }
+      .inspector { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr 1fr; }
+      .inspector .section { border-bottom: 0; border-right: 1px solid var(--border); }
+      .inspector .section:last-child { border-right: 0; }
+    }
+
+    @media (max-width: 760px) {
+      .app-header { padding: 0 12px; }
+      .status span:last-child { display: none; }
+      .workspace { display: block; }
+      .sidebar, .inspector { border: 0; overflow: visible; }
+      .sidebar { border-bottom: 1px solid var(--border); }
+      .stage { min-height: 560px; }
+      .canvas-shell { padding: 12px; }
+      .pattern-frame { padding: 8px; }
+      .inspector { display: block; }
+      .inspector .section { border-right: 0; border-bottom: 1px solid var(--border); }
+      .candidate-list { grid-template-columns: repeat(4, minmax(72px, 1fr)); overflow-x: auto; }
+    }
+
+    @media (max-width: 420px) {
+      .stage-toolbar { align-items: flex-start; }
+      .stage-meta { display: grid; gap: 1px; }
+      .stage { min-height: 470px; }
+      .candidate-list { grid-template-columns: repeat(3, minmax(76px, 1fr)); }
+      .section { padding: 14px 12px; }
+      .sidebar .section:nth-child(3) .check-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .sidebar .section:nth-child(3) .check-item { justify-content: flex-start; flex-direction: row-reverse; }
+      .sidebar .section:nth-child(4) .check-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <h1>拼豆工作台</h1>
+    </div>
+    <div class="status" id="status" data-state="ready" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="statusText">准备完成</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="sidebar" aria-label="生成设置">
+      <section class="section">
+        <h2 class="section-title">图片</h2>
+        <div class="upload-row">
+          <canvas class="source-preview" id="sourcePreview" width="144" height="144" aria-label="原图预览"></canvas>
+          <div class="file-meta">
+            <p class="file-name" id="fileName">示例猫咪</p>
+            <label class="file-button">
+              <span aria-hidden="true">＋</span>
+              选择图片
+              <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp">
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">画布</h2>
+        <div class="control-group">
+          <div class="control-label"><span>尺寸</span><span class="control-value" id="sizeValue">自动</span></div>
+          <div class="segmented" id="sizeControl" aria-label="画布尺寸">
+            <button type="button" data-size="auto" aria-pressed="true">自动</button>
+            <button type="button" data-size="32" aria-pressed="false">32</button>
+            <button type="button" data-size="48" aria-pressed="false">48</button>
+            <button type="button" data-size="64" aria-pressed="false">64</button>
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="maxColors"><span>颜色</span><span class="control-value" id="colorValue">20 色</span></label>
+          <input id="maxColors" type="range" min="6" max="24" step="1" value="20">
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">候选风格</h2>
+        <div class="check-list" id="styleControl">
+          <label class="check-item"><span>还原</span><input type="checkbox" value="faithful" checked></label>
+          <label class="check-item"><span>简洁</span><input type="checkbox" value="simple" checked></label>
+          <label class="check-item"><span>高对比</span><input type="checkbox" value="high-contrast" checked></label>
+          <label class="check-item"><span>柔和</span><input type="checkbox" value="soft"></label>
+          <label class="check-item"><span>可爱</span><input type="checkbox" value="cute"></label>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">整理</h2>
+        <div class="check-list">
+          <label class="check-item">
+            <span>特征保护</span>
+            <span class="switch"><input id="protectFeatures" type="checkbox" checked><span class="switch-track"></span></span>
+          </label>
+          <label class="check-item">
+            <span>网格整理</span>
+            <span class="switch"><input id="cleanGrid" type="checkbox" checked><span class="switch-track"></span></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="section">
+        <button class="generate-button" id="generateButton" type="button">生成图纸</button>
+      </section>
+    </aside>
+
+    <section class="stage" id="stage" data-busy="false" aria-label="拼豆图纸预览">
+      <div class="stage-toolbar">
+        <div class="stage-meta">
+          <h2 class="stage-title" id="patternTitle">推荐方案</h2>
+          <span class="stage-detail" id="patternDetail">32 × 32 · 0 色</span>
+        </div>
+        <div class="toolbar-actions">
+          <button class="icon-button" id="toggleGridButton" type="button" title="切换网格" aria-label="切换网格" aria-pressed="true">#</button>
+          <button class="icon-button" id="downloadButton" type="button" title="下载 PNG" aria-label="下载 PNG" disabled>↓</button>
+        </div>
+      </div>
+      <div class="canvas-shell">
+        <div class="pattern-frame">
+          <canvas id="patternCanvas" width="768" height="768" aria-label="拼豆网格图"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <aside class="inspector" aria-label="生成结果">
+      <section class="section">
+        <h2 class="section-title">候选</h2>
+        <div class="candidate-list" id="candidateList">
+          <div class="empty">等待生成</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">概览</h2>
+        <div class="summary-grid">
+          <div class="summary-item"><span class="summary-value" id="beadCount">0</span><span class="summary-label">豆数</span></div>
+          <div class="summary-item"><span class="summary-value" id="uniqueColors">0</span><span class="summary-label">颜色</span></div>
+          <div class="summary-item"><span class="summary-value" id="qualityScore">0</span><span class="summary-label">评分</span></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">材料</h2>
+        <div class="material-list" id="materialList">
+          <div class="empty">等待生成</div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module">
+    import { createPatternAlgorithm } from '/packages/pattern-core/dist/index.js'
+
+    const palette = await fetch('/assets/palettes/generic-24.json').then((response) => {
+      if (response.ok === false) throw new Error('色板读取失败')
+      return response.json()
+    })
+    const colorsById = new Map(palette.colors.map((color) => [color.id, color]))
+    const algorithm = createPatternAlgorithm()
+    const elements = {
+      status: document.querySelector('#status'),
+      statusText: document.querySelector('#statusText'),
+      fileInput: document.querySelector('#fileInput'),
+      fileName: document.querySelector('#fileName'),
+      sourcePreview: document.querySelector('#sourcePreview'),
+      sizeControl: document.querySelector('#sizeControl'),
+      sizeValue: document.querySelector('#sizeValue'),
+      maxColors: document.querySelector('#maxColors'),
+      colorValue: document.querySelector('#colorValue'),
+      styleControl: document.querySelector('#styleControl'),
+      protectFeatures: document.querySelector('#protectFeatures'),
+      cleanGrid: document.querySelector('#cleanGrid'),
+      generateButton: document.querySelector('#generateButton'),
+      stage: document.querySelector('#stage'),
+      patternCanvas: document.querySelector('#patternCanvas'),
+      patternTitle: document.querySelector('#patternTitle'),
+      patternDetail: document.querySelector('#patternDetail'),
+      toggleGridButton: document.querySelector('#toggleGridButton'),
+      downloadButton: document.querySelector('#downloadButton'),
+      candidateList: document.querySelector('#candidateList'),
+      materialList: document.querySelector('#materialList'),
+      beadCount: document.querySelector('#beadCount'),
+      uniqueColors: document.querySelector('#uniqueColors'),
+      qualityScore: document.querySelector('#qualityScore'),
+    }
+
+    let sourceImage = createSampleImage()
+    let candidates = []
+    let selectedCandidate = null
+    let selectedSize = 'auto'
+    let showGrid = true
+
+    function setStatus(text, state = 'ready') {
+      elements.status.dataset.state = state
+      elements.statusText.textContent = text
+    }
+
+    function setBusy(busy) {
+      elements.generateButton.disabled = busy
+      elements.stage.dataset.busy = String(busy)
+      if (busy) setStatus('生成中', 'busy')
+    }
+
+    function createSampleImage() {
+      const canvas = document.createElement('canvas')
+      canvas.width = 420
+      canvas.height = 420
+      const context = canvas.getContext('2d')
+      context.fillStyle = '#8ec9d0'
+      context.fillRect(0, 0, 420, 420)
+      context.fillStyle = '#f1d35e'
+      context.beginPath()
+      context.arc(335, 78, 38, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle = '#d97745'
+      context.beginPath()
+      context.moveTo(105, 152)
+      context.lineTo(128, 58)
+      context.lineTo(198, 137)
+      context.lineTo(292, 58)
+      context.lineTo(315, 160)
+      context.closePath()
+      context.fill()
+      context.beginPath()
+      context.ellipse(210, 232, 132, 122, 0, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle = '#f2b56f'
+      context.beginPath()
+      context.ellipse(210, 246, 103, 88, 0, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle = '#25343b'
+      context.beginPath()
+      context.ellipse(166, 217, 15, 22, -0.15, 0, Math.PI * 2)
+      context.ellipse(254, 217, 15, 22, 0.15, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle = '#f7f3e9'
+      context.beginPath()
+      context.arc(170, 211, 5, 0, Math.PI * 2)
+      context.arc(250, 211, 5, 0, Math.PI * 2)
+      context.fill()
+      context.fillStyle = '#b94e58'
+      context.beginPath()
+      context.moveTo(210, 246)
+      context.lineTo(199, 258)
+      context.lineTo(221, 258)
+      context.closePath()
+      context.fill()
+      context.strokeStyle = '#75452a'
+      context.lineWidth = 5
+      context.lineCap = 'round'
+      context.beginPath()
+      context.moveTo(210, 258)
+      context.lineTo(210, 275)
+      context.moveTo(210, 275)
+      context.quadraticCurveTo(192, 288, 180, 277)
+      context.moveTo(210, 275)
+      context.quadraticCurveTo(228, 288, 240, 277)
+      context.stroke()
+      context.strokeStyle = '#a95b3d'
+      context.lineWidth = 8
+      context.beginPath()
+      context.moveTo(187, 148)
+      context.lineTo(174, 180)
+      context.moveTo(233, 148)
+      context.lineTo(246, 180)
+      context.stroke()
+      return canvasToPixelImage(canvas)
+    }
+
+    function canvasToPixelImage(canvas) {
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+      return {
+        width: canvas.width,
+        height: canvas.height,
+        data: context.getImageData(0, 0, canvas.width, canvas.height).data,
+      }
+    }
+
+    function renderSourcePreview() {
+      const canvas = elements.sourcePreview
+      const context = canvas.getContext('2d')
+      const imageData = new ImageData(new Uint8ClampedArray(sourceImage.data), sourceImage.width, sourceImage.height)
+      const buffer = document.createElement('canvas')
+      buffer.width = sourceImage.width
+      buffer.height = sourceImage.height
+      buffer.getContext('2d').putImageData(imageData, 0, 0)
+      context.clearRect(0, 0, canvas.width, canvas.height)
+      context.imageSmoothingQuality = 'high'
+      context.drawImage(buffer, 0, 0, canvas.width, canvas.height)
+    }
+
+    function buildImportanceMap(image) {
+      const weights = new Float32Array(image.width * image.height)
+      const luminance = new Float32Array(image.width * image.height)
+      for (let index = 0; index < luminance.length; index += 1) {
+        const offset = index * 4
+        luminance[index] = (image.data[offset] ?? 0) * 0.2126
+          + (image.data[offset + 1] ?? 0) * 0.7152
+          + (image.data[offset + 2] ?? 0) * 0.0722
+      }
+      for (let y = 0; y < image.height; y += 1) {
+        for (let x = 0; x < image.width; x += 1) {
+          const index = y * image.width + x
+          const right = luminance[y * image.width + Math.min(image.width - 1, x + 1)]
+          const bottom = luminance[Math.min(image.height - 1, y + 1) * image.width + x]
+          const edge = Math.min(1, (Math.abs(luminance[index] - right) + Math.abs(luminance[index] - bottom)) / 100)
+          const centerX = (x + 0.5) / image.width - 0.5
+          const centerY = (y + 0.5) / image.height - 0.5
+          const center = Math.max(0, 1 - Math.hypot(centerX, centerY) * 1.5)
+          weights[index] = Math.min(1, 0.2 + edge * 0.55 + center * 0.35)
+        }
+      }
+      return { width: image.width, height: image.height, weights }
+    }
+
+    function selectedStyles() {
+      const styles = [...elements.styleControl.querySelectorAll('input:checked')].map((input) => input.value)
+      return styles.length > 0 ? styles : ['faithful']
+    }
+
+    function canvasOptions() {
+      if (selectedSize === 'auto') {
+        return {
+          mode: 'auto',
+          candidates: [
+            { width: 32, height: 32 },
+            { width: 48, height: 48 },
+            { width: 64, height: 64 },
+          ],
+        }
+      }
+      const size = Number(selectedSize)
+      return { mode: 'fixed', size: { width: size, height: size } }
+    }
+
+    async function generate() {
+      setBusy(true)
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+      try {
+        const analysis = elements.protectFeatures.checked
+          ? { importanceMap: buildImportanceMap(sourceImage) }
+          : undefined
+        const result = await algorithm.generate({
+          image: sourceImage,
+          palette,
+          options: {
+            canvas: canvasOptions(),
+            maxColors: Number(elements.maxColors.value),
+            maxCandidates: 5,
+            styles: selectedStyles(),
+            backgroundRgb: [245, 245, 242],
+            optimization: elements.cleanGrid.checked
+              ? { minRegionSize: 2, isolatedPixelPenalty: 1, stripePenalty: 0.7 }
+              : { minRegionSize: 1, isolatedPixelPenalty: 0, stripePenalty: 0 },
+          },
+          ...(analysis === undefined ? {} : { analysis }),
+        })
+        candidates = [result.recommended, ...result.alternatives]
+        selectCandidate(result.recommended.id)
+        renderCandidates()
+        elements.downloadButton.disabled = false
+        setStatus(`完成 · ${Math.round(result.metrics.processingTimeMs)} ms`)
+      } catch (error) {
+        console.error(error)
+        setStatus(error instanceof Error ? error.message : '生成失败', 'error')
+      } finally {
+        setBusy(false)
+      }
+    }
+
+    function selectCandidate(id) {
+      selectedCandidate = candidates.find((candidate) => candidate.id === id) ?? candidates[0] ?? null
+      if (selectedCandidate === null) return
+      renderPattern(selectedCandidate)
+      renderMaterials(selectedCandidate)
+      for (const button of elements.candidateList.querySelectorAll('.candidate')) {
+        button.setAttribute('aria-pressed', String(button.dataset.id === selectedCandidate.id))
+      }
+    }
+
+    function styleName(style) {
+      return { faithful: '还原', simple: '简洁', 'high-contrast': '高对比', soft: '柔和', cute: '可爱' }[style] ?? style
+    }
+
+    function renderPattern(candidate) {
+      drawPattern(elements.patternCanvas, candidate.pattern, { grid: showGrid, beads: true })
+      elements.patternTitle.textContent = `${styleName(candidate.style)}方案`
+      elements.patternDetail.textContent = `${candidate.pattern.width} × ${candidate.pattern.height} · ${candidate.materialCounts.length} 色`
+      elements.beadCount.textContent = candidate.pattern.metadata.totalBeads.toLocaleString('zh-CN')
+      elements.uniqueColors.textContent = String(candidate.materialCounts.length)
+      elements.qualityScore.textContent = String(Math.round(candidate.score.total * 100))
+    }
+
+    function drawPattern(canvas, pattern, options = {}) {
+      const maximum = options.maximum ?? 900
+      const cellSize = Math.max(2, Math.floor(maximum / Math.max(pattern.width, pattern.height)))
+      canvas.width = pattern.width * cellSize
+      canvas.height = pattern.height * cellSize
+      const context = canvas.getContext('2d')
+      context.clearRect(0, 0, canvas.width, canvas.height)
+      for (const cell of pattern.cells) {
+        const color = colorsById.get(cell.colorId)
+        if (color === undefined) continue
+        const x = cell.x * cellSize
+        const y = cell.y * cellSize
+        context.fillStyle = color.hex
+        context.fillRect(x, y, cellSize, cellSize)
+        if (options.beads && cellSize >= 8) {
+          context.beginPath()
+          context.arc(x + cellSize / 2, y + cellSize / 2, cellSize * 0.36, 0, Math.PI * 2)
+          context.fillStyle = color.hex
+          context.fill()
+          context.strokeStyle = 'rgba(0,0,0,.24)'
+          context.lineWidth = Math.max(0.6, cellSize * 0.045)
+          context.stroke()
+          context.beginPath()
+          context.arc(x + cellSize * 0.39, y + cellSize * 0.36, Math.max(0.7, cellSize * 0.045), 0, Math.PI * 2)
+          context.fillStyle = 'rgba(255,255,255,.48)'
+          context.fill()
+        }
+      }
+      if (options.grid && cellSize >= 5) {
+        context.strokeStyle = 'rgba(20,25,26,.18)'
+        context.lineWidth = 1
+        context.beginPath()
+        for (let x = 0; x <= pattern.width; x += 1) {
+          context.moveTo(x * cellSize + 0.5, 0)
+          context.lineTo(x * cellSize + 0.5, canvas.height)
+        }
+        for (let y = 0; y <= pattern.height; y += 1) {
+          context.moveTo(0, y * cellSize + 0.5)
+          context.lineTo(canvas.width, y * cellSize + 0.5)
+        }
+        context.stroke()
+      }
+    }
+
+    function renderCandidates() {
+      elements.candidateList.replaceChildren()
+      for (const candidate of candidates) {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = 'candidate'
+        button.dataset.id = candidate.id
+        button.setAttribute('aria-pressed', String(candidate.id === selectedCandidate?.id))
+        button.setAttribute('aria-label', `${styleName(candidate.style)} ${candidate.pattern.width}乘${candidate.pattern.height}`)
+        const canvas = document.createElement('canvas')
+        drawPattern(canvas, candidate.pattern, { maximum: 160 })
+        const label = document.createElement('span')
+        label.className = 'candidate-name'
+        label.textContent = `${styleName(candidate.style)} ${candidate.pattern.width}`
+        button.append(canvas, label)
+        button.addEventListener('click', () => selectCandidate(candidate.id))
+        elements.candidateList.append(button)
+      }
+    }
+
+    function renderMaterials(candidate) {
+      elements.materialList.replaceChildren()
+      const rows = [...candidate.materialCounts].sort((first, second) => second.count - first.count)
+      for (const entry of rows) {
+        const color = colorsById.get(entry.colorId)
+        const row = document.createElement('div')
+        row.className = 'material-row'
+        const swatch = document.createElement('span')
+        swatch.className = 'swatch'
+        swatch.style.backgroundColor = color?.hex ?? '#fff'
+        const name = document.createElement('span')
+        name.className = 'material-name'
+        name.textContent = color?.name ?? entry.colorId
+        const count = document.createElement('span')
+        count.className = 'material-count'
+        count.textContent = entry.count.toLocaleString('zh-CN')
+        row.append(swatch, name, count)
+        elements.materialList.append(row)
+      }
+    }
+
+    async function loadFile(file) {
+      const bitmap = await createImageBitmap(file)
+      const maximum = 512
+      const scale = Math.min(1, maximum / Math.max(bitmap.width, bitmap.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+      context.imageSmoothingEnabled = true
+      context.imageSmoothingQuality = 'high'
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+      bitmap.close()
+      sourceImage = canvasToPixelImage(canvas)
+      elements.fileName.textContent = file.name
+      renderSourcePreview()
+      await generate()
+    }
+
+    function downloadPattern() {
+      if (selectedCandidate === null) return
+      const canvas = document.createElement('canvas')
+      drawPattern(canvas, selectedCandidate.pattern, { grid: true, beads: true, maximum: 1600 })
+      const link = document.createElement('a')
+      link.download = `bead-pattern-${selectedCandidate.pattern.width}x${selectedCandidate.pattern.height}-${selectedCandidate.style}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    }
+
+    elements.sizeControl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-size]')
+      if (button === null) return
+      selectedSize = button.dataset.size
+      elements.sizeValue.textContent = selectedSize === 'auto' ? '自动' : `${selectedSize} × ${selectedSize}`
+      for (const item of elements.sizeControl.querySelectorAll('button')) {
+        item.setAttribute('aria-pressed', String(item === button))
+      }
+    })
+    elements.maxColors.addEventListener('input', () => {
+      elements.colorValue.textContent = `${elements.maxColors.value} 色`
+    })
+    elements.fileInput.addEventListener('change', async () => {
+      const file = elements.fileInput.files?.[0]
+      if (file === undefined) return
+      try {
+        setStatus('读取图片', 'busy')
+        await loadFile(file)
+      } catch (error) {
+        console.error(error)
+        setStatus('图片读取失败', 'error')
+      }
+    })
+    elements.generateButton.addEventListener('click', generate)
+    elements.toggleGridButton.addEventListener('click', () => {
+      showGrid = showGrid === false
+      elements.toggleGridButton.setAttribute('aria-pressed', String(showGrid))
+      if (selectedCandidate !== null) renderPattern(selectedCandidate)
+    })
+    elements.downloadButton.addEventListener('click', downloadPattern)
+
+    renderSourcePreview()
+    await generate()
+  </script>
+</body>
+</html>

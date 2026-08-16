@@ -42,6 +42,8 @@ docs/                  架构、隐私与路线说明
 - 关键点锁定与网格工艺整理
 - 推荐项、备选项、评分和材料统计
 
+浏览器体验页：`apps/demo/index.html`
+
 运行验证：
 
 ```bash
@@ -50,6 +52,7 @@ pnpm test
 pnpm typecheck
 pnpm build
 pnpm --filter @ai-bead-pattern/pattern-core example
+pnpm demo
 ```
 
 ## License

@@ -4,6 +4,7 @@
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "build": "pnpm --filter @ai-bead-pattern/pattern-core build",
+    "demo": "pnpm build && node scripts/serve-demo.mjs",
     "test": "pnpm --filter @ai-bead-pattern/pattern-core test",
     "typecheck": "pnpm --filter @ai-bead-pattern/pattern-core typecheck"
   },
