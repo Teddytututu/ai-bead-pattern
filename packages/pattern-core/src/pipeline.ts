@@ -66,14 +66,34 @@ interface AssignedGrid {
 }
 
 const defaultStyles: readonly PatternStyle[] = ['faithful', 'simple', 'high-contrast']
-const maxImagePixels = 50_000_000
-const maxCanvasSide = 256
-const maxCanvasCells = 65_536
-const maxPaletteColors = 512
-const maxCanvasCandidates = 16
+const maxImageSide = 2_048
+const maxImagePixels = 4_000_000
+const maxCanvasSide = 96
+const maxCanvasCells = 9_216
+const maxPaletteColors = 128
+const maxSelectedColors = 48
+const maxCanvasCandidates = 12
+const maxGeneratedCandidates = 20
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
+}
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`
+  const record = value as Readonly<Record<string, unknown>>
+  return `{${Object.keys(record).sort().map((key) =>
+    `${JSON.stringify(key)}:${stableSerialize(record[key])}`).join(',')}}`
+}
+
+function stableHash(value: string): string {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(36).padStart(7, '0')
 }
 
 function validatePositiveInteger(value: number, label: string): void {
@@ -113,7 +133,8 @@ function validateRequest(request: PatternGenerationRequest): void {
   if (request.image.data.length !== request.image.width * request.image.height * 4) {
     throw new RangeError('RGBA data length must equal width * height * 4')
   }
-  if (request.image.width * request.image.height > maxImagePixels) {
+  if (request.image.width > maxImageSide || request.image.height > maxImageSide
+    || request.image.width * request.image.height > maxImagePixels) {
     throw new RangeError('Image exceeds the MVP processing limit')
   }
   if (request.palette.colors.length === 0) {
@@ -197,13 +218,33 @@ function validateRequest(request: PatternGenerationRequest): void {
       .some((value) => Number.isFinite(value) === false)) {
     throw new RangeError('Suggested crop values must be finite')
   }
+  if (analysis?.suggestedCrop !== undefined
+    && (analysis.suggestedCrop.width <= 0 || analysis.suggestedCrop.height <= 0)) {
+    throw new RangeError('Suggested crop dimensions must be positive')
+  }
+  if (analysis?.suggestedCropSource !== undefined
+    && analysis.suggestedCropSource !== 'automatic'
+    && analysis.suggestedCropSource !== 'manual') {
+    throw new RangeError('Suggested crop source must be automatic or manual')
+  }
+  if (analysis?.suggestedCropConfidence !== undefined
+    && (Number.isFinite(analysis.suggestedCropConfidence) === false
+      || analysis.suggestedCropConfidence < 0 || analysis.suggestedCropConfidence > 1)) {
+    throw new RangeError('Suggested crop confidence must stay within 0..1')
+  }
   validatePositiveInteger(request.options.maxColors, 'maxColors')
-  if (request.options.maxColors > 256) {
+  if (request.options.maxColors > maxSelectedColors) {
     throw new RangeError('maxColors exceeds the MVP processing limit')
   }
   if (request.options.canvas?.mode === 'auto'
     && request.options.canvas.candidates.length > maxCanvasCandidates) {
     throw new RangeError('Canvas candidates exceed the MVP processing limit')
+  }
+  if (request.options.maxCandidates !== undefined) {
+    validatePositiveInteger(request.options.maxCandidates, 'maxCandidates')
+    if (request.options.maxCandidates > maxGeneratedCandidates) {
+      throw new RangeError('maxCandidates exceeds the MVP processing limit')
+    }
   }
   for (const [name, value] of Object.entries(request.options.optimization ?? {})) {
     if (value !== undefined && (Number.isFinite(value) === false || value < 0)) {
@@ -223,6 +264,24 @@ function validateRequest(request: PatternGenerationRequest): void {
       throw new RangeError('Canvas size exceeds the MVP processing limit')
     }
   })
+  const baseline = request.options.baseline ?? 'mvp'
+  if (resolveSizes(request.options).length * resolveStyles(request.options, baseline).length
+    > maxGeneratedCandidates) {
+    throw new RangeError('Generated candidate count exceeds the MVP processing limit')
+  }
+}
+
+function resolvedCrop(request: PatternGenerationRequest): CropRect | undefined {
+  const analysis = request.analysis
+  const crop = analysis?.suggestedCrop
+  if (analysis === undefined || crop === undefined) return undefined
+  if (analysis.suggestedCropSource === 'manual') return crop
+  const hasAutomaticMetadata = analysis.suggestedCropSource === 'automatic'
+    || analysis.suggestedCropConfidence !== undefined
+    || analysis.confidence !== undefined
+  if (hasAutomaticMetadata === false) return crop
+  const confidence = (analysis.suggestedCropConfidence ?? 1) * (analysis.confidence ?? 1)
+  return confidence >= 0.5 ? crop : undefined
 }
 
 function resolveSizes(options: PatternOptions): readonly GridSize[] {
@@ -347,7 +406,9 @@ function gridRegionIds(
       const sourceY = clamp(Math.round(sourcePoint[1]), 0, regions[0]!.mask.height - 1)
       let bestScore = 0.4
       for (const region of regions) {
-        const score = (region.mask.values[sourceY * region.mask.width + sourceX] ?? 0) * region.confidence
+        const score = (region.mask.values[sourceY * region.mask.width + sourceX] ?? 0)
+          * region.confidence
+          * (analysis?.confidence ?? 1)
         if (score > bestScore) {
           bestScore = score
           ids[index] = region.id
@@ -521,6 +582,36 @@ function boundaryAgreement(
 interface FeatureVisibilityResult {
   score: number
   confidence: number
+  coverage: number
+  purity: number
+  connectivity: number
+  localContrast: number
+  valid: boolean
+  rejectionReasons: readonly string[]
+}
+
+function connectedFeatureRatio(
+  featureCells: ReadonlySet<number>,
+  center: number,
+  width: number,
+): number {
+  if (featureCells.size === 0 || featureCells.has(center) === false) return 0
+  const visited = new Set<number>([center])
+  const queue = [center]
+  while (queue.length > 0) {
+    const current = queue.pop()!
+    const x = current % width
+    const candidates = [current - width, current + width]
+    if (x > 0) candidates.push(current - 1)
+    if (x + 1 < width) candidates.push(current + 1)
+    for (const next of candidates) {
+      if (featureCells.has(next) && visited.has(next) === false) {
+        visited.add(next)
+        queue.push(next)
+      }
+    }
+  }
+  return visited.size / featureCells.size
 }
 
 function sourceRgbAt(
@@ -548,26 +639,54 @@ function featureVisibility(
   colorIds: readonly string[],
   palette: readonly PreparedColor[],
   activeMask: Uint8Array,
+  regionIds: readonly (string | undefined)[],
 ): FeatureVisibilityResult {
+  const analysisConfidence = analysis?.confidence ?? 1
   const landmarks = (analysis?.landmarks ?? []).filter((landmark) =>
-    landmark.confidence > 0
+    landmarkEffectiveConfidence(landmark, analysisConfidence) > 0
       && landmark.x >= crop.x && landmark.y >= crop.y
       && landmark.x < crop.x + crop.width && landmark.y < crop.y + crop.height,
   )
-  if (landmarks.length === 0) return { score: 0, confidence: 0 }
+  if (landmarks.length === 0) {
+    return {
+      score: 0,
+      confidence: 0,
+      coverage: 0,
+      purity: 0,
+      connectivity: 0,
+      localContrast: 0,
+      valid: true,
+      rejectionReasons: [],
+    }
+  }
   const colorsById = new Map(palette.map((color) => [color.id, color]))
-  const analysisConfidence = analysis?.confidence ?? 1
   const evaluated = landmarks.map((landmark) => {
     const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
     const center = centerY * width + centerX
     const colorId = colorIds[center]
     const color = colorId === undefined ? undefined : colorsById.get(colorId)
     if (activeMask[center] !== 1 || color === undefined) {
-      return { landmark, cell: center, area: 0, score: 0 }
+      const enforced = landmark.priority === 'hard'
+        && landmarkEffectiveConfidence(landmark, analysisConfidence) >= 0.5
+      return {
+        landmark,
+        cell: center,
+        area: 0,
+        score: 0,
+        coverage: 0,
+        purity: 0,
+        connectivity: 0,
+        contrastScore: 0,
+        sourceMatch: 0,
+        valid: enforced === false,
+        rejectionReasons: enforced ? ['hard-feature-missing'] : [],
+      }
     }
     const radius = landmarkGridRadiusCells(landmark, crop, fit)
-    const featureCells: number[] = []
+    const regionCells: number[] = []
+    const matchingCells = new Set<number>()
     const neighborCells: number[] = []
+    const carrierRegionId = regionIds[center]
     for (let offsetY = -radius - 1; offsetY <= radius + 1; offsetY += 1) {
       for (let offsetX = -radius - 1; offsetX <= radius + 1; offsetX += 1) {
         const x = centerX + offsetX
@@ -576,12 +695,18 @@ function featureVisibility(
         const index = y * width + x
         if (activeMask[index] !== 1) continue
         const insideFeature = Math.abs(offsetX) <= radius && Math.abs(offsetY) <= radius
-        if (insideFeature && colorIds[index] === colorId) featureCells.push(index)
-        else if (insideFeature === false) neighborCells.push(index)
+        if (insideFeature) {
+          regionCells.push(index)
+          if (colorIds[index] === colorId) matchingCells.add(index)
+        } else if (carrierRegionId === undefined || regionIds[index] === carrierRegionId) {
+          neighborCells.push(index)
+        }
       }
     }
-    const minimumCells = Math.max(1, radius === 0 ? 1 : radius * 2)
-    const areaScore = clamp(featureCells.length / minimumCells, 0, 1)
+    const minimumCells = radius === 0 ? 1 : Math.max(2, Math.ceil(regionCells.length * 0.4))
+    const coverage = clamp(matchingCells.size / minimumCells, 0, 1)
+    const purity = matchingCells.size / Math.max(1, regionCells.length)
+    const connectivity = connectedFeatureRatio(matchingCells, center, width)
     const contrast = neighborCells.length === 0 ? 0 : neighborCells.reduce((sum, index) => {
       const neighbor = colorsById.get(colorIds[index]!)
       return sum + (neighbor === undefined ? 0 : colorDistance(color.lab, neighbor.lab, 'delta-e-2000'))
@@ -592,11 +717,31 @@ function featureVisibility(
       color.lab,
       'delta-e-2000',
     ) / 15)
+    const rejectionReasons: string[] = []
+    if (landmark.priority === 'hard'
+      && landmarkEffectiveConfidence(landmark, analysisConfidence) >= 0.5) {
+      if (coverage < 0.75 || purity < 0.35) rejectionReasons.push('hard-feature-area')
+      if (connectivity < 0.75) rejectionReasons.push('hard-feature-fragmented')
+      if (contrastScore < 0.2) rejectionReasons.push('hard-feature-low-contrast')
+      if (sourceMatch < 0.35) rejectionReasons.push('hard-feature-source-mismatch')
+    }
     return {
       landmark,
       cell: center,
-      area: featureCells.length,
-      score: sourceMatch * (areaScore * 0.35 + contrastScore * 0.65),
+      area: matchingCells.size,
+      score: sourceMatch * (
+        coverage * 0.25
+        + purity * 0.2
+        + connectivity * 0.2
+        + contrastScore * 0.35
+      ),
+      coverage,
+      purity,
+      connectivity,
+      contrastScore,
+      sourceMatch,
+      valid: rejectionReasons.length === 0,
+      rejectionReasons,
     }
   })
   const baseScore = evaluated.reduce((sum, entry) => sum + entry.score, 0) / evaluated.length
@@ -607,6 +752,10 @@ function featureVisibility(
     group.push(entry)
     symmetryGroups.set(entry.landmark.symmetryGroup, group)
   }
+  const hardCollision = [...symmetryGroups.values()].some((group) =>
+    group.some((entry) => entry.landmark.priority === 'hard'
+      && landmarkEffectiveConfidence(entry.landmark, analysisConfidence) >= 0.5)
+      && new Set(group.map((entry) => entry.cell)).size < group.length)
   const groupScores = [...symmetryGroups.values()]
     .filter((group) => group.length > 1)
     .map((group) => {
@@ -621,9 +770,17 @@ function featureVisibility(
     : groupScores.reduce((sum, score) => sum + score, 0) / groupScores.length
   const confidence = evaluated.reduce((sum, entry) =>
     sum + landmarkEffectiveConfidence(entry.landmark, analysisConfidence), 0) / evaluated.length
+  const rejectionReasons = new Set(evaluated.flatMap((entry) => entry.rejectionReasons))
+  if (hardCollision) rejectionReasons.add('hard-feature-collision')
   return {
     score: clamp(baseScore * 0.85 + symmetryScore * 0.15, 0, 1),
     confidence: clamp(confidence, 0, 1),
+    coverage: evaluated.reduce((sum, entry) => sum + entry.coverage, 0) / evaluated.length,
+    purity: evaluated.reduce((sum, entry) => sum + entry.purity, 0) / evaluated.length,
+    connectivity: evaluated.reduce((sum, entry) => sum + entry.connectivity, 0) / evaluated.length,
+    localContrast: evaluated.reduce((sum, entry) => sum + entry.contrastScore, 0) / evaluated.length,
+    valid: evaluated.every((entry) => entry.valid) && hardCollision === false,
+    rejectionReasons: [...rejectionReasons].sort(),
   }
 }
 
@@ -641,7 +798,7 @@ function scoreCandidate(
 ): CandidateScore {
   const sourceFidelity = 1 / (1 + sourceMeanColorDistance / 15)
   const planFidelity = 1 / (1 + planMeanColorDistance / 15)
-  const colorFidelity = sourceFidelity
+  const colorFidelity = planFidelity
   const featureProtection = feature.score
   const cleanliness = clamp(1 - (isolatedCells * 2 + thinStripes) / Math.max(1, totalCells), 0, 1)
   const craftEase = clamp(
@@ -650,9 +807,7 @@ function scoreCandidate(
     1,
   )
   const beadCostScore = 1 / (1 + totalCells / 1024)
-  const canvasFit = feature.confidence > 0
-    ? clamp(feature.score * 0.45 + structure * 0.3 + beadCostScore * 0.25, 0, 1)
-    : clamp(structure * 0.55 + beadCostScore * 0.45, 0, 1)
+  const canvasFit = beadCostScore
   const styleBias: Record<PatternStyle, number> = {
     faithful: 0.015,
     cute: 0,
@@ -668,7 +823,7 @@ function scoreCandidate(
     + cleanliness * 0.14
     + craftEase * 0.11
     + canvasFit * 0.08
-  const total = weightedTotal / (0.82 + featureWeight) + styleBias[style]
+  const total = clamp(weightedTotal / (0.82 + featureWeight) + styleBias[style], 0, 1)
   return {
     total,
     colorFidelity,
@@ -690,7 +845,6 @@ function metadata(
   baseline: BaselineMode,
   totalBeads: number,
   generatedAt: number,
-  engine: AlgorithmEngine,
 ): PatternMetadata {
   const result: PatternMetadata = {
     sourceWidth: request.image.width,
@@ -701,7 +855,7 @@ function metadata(
     aiEnhanced: Boolean(request.options.aiEnhancement && request.analysis !== undefined),
     style,
     baseline,
-    engine,
+    engine: 'baseline',
   }
   if (request.options.beadDiameterMm !== undefined) {
     result.beadDiameterMm = request.options.beadDiameterMm
@@ -713,7 +867,6 @@ function generateCandidate(
   context: CandidateContext,
   version: string,
   clock: () => number,
-  engine: AlgorithmEngine,
 ): PatternCandidate {
   const startedAt = performance.now()
   const { request, crop, size, style, baseline, resizeMethod, distanceMethod } = context
@@ -731,6 +884,16 @@ function generateCandidate(
       edgeStrength: Math.max(0, structureOptions.edgeStrength ?? 1.25),
     } : undefined,
   )
+  const rawResized = baseline === 'mvp'
+    ? resizePixels(
+      request.image,
+      crop,
+      size.width,
+      size.height,
+      resizeMethod,
+      request.options.backgroundRgb,
+    )
+    : resized
   const weights = buildImportanceWeights(
     request.analysis,
     context.sourceGuidance,
@@ -740,17 +903,25 @@ function generateCandidate(
     resized.fit,
     resized.activeMask,
   )
-  const sourceLabs = resized.pixels.map(rgbToLab)
+  const sourceLabs = rawResized.pixels.map(rgbToLab)
   const styledPixels = resized.pixels.map((pixel) => applyStyle(pixel, style))
   const valueLevels = structureOptions.valueLevels
     ?? (style === 'simple' ? 2 : 3)
+  const regionIds = gridRegionIds(
+    request.analysis,
+    crop,
+    size.width,
+    size.height,
+    resized.fit,
+    resized.activeMask,
+  )
   const pixels = baseline === 'mvp'
     ? designRegionValues(
       styledPixels,
       resized.activeMask,
       valueLevels,
       weights,
-      gridRegionIds(request.analysis, crop, size.width, size.height, resized.fit, resized.activeMask),
+      regionIds,
     )
     : styledPixels
   const pixelLabs = pixels.map(rgbToLab)
@@ -842,13 +1013,21 @@ function generateCandidate(
     size.height,
     resized.activeMask,
   )
-  const structure = boundaryAgreement(
+  const sourceBoundaryAgreement = boundaryAgreement(
+    sourceLabs,
+    optimization.colorIds,
+    size.width,
+    size.height,
+    resized.activeMask,
+  )
+  const planBoundaryAgreement = boundaryAgreement(
     pixelLabs,
     optimization.colorIds,
     size.width,
     size.height,
     resized.activeMask,
   )
+  const structure = sourceBoundaryAgreement * 0.65 + planBoundaryAgreement * 0.35
   const planMeanColorDistance = finalMeanColorDistance(
     pixelLabs,
     optimization.colorIds,
@@ -872,6 +1051,7 @@ function generateCandidate(
     optimization.colorIds,
     selectedPalette,
     resized.activeMask,
+    regionIds,
   )
   const score = scoreCandidate(
     style,
@@ -885,15 +1065,40 @@ function generateCandidate(
     thinStripes,
     counts.length,
   )
-  return {
-    id: `${size.width}x${size.height}-${style}-${baseline}`,
+  const identity = stableSerialize({
+    engine: 'baseline',
+    version,
+    size,
     style,
+    baseline,
+    crop,
+    resizeMethod,
+    distanceMethod,
+    maxColors: request.options.maxColors,
+    palette: selectedPalette.map((color) => color.id),
+    landmarks: request.analysis?.landmarks?.map((landmark) => ({
+      id: landmark.id,
+      kind: landmark.kind,
+      x: landmark.x,
+      y: landmark.y,
+      priority: landmark.priority,
+      sourceRadiusPx: landmark.sourceRadiusPx ?? landmark.radius ?? 0,
+      gridRadiusCells: landmark.gridRadiusCells ?? landmark.radius ?? 0,
+    })) ?? [],
+    structure: request.options.structure ?? {},
+    optimization: request.options.optimization ?? {},
+  })
+  return {
+    id: `${size.width}x${size.height}-${style}-${baseline}-${stableHash(identity)}`,
+    style,
+    valid: visibility.valid,
+    rejectionReasons: visibility.rejectionReasons,
     pattern: {
       width: size.width,
       height: size.height,
       palette: usedPalette,
       cells,
-      metadata: metadata(request, version, style, baseline, totalBeads, clock(), engine),
+      metadata: metadata(request, version, style, baseline, totalBeads, clock()),
     },
     materialCounts: counts,
     metrics: {
@@ -908,6 +1113,12 @@ function generateCandidate(
       thinStripes,
       featureExpressibility: visibility.score,
       featureVisibilityConfidence: visibility.confidence,
+      featureCoverage: visibility.coverage,
+      featurePurity: visibility.purity,
+      featureConnectivity: visibility.connectivity,
+      featureLocalContrast: visibility.localContrast,
+      sourceBoundaryAgreement,
+      planBoundaryAgreement,
       paletteOptimizationChanges: paletteOptimization.changedCells,
       topologyEdits: optimization.topologyEdits,
     },
@@ -928,9 +1139,9 @@ export class DeterministicPatternAlgorithm {
   readonly engine: AlgorithmEngine
   readonly #clock: () => number
 
-  constructor(config: { version?: string; clock?: () => number; engine?: AlgorithmEngine }) {
-    this.engine = config.engine ?? 'legacy'
-    this.version = config.version ?? (this.engine === 'v2' ? '0.2.1-baseline-v2-contracts' : '0.2.1-baseline')
+  constructor(config: { version?: string; clock?: () => number }) {
+    this.engine = 'baseline'
+    this.version = config.version ?? '0.2.2-baseline'
     this.#clock = config.clock ?? Date.now
   }
 
@@ -939,7 +1150,7 @@ export class DeterministicPatternAlgorithm {
     const baseline = request.options.baseline ?? 'mvp'
     const sizes = resolveSizes(request.options)
     const styles = resolveStyles(request.options, baseline)
-    const crop = normalizeCrop(request.image, request.analysis?.suggestedCrop)
+    const crop = normalizeCrop(request.image, resolvedCrop(request))
     const preparedPalette = prepareColors(request.palette.colors)
     const sourceGuidance = buildSourceGuidance(
       request.image,
@@ -961,10 +1172,12 @@ export class DeterministicPatternAlgorithm {
           distanceMethod,
           preparedPalette,
           sourceGuidance,
-        }, this.version, this.#clock, request.options.engine ?? this.engine))
+        }, this.version, this.#clock))
       }
     }
-    candidates.sort((first, second) => second.score.total - first.score.total || first.id.localeCompare(second.id))
+    candidates.sort((first, second) => Number(second.valid) - Number(first.valid)
+      || second.score.total - first.score.total
+      || first.id.localeCompare(second.id))
     const maximumCandidates = Math.max(1, Math.floor(request.options.maxCandidates ?? 5))
     const ranked = candidates.slice(0, maximumCandidates)
     const recommended = ranked[0]!

@@ -8,7 +8,7 @@
 - A0 最近邻/RGB 基线与 A1 面积缩放/Lab 基线
 - sRGB 到 CIELAB、ΔE76 与 CIEDE2000
 - 全图有限色板选择和合法色号映射
-- 建议裁剪、重要性地图与硬关键点锁定
+- 带来源和置信度的建议裁剪、重要性地图与硬关键点锁定
 - 小连通域、孤立豆和细条纹整理
 - 五种风格参数与规则候选排序
 - 材料数量、颜色误差和工艺指标
@@ -37,6 +37,8 @@ const result = await algorithm.generate({
   },
   analysis: {
     suggestedCrop,
+    suggestedCropSource: 'automatic',
+    suggestedCropConfidence: 0.9,
     importanceMap,
     landmarks,
   },
@@ -48,6 +50,8 @@ console.log(result.alternatives)
 
 外部人物、宠物和分割模型通过 `ImageAnalysis` 注入主体掩码、语义区域、关键点、裁剪和重要性地图。核心包保持纯 TypeScript 与平台无关。
 
+V2 规划合同从 `@ai-bead-pattern/pattern-core/experimental` 导出，并配有 CanvasPlan 与 StructurePlan 校验器。
+
 ## 验证
 
 ```bash
@@ -55,4 +59,5 @@ pnpm test
 pnpm typecheck
 pnpm build
 pnpm --filter @ai-bead-pattern/pattern-core example
+pnpm --filter @ai-bead-pattern/pattern-core benchmark
 ```

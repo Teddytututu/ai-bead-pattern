@@ -17,7 +17,6 @@ export interface PatternAlgorithm {
 export interface PatternAlgorithmConfig {
   version?: string
   clock?: () => number
-  engine?: AlgorithmEngine
 }
 
 export function createPatternAlgorithm(config: PatternAlgorithmConfig = {}): PatternAlgorithm {

@@ -137,12 +137,16 @@ export function optimizeGrid(
         const bottom = snapshot[bottomIndex]
         const horizontal = left === right && left !== snapshot[current] ? left : undefined
         const vertical = top === bottom && top !== snapshot[current] ? top : undefined
-        const replacement = horizontal ?? vertical
-        const support = Number(horizontal !== undefined) + Number(vertical !== undefined)
-        if (replacement !== undefined && stripePenalty * support > 0.5) {
+        const candidates = new Map<string, number>()
+        if (horizontal !== undefined) candidates.set(horizontal, 1)
+        if (vertical !== undefined) candidates.set(vertical, (candidates.get(vertical) ?? 0) + 1)
+        const replacement = [...candidates.entries()]
+          .filter((entry) => stripePenalty * entry[1] > 0.5)
+          .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0]
+        if (replacement !== undefined) {
           const fromColorId = colorIds[current]!
-          colorIds[current] = replacement
-          edits.push({ x, y, fromColorId, toColorId: replacement, reason: 'stripe' })
+          colorIds[current] = replacement[0]
+          edits.push({ x, y, fromColorId, toColorId: replacement[0], reason: 'stripe' })
         }
       }
     }

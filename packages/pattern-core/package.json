@@ -1,11 +1,15 @@
 {
   "name": "@ai-bead-pattern/pattern-core",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./experimental": {
+      "types": "./dist/experimental.d.ts",
+      "default": "./dist/experimental.js"
     }
   },
   "files": [
@@ -13,6 +17,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "benchmark": "pnpm build && node examples/benchmark.mjs",
     "example": "pnpm build && node examples/basic.mjs",
     "test": "tsc -p tsconfig.test.json && node --test .test-dist/test/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"

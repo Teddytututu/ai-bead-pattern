@@ -28,7 +28,7 @@ export type ResizeMethod = 'area' | 'bilinear' | 'nearest'
 export type ColorDistanceMethod = 'delta-e-76' | 'delta-e-2000'
 export type PatternStyle = 'faithful' | 'cute' | 'simple' | 'high-contrast' | 'soft'
 export type BaselineMode = 'a0' | 'a1' | 'mvp'
-export type AlgorithmEngine = 'legacy' | 'v2'
+export type AlgorithmEngine = 'baseline'
 
 export interface GridSize {
   width: number
@@ -67,7 +67,6 @@ export interface PatternOptions {
   resizeMethod?: ResizeMethod
   colorDistanceMethod?: ColorDistanceMethod
   baseline?: BaselineMode
-  engine?: AlgorithmEngine
   backgroundRgb?: RGB
   aiEnhancement?: boolean
   structure?: StructureOptions
@@ -131,6 +130,8 @@ export interface ImageAnalysis {
   landmarks?: readonly ImageLandmark[]
   importanceMap?: ImportanceMap
   suggestedCrop?: CropRect
+  suggestedCropConfidence?: number
+  suggestedCropSource?: 'automatic' | 'manual'
   imageType?: ImageType
   confidence?: number
 }
@@ -198,6 +199,12 @@ export interface GenerationMetrics {
   thinStripes: number
   featureExpressibility: number
   featureVisibilityConfidence: number
+  featureCoverage: number
+  featurePurity: number
+  featureConnectivity: number
+  featureLocalContrast: number
+  sourceBoundaryAgreement: number
+  planBoundaryAgreement: number
   paletteOptimizationChanges: number
   topologyEdits: number
 }
@@ -218,6 +225,8 @@ export interface CandidateScore {
 export interface PatternCandidate {
   id: string
   style: PatternStyle
+  valid: boolean
+  rejectionReasons: readonly string[]
   pattern: BeadPattern
   materialCounts: readonly MaterialCount[]
   metrics: GenerationMetrics

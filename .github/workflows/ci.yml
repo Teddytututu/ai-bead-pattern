@@ -13,11 +13,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/setup@v1
+      - uses: pnpm/setup@v2
         with:
-          version: 11
           runtime: node@24
           cache: true
+          install: false
+      - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm typecheck
       - run: pnpm build
