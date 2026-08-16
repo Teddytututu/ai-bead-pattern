@@ -11,6 +11,7 @@ import {
   type PatternGenerationRequest,
   type PixelImage,
 } from '../src/index.js'
+import { arrayFingerprint } from '../src/pipeline.js'
 import { buildSourceGuidance } from '../src/structure.js'
 
 const palette: MaterialPalette = {
@@ -1010,6 +1011,13 @@ describe('deterministic pattern algorithm', () => {
     assert.notEqual(first.generationId, changedSource.generationId)
     assert.notEqual(first.generationId, changedPalette.generationId)
     assert.match(first.generationId, /^[a-f0-9]{32}$/)
+  })
+
+  it('fingerprints numeric analysis arrays with a fixed big-endian encoding', async () => {
+    assert.equal(
+      await arrayFingerprint([1, -2.5, 0.125]),
+      'f6f5cbe9bfa90aac3efc5c616c71be62771e3354aa52f009bf95f73b3dcab0fd',
+    )
   })
 
   it('returns best-effort semantics when every candidate violates hard features', async () => {

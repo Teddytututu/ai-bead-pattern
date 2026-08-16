@@ -141,6 +141,31 @@ export interface CandidateMetricsV2 {
   estimatedBuildMinutes: MetricValue
 }
 
+const occupancyModes = new Set<OccupancyMode>(['full-frame', 'subject-shape', 'solid-background'])
+const landmarkKinds = new Set<LandmarkKind>([
+  'eye',
+  'mouth',
+  'nose',
+  'ear',
+  'face-contour',
+  'body',
+  'identity-mark',
+  'custom',
+])
+const candidateMetricNames = [
+  'sourceFidelity',
+  'featureVisibility',
+  'silhouetteQuality',
+  'semanticBoundaryQuality',
+  'regionAdjacencyPreservation',
+  'valueOrderAccuracy',
+  'paletteRoleConsistency',
+  'clusterCleanliness',
+  'symmetryQuality',
+  'craftComplexity',
+  'estimatedBuildMinutes',
+] as const satisfies readonly (keyof CandidateMetricsV2)[]
+
 function assertFinite(value: number, label: string): void {
   if (Number.isFinite(value) === false) throw new RangeError(`${label} must be finite`)
 }
@@ -162,6 +187,10 @@ function assertUniqueStrings(values: readonly string[], label: string): void {
   }
 }
 
+function assertLandmarkKind(value: LandmarkKind, label: string): void {
+  if (landmarkKinds.has(value) === false) throw new RangeError(`${label} has an invalid feature kind`)
+}
+
 export function validateCanvasPlan(plan: CanvasPlan): void {
   if (Number.isInteger(plan.size.width) === false || plan.size.width <= 0
     || Number.isInteger(plan.size.height) === false || plan.size.height <= 0) {
@@ -170,6 +199,9 @@ export function validateCanvasPlan(plan: CanvasPlan): void {
   for (const [label, value] of Object.entries(plan.crop)) assertFinite(value, `Canvas crop ${label}`)
   if (plan.crop.width <= 0 || plan.crop.height <= 0) {
     throw new RangeError('Canvas crop dimensions must be positive')
+  }
+  if (occupancyModes.has(plan.occupancyMode) === false) {
+    throw new RangeError('Canvas occupancy mode is invalid')
   }
   assertUnitInterval(plan.subjectCoverage, 'Canvas subject coverage')
   assertNonNegativeInteger(plan.estimatedBeads, 'Canvas estimated beads')
@@ -186,6 +218,7 @@ export function validateCanvasPlan(plan: CanvasPlan): void {
   }
   assertUniqueStrings(plan.featureBudgets.map((budget) => budget.featureId), 'Feature budget ids')
   for (const budget of plan.featureBudgets) {
+    assertLandmarkKind(budget.kind, `Feature budget ${budget.featureId}`)
     assertNonNegativeInteger(budget.minimumCells, `Feature budget ${budget.featureId} minimum cells`)
     assertNonNegativeInteger(budget.preferredCells, `Feature budget ${budget.featureId} preferred cells`)
     assertNonNegativeInteger(budget.maximumCells, `Feature budget ${budget.featureId} maximum cells`)
@@ -224,6 +257,9 @@ export function validateStructurePlan(plan: StructurePlan): void {
   for (const value of plan.sourceMapping) assertFinite(value, 'Structure source mapping coordinate')
   for (const value of plan.boundaryStrength) assertUnitInterval(value, 'Structure boundary strength')
   const regionIdValues = plan.regions.map((region) => region.id)
+  for (const regionId of regionIdValues) {
+    assertNonNegativeInteger(regionId, 'Structure region id')
+  }
   const validRegionIds = new Set(regionIdValues)
   if (validRegionIds.size !== regionIdValues.length) {
     throw new RangeError('Structure region ids must be unique')
@@ -248,6 +284,7 @@ export function validateStructurePlan(plan: StructurePlan): void {
       throw new RangeError(`Structure region ${region.id} adjacency must be unique`)
     }
     for (const adjacentId of region.adjacentRegionIds) {
+      assertNonNegativeInteger(adjacentId, `Structure region ${region.id} adjacent region id`)
       if (adjacentId === region.id) throw new RangeError(`Structure region ${region.id} has a self-loop`)
       if (validRegionIds.has(adjacentId) === false) {
         throw new RangeError(`Structure region ${region.id} references an unknown adjacent region`)
@@ -255,6 +292,9 @@ export function validateStructurePlan(plan: StructurePlan): void {
     }
   }
   for (const regionId of plan.regionIds) {
+    if (Number.isInteger(regionId) === false || regionId < -1) {
+      throw new RangeError('Structure regionIds must contain integers greater than or equal to -1')
+    }
     if (regionId !== -1 && validRegionIds.has(regionId) === false) {
       throw new RangeError(`Structure region id ${regionId} has no matching region`)
     }
@@ -275,6 +315,7 @@ export function validateStructurePlan(plan: StructurePlan): void {
   }
   assertUniqueStrings(plan.featureConstraints.map((constraint) => constraint.id), 'Feature constraint ids')
   for (const constraint of plan.featureConstraints) {
+    assertLandmarkKind(constraint.kind, `Feature constraint ${constraint.id}`)
     assertNonNegativeInteger(constraint.minimumCells, `Feature constraint ${constraint.id} minimum cells`)
     assertNonNegativeInteger(constraint.maximumCells, `Feature constraint ${constraint.id} maximum cells`)
     assertNonNegativeInteger(constraint.allowedShiftCells, `Feature constraint ${constraint.id} shift`)
@@ -340,7 +381,11 @@ export function validatePalettePlan(plan: PalettePlan): void {
 }
 
 export function validateCandidateMetricsV2(metrics: CandidateMetricsV2): void {
-  for (const [name, metric] of Object.entries(metrics)) {
+  for (const name of candidateMetricNames) {
+    const metric = metrics[name]
+    if (metric === undefined || metric === null || typeof metric !== 'object') {
+      throw new RangeError(`Candidate required metric ${name} is missing`)
+    }
     if (typeof metric.available !== 'boolean') throw new RangeError(`Candidate metric ${name} availability is invalid`)
     assertFinite(metric.value, `Candidate metric ${name} value`)
     assertUnitInterval(metric.confidence, `Candidate metric ${name} confidence`)

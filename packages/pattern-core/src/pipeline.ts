@@ -115,11 +115,14 @@ async function sha256Text(value: string): Promise<string> {
   return sha256Hex(new TextEncoder().encode(value))
 }
 
-async function arrayFingerprint(values: ArrayLike<number> | undefined): Promise<string | undefined> {
+export async function arrayFingerprint(values: ArrayLike<number> | undefined): Promise<string | undefined> {
   if (values === undefined) return undefined
-  const normalized = new Float64Array(values.length)
-  for (let index = 0; index < values.length; index += 1) normalized[index] = values[index] ?? 0
-  return sha256Hex(normalized)
+  const normalized = new ArrayBuffer(values.length * Float64Array.BYTES_PER_ELEMENT)
+  const view = new DataView(normalized)
+  for (let index = 0; index < values.length; index += 1) {
+    view.setFloat64(index * Float64Array.BYTES_PER_ELEMENT, values[index] ?? 0, false)
+  }
+  return sha256Hex(new Uint8Array(normalized))
 }
 
 async function generationFingerprint(
