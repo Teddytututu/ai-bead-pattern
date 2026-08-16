@@ -21,6 +21,7 @@ docs/                  架构、隐私与路线说明
 
 - [从绘画过程到拼豆图纸：生成方法论](docs/drawing-to-bead-method.md)
 - [拼豆生成算法完整调研](docs/algorithm-research.md)
+- [可采用方法与 GitHub 项目复核](docs/methods-and-github-review.md)
 - [拼豆生成算法实现规划](docs/algorithm-implementation-plan.md)
 - [V2 算法升级方案](docs/algorithm-upgrade-v2.md)
 - [系统架构](docs/architecture.md)
