@@ -4,6 +4,7 @@ import type {
   PixelImage,
   RGB,
 } from './types.js'
+import { landmarkEffectiveConfidence, landmarkSourceRadiusPx } from './landmarks.js'
 
 export interface SourceGuidance {
   width: number
@@ -41,6 +42,7 @@ export function buildSourceGuidance(
   const lightness = new Float32Array(total)
   const edge = new Float32Array(total)
   const importance = new Float32Array(total)
+  const analysisConfidence = clamp(analysis?.confidence ?? 1, 0, 1)
   for (let index = 0; index < total; index += 1) {
     lightness[index] = luminance(sourceRgb(image, index, background))
   }
@@ -52,18 +54,21 @@ export function buildSourceGuidance(
       const top = lightness[Math.max(0, y - 1) * image.width + x]!
       const bottom = lightness[Math.min(image.height - 1, y + 1) * image.width + x]!
       edge[index] = clamp(Math.hypot(right - left, bottom - top) / 255, 0, 1)
-      importance[index] = edge[index]! * 0.35
     }
   }
   for (let index = 0; index < total; index += 1) {
     importance[index] = Math.max(
       importance[index]!,
-      clamp(analysis?.importanceMap?.weights[index] ?? 0, 0, 1),
-      maskValue(analysis?.subjectMask, index) * 0.55,
+      clamp(analysis?.importanceMap?.weights[index] ?? 0, 0, 1) * analysisConfidence,
+      maskValue(analysis?.subjectMask, index) * 0.55 * analysisConfidence,
     )
   }
   for (const region of analysis?.semanticRegions ?? []) {
-    const regionWeight = clamp((region.importance ?? 0.45) * region.confidence, 0, 1)
+    const regionWeight = clamp(
+      (region.importance ?? 0.45) * region.confidence * analysisConfidence,
+      0,
+      1,
+    )
     for (let index = 0; index < total; index += 1) {
       importance[index] = Math.max(
         importance[index]!,
@@ -72,8 +77,9 @@ export function buildSourceGuidance(
     }
   }
   for (const landmark of analysis?.landmarks ?? []) {
-    if (landmark.confidence <= 0) continue
-    const radius = Math.max(0, Math.ceil(landmark.radius ?? 1))
+    const confidence = landmarkEffectiveConfidence(landmark, analysisConfidence)
+    if (confidence <= 0) continue
+    const radius = Math.max(0, Math.ceil(landmarkSourceRadiusPx(landmark)))
     const centerX = Math.round(landmark.x)
     const centerY = Math.round(landmark.y)
     for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
@@ -87,7 +93,7 @@ export function buildSourceGuidance(
         const index = y * image.width + x
         importance[index] = Math.max(
           importance[index]!,
-          priority * landmark.confidence * falloff,
+          priority * confidence * falloff,
         )
       }
     }

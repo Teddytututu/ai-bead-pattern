@@ -12,6 +12,22 @@ export {
 export { optimizeGrid } from './grid.js'
 export { adaptPattern } from './adaptation.js'
 export type {
+  CandidateMetricsV2,
+  CanvasPlan,
+  CanvasPlanScore,
+  ColorRole,
+  FeatureBudget,
+  FeatureConstraint,
+  OccupancyMode,
+  PalettePlan,
+  StructurePlan,
+  StructureRegion,
+  ValuePlan,
+  ValueRole,
+  ValueRoleKind,
+} from './contracts.js'
+export type {
+  AlgorithmEngine,
   BaselineMode,
   BeadPattern,
   BinaryMask,

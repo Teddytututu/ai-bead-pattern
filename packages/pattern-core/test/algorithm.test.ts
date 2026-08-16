@@ -3,10 +3,12 @@ import { describe, it } from 'node:test'
 
 import {
   createPatternAlgorithm,
+  optimizeGrid,
   type MaterialPalette,
   type PatternGenerationRequest,
   type PixelImage,
 } from '../src/index.js'
+import { buildSourceGuidance } from '../src/structure.js'
 
 const palette: MaterialPalette = {
   id: 'test',
@@ -45,11 +47,85 @@ function fixedRequest(source: PixelImage, overrides: Partial<PatternGenerationRe
 }
 
 describe('deterministic pattern algorithm', () => {
+  it('keeps automatic image edges separate from semantic importance', () => {
+    const source = image(3, 1, [
+      [255, 0, 0], [0, 0, 255], [255, 0, 0],
+    ])
+
+    const guidance = buildSourceGuidance(source, undefined)
+
+    assert.ok([...guidance.edge].some((weight) => weight > 0))
+    assert.deepEqual([...guidance.importance], [0, 0, 0])
+  })
+
   it('rejects malformed RGBA input', async () => {
     const algorithm = createPatternAlgorithm()
     const request = fixedRequest({ width: 2, height: 2, data: new Uint8ClampedArray(3) })
 
     await assert.rejects(() => algorithm.generate(request), /RGBA/)
+  })
+
+  it('uses isolated-cell penalty as a numeric cleanup weight', () => {
+    const input = [
+      'red', 'red', 'red',
+      'red', 'blue', 'red',
+      'red', 'red', 'red',
+    ]
+
+    const lowPenalty = optimizeGrid(input, 3, 3, new Set(), {
+      minRegionSize: 2,
+      isolatedPixelPenalty: 0,
+      stripePenalty: 0,
+      aliasPenalty: 0,
+    })
+    const highPenalty = optimizeGrid(input, 3, 3, new Set(), {
+      minRegionSize: 2,
+      isolatedPixelPenalty: 1,
+      stripePenalty: 0,
+      aliasPenalty: 0,
+    })
+
+    assert.equal(lowPenalty.colorIds[4], 'blue')
+    assert.equal(highPenalty.colorIds[4], 'red')
+  })
+
+  it('uses stripe and alias penalties as numeric topology weights', () => {
+    const stripeInput = [
+      'blue', 'blue', 'blue',
+      'red', 'blue', 'red',
+      'blue', 'blue', 'blue',
+    ]
+    const aliasInput = [
+      'red', 'red', 'blue',
+      'red', 'blue', 'red',
+      'red', 'blue', 'red',
+    ]
+
+    const weakStripe = optimizeGrid(stripeInput, 3, 3, new Set(), {
+      minRegionSize: 1,
+      stripePenalty: 0.25,
+      aliasPenalty: 0,
+    })
+    const strongStripe = optimizeGrid(stripeInput, 3, 3, new Set(), {
+      minRegionSize: 1,
+      stripePenalty: 1,
+      aliasPenalty: 0,
+    })
+    const weakAlias = optimizeGrid(aliasInput, 3, 3, new Set(), {
+      minRegionSize: 1,
+      stripePenalty: 0,
+      aliasPenalty: 0.1,
+    })
+    const strongAlias = optimizeGrid(aliasInput, 3, 3, new Set(), {
+      minRegionSize: 1,
+      stripePenalty: 0,
+      aliasPenalty: 1,
+    })
+
+    assert.equal(weakStripe.colorIds[4], 'blue')
+    assert.equal(strongStripe.colorIds[4], 'red')
+    assert.equal(weakAlias.colorIds[4], 'blue')
+    assert.equal(strongAlias.colorIds[4], 'red')
   })
 
   it('generates the requested grid with legal colors and accurate material counts', async () => {
@@ -120,6 +196,78 @@ describe('deterministic pattern algorithm', () => {
     const result = await algorithm.generate(request)
 
     assert.equal(result.pattern.cells[4]?.colorId, 'blue')
+  })
+
+  it('locks the full hard-feature grid radius during cleanup', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const red = [255, 0, 0] as const
+    const blue = [0, 0, 255] as const
+    const pixels: Array<typeof red | typeof blue> = Array.from({ length: 25 }, () => red)
+    pixels[6] = blue
+    pixels[12] = blue
+    const source = image(5, 5, pixels)
+    const request = fixedRequest(source, {
+      optimization: {
+        minRegionSize: 2,
+        isolatedPixelPenalty: 1,
+        stripePenalty: 0,
+        aliasPenalty: 0,
+        paletteCoherence: 0,
+        localSearchIterations: 0,
+      },
+    })
+    request.analysis = {
+      confidence: 1,
+      landmarks: [{
+        id: 'eye',
+        kind: 'eye',
+        x: 2,
+        y: 2,
+        confidence: 1,
+        priority: 'hard',
+        sourceRadiusPx: 0,
+        gridRadiusCells: 1,
+      }],
+    }
+
+    const result = await algorithm.generate(request)
+
+    assert.equal(result.pattern.cells.find((cell) => cell.x === 1 && cell.y === 1)?.colorId, 'blue')
+    assert.equal(result.pattern.cells.find((cell) => cell.x === 2 && cell.y === 2)?.colorId, 'blue')
+  })
+
+  it('keeps hard-feature labels fixed during palette coherence optimization', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const red = [255, 0, 0] as const
+    const blue = [0, 0, 255] as const
+    const source = image(3, 3, [red, red, red, red, blue, red, red, red, red])
+    const request = fixedRequest(source, {
+      optimization: {
+        minRegionSize: 1,
+        paletteCoherence: 1_000,
+        localSearchIterations: 1,
+        edgeProtection: 0,
+        stripePenalty: 0,
+        aliasPenalty: 0,
+      },
+    })
+    request.analysis = {
+      confidence: 1,
+      landmarks: [{
+        id: 'eye',
+        kind: 'eye',
+        x: 1,
+        y: 1,
+        confidence: 1,
+        priority: 'hard',
+        sourceRadiusPx: 0,
+        gridRadiusCells: 0,
+      }],
+    }
+
+    const result = await algorithm.generate(request)
+
+    assert.equal(result.pattern.cells.find((cell) => cell.x === 1 && cell.y === 1)?.colorId, 'blue')
   })
 
   it('returns ranked candidates for automatic canvas and style options', async () => {
@@ -314,6 +462,35 @@ describe('deterministic pattern algorithm', () => {
     }), /Importance map values/)
   })
 
+  it('rejects non-finite grid optimization weights', async () => {
+    const algorithm = createPatternAlgorithm()
+    const source = image(1, 1, [[255, 0, 0]])
+
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      optimization: { isolatedPixelPenalty: Number.NaN },
+    })), /Optimization/)
+  })
+
+  it('rejects feature radii beyond the source and grid limits', async () => {
+    const algorithm = createPatternAlgorithm()
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+    const request = fixedRequest(source)
+    request.analysis = {
+      landmarks: [{
+        id: 'eye',
+        kind: 'eye',
+        x: 0,
+        y: 0,
+        confidence: 1,
+        priority: 'hard',
+        sourceRadiusPx: 10,
+        gridRadiusCells: 300,
+      }],
+    }
+
+    await assert.rejects(() => algorithm.generate(request), /radius/)
+  })
+
   it('rejects palette channels outside the sRGB byte range', async () => {
     const algorithm = createPatternAlgorithm()
     const source = image(1, 1, [[255, 0, 0]])
@@ -362,6 +539,66 @@ describe('deterministic pattern algorithm', () => {
 
     assert.equal(area.pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'red')
     assert.equal(structural.pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'blue')
+  })
+
+  it('reports zero feature confidence when visual analysis is absent', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+
+    const result = await algorithm.generate(fixedRequest(source))
+
+    assert.equal(result.metrics.featureExpressibility, 0)
+    assert.equal(result.metrics.featureVisibilityConfidence, 0)
+  })
+
+  it('scores feature visibility from the final grid colors', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const redOnlyPalette: MaterialPalette = {
+      id: 'red-only',
+      name: 'Red only',
+      colors: [palette.colors[2]!],
+    }
+    const red = [255, 0, 0] as const
+    const blue = [0, 0, 255] as const
+    const source = image(3, 3, [red, red, red, red, blue, red, red, red, red])
+    const request = fixedRequest(source, {
+      maxColors: 1,
+      optimization: { minRegionSize: 1, paletteCoherence: 0, localSearchIterations: 0 },
+    })
+    request.palette = redOnlyPalette
+    request.analysis = {
+      confidence: 1,
+      landmarks: [{
+        id: 'eye',
+        kind: 'eye',
+        x: 1,
+        y: 1,
+        confidence: 1,
+        priority: 'hard',
+        sourceRadiusPx: 0,
+        gridRadiusCells: 0,
+      }],
+    }
+
+    const result = await algorithm.generate(request)
+
+    assert.equal(result.metrics.featureVisibilityConfidence, 1)
+    assert.ok(result.metrics.featureExpressibility < 0.2)
+  })
+
+  it('reports source fidelity separately from design-plan fidelity', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const source = image(2, 2, [
+      [255, 0, 0], [0, 0, 255],
+      [255, 0, 0], [0, 0, 255],
+    ])
+
+    const result = await algorithm.generate(fixedRequest(source, { styles: ['high-contrast'] }))
+
+    assert.ok(Number.isFinite(result.metrics.sourceMeanColorDistance))
+    assert.ok(Number.isFinite(result.metrics.planMeanColorDistance))
+    assert.ok(Number.isFinite(result.recommended.score.sourceFidelity))
+    assert.ok(Number.isFinite(result.recommended.score.planFidelity))
   })
 
   it('reduces a semantic gradient to a controlled three-level value design', async () => {

@@ -19,9 +19,14 @@ import {
   sourcePointForGridCell,
   type CanvasFit,
 } from './image.js'
+import {
+  landmarkEffectiveConfidence,
+  landmarkGridRadiusCells,
+} from './landmarks.js'
 import { optimizePaletteAssignments } from './palette-optimization.js'
 import { buildSourceGuidance, designRegionValues, type SourceGuidance } from './structure.js'
 import type {
+  AlgorithmEngine,
   BaselineMode,
   CandidateEvaluation,
   CandidateScore,
@@ -163,10 +168,28 @@ function validateRequest(request: PatternGenerationRequest): void {
     )
   }
   for (const landmark of analysis?.landmarks ?? []) {
-    if ([landmark.x, landmark.y, landmark.confidence, landmark.radius ?? 0]
+    if ([landmark.x, landmark.y, landmark.confidence, landmark.radius ?? 0,
+      landmark.sourceRadiusPx ?? 0, landmark.gridRadiusCells ?? 0]
       .some((value) => Number.isFinite(value) === false)) {
       throw new RangeError(`Landmark ${landmark.id} values must be finite`)
     }
+    if (landmark.confidence < 0 || landmark.confidence > 1
+      || (landmark.radius ?? 0) < 0
+      || (landmark.sourceRadiusPx ?? 0) < 0
+      || (landmark.gridRadiusCells ?? 0) < 0) {
+      throw new RangeError(`Landmark ${landmark.id} confidence and radii are outside their valid range`)
+    }
+    const maximumSourceRadius = Math.max(request.image.width, request.image.height)
+    if ((landmark.sourceRadiusPx ?? 0) > maximumSourceRadius
+      || (landmark.gridRadiusCells ?? 0) > maxCanvasSide
+      || (landmark.radius ?? 0) > Math.max(maximumSourceRadius, maxCanvasSide)) {
+      throw new RangeError(`Landmark ${landmark.id} radius exceeds the processing limit`)
+    }
+  }
+  if (analysis?.confidence !== undefined
+    && (Number.isFinite(analysis.confidence) === false
+      || analysis.confidence < 0 || analysis.confidence > 1)) {
+    throw new RangeError('Analysis confidence must stay within 0..1')
   }
   if (analysis?.suggestedCrop !== undefined
     && [analysis.suggestedCrop.x, analysis.suggestedCrop.y,
@@ -181,6 +204,16 @@ function validateRequest(request: PatternGenerationRequest): void {
   if (request.options.canvas?.mode === 'auto'
     && request.options.canvas.candidates.length > maxCanvasCandidates) {
     throw new RangeError('Canvas candidates exceed the MVP processing limit')
+  }
+  for (const [name, value] of Object.entries(request.options.optimization ?? {})) {
+    if (value !== undefined && (Number.isFinite(value) === false || value < 0)) {
+      throw new RangeError(`Optimization option ${name} must be a finite non-negative number`)
+    }
+  }
+  for (const [name, value] of Object.entries(request.options.structure ?? {})) {
+    if (value !== undefined && (Number.isFinite(value) === false || value < 0)) {
+      throw new RangeError(`Structure option ${name} must be a finite non-negative number`)
+    }
   }
   resolveSizes(request.options).forEach((size) => {
     validatePositiveInteger(size.width, 'Canvas width')
@@ -272,8 +305,10 @@ function buildImportanceWeights(
   for (const landmark of analysis?.landmarks ?? []) {
     if (landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) continue
+    const confidence = landmarkEffectiveConfidence(landmark, analysis?.confidence ?? 1)
+    if (confidence <= 0) continue
     const [gridX, gridY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
-    const radius = Math.max(0, Math.round(landmark.radius ?? 1))
+    const radius = landmarkGridRadiusCells(landmark, crop, fit)
     for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
       for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
         const x = gridX + offsetX
@@ -282,7 +317,7 @@ function buildImportanceWeights(
         if (x >= 0 && y >= 0 && x < width && y < height && activeMask[index] === 1) {
           weights[index] = Math.max(
             weights[index] ?? 1,
-            landmark.priority === 'hard' ? 3 : 2,
+            1 + (landmark.priority === 'hard' ? 2 : 1) * confidence,
           )
         }
       }
@@ -327,15 +362,29 @@ function protectedCells(
   analysis: ImageAnalysis | undefined,
   crop: CropRect,
   width: number,
+  height: number,
   fit: CanvasFit,
+  activeMask: Uint8Array,
 ): ReadonlySet<number> {
   const cells = new Set<number>()
+  const analysisConfidence = analysis?.confidence ?? 1
   for (const landmark of analysis?.landmarks ?? []) {
-    if (landmark.priority !== 'hard' || landmark.confidence <= 0) continue
+    if (landmark.priority !== 'hard'
+      || landmarkEffectiveConfidence(landmark, analysisConfidence) < 0.5) continue
     if (landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) continue
-    const [x, y] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
-    cells.add(y * width + x)
+    const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
+    const radius = landmarkGridRadiusCells(landmark, crop, fit)
+    for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
+      for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
+        const x = centerX + offsetX
+        const y = centerY + offsetY
+        const index = y * width + x
+        if (x >= 0 && y >= 0 && x < width && y < height && activeMask[index] === 1) {
+          cells.add(index)
+        }
+      }
+    }
   }
   return cells
 }
@@ -469,59 +518,141 @@ function boundaryAgreement(
   return comparisons === 0 ? 1 : agreements / comparisons
 }
 
-function featureExpressibility(
+interface FeatureVisibilityResult {
+  score: number
+  confidence: number
+}
+
+function sourceRgbAt(
+  request: PatternGenerationRequest,
+  x: number,
+  y: number,
+): RGB {
+  const sourceX = clamp(Math.round(x), 0, request.image.width - 1)
+  const sourceY = clamp(Math.round(y), 0, request.image.height - 1)
+  const index = (sourceY * request.image.width + sourceX) * 4
+  const alpha = (request.image.data[index + 3] ?? 255) / 255
+  const background = request.options.backgroundRgb ?? [255, 255, 255]
+  return [0, 1, 2].map((channel) => Math.round(
+    (request.image.data[index + channel] ?? 0) * alpha + background[channel]! * (1 - alpha),
+  )) as unknown as RGB
+}
+
+function featureVisibility(
+  request: PatternGenerationRequest,
   analysis: ImageAnalysis | undefined,
   crop: CropRect,
   width: number,
+  height: number,
   fit: CanvasFit,
-): number {
+  colorIds: readonly string[],
+  palette: readonly PreparedColor[],
+  activeMask: Uint8Array,
+): FeatureVisibilityResult {
   const landmarks = (analysis?.landmarks ?? []).filter((landmark) =>
     landmark.confidence > 0
       && landmark.x >= crop.x && landmark.y >= crop.y
       && landmark.x < crop.x + crop.width && landmark.y < crop.y + crop.height,
   )
-  if (landmarks.length === 0) return 0.85
-  const mapped = landmarks.map((landmark) => {
-    const [x, y] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
-    return { landmark, x, y, cell: y * width + x }
+  if (landmarks.length === 0) return { score: 0, confidence: 0 }
+  const colorsById = new Map(palette.map((color) => [color.id, color]))
+  const analysisConfidence = analysis?.confidence ?? 1
+  const evaluated = landmarks.map((landmark) => {
+    const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
+    const center = centerY * width + centerX
+    const colorId = colorIds[center]
+    const color = colorId === undefined ? undefined : colorsById.get(colorId)
+    if (activeMask[center] !== 1 || color === undefined) {
+      return { landmark, cell: center, area: 0, score: 0 }
+    }
+    const radius = landmarkGridRadiusCells(landmark, crop, fit)
+    const featureCells: number[] = []
+    const neighborCells: number[] = []
+    for (let offsetY = -radius - 1; offsetY <= radius + 1; offsetY += 1) {
+      for (let offsetX = -radius - 1; offsetX <= radius + 1; offsetX += 1) {
+        const x = centerX + offsetX
+        const y = centerY + offsetY
+        if (x < 0 || y < 0 || x >= width || y >= height) continue
+        const index = y * width + x
+        if (activeMask[index] !== 1) continue
+        const insideFeature = Math.abs(offsetX) <= radius && Math.abs(offsetY) <= radius
+        if (insideFeature && colorIds[index] === colorId) featureCells.push(index)
+        else if (insideFeature === false) neighborCells.push(index)
+      }
+    }
+    const minimumCells = Math.max(1, radius === 0 ? 1 : radius * 2)
+    const areaScore = clamp(featureCells.length / minimumCells, 0, 1)
+    const contrast = neighborCells.length === 0 ? 0 : neighborCells.reduce((sum, index) => {
+      const neighbor = colorsById.get(colorIds[index]!)
+      return sum + (neighbor === undefined ? 0 : colorDistance(color.lab, neighbor.lab, 'delta-e-2000'))
+    }, 0) / neighborCells.length
+    const contrastScore = clamp(contrast / 24, 0, 1)
+    const sourceMatch = 1 / (1 + colorDistance(
+      rgbToLab(sourceRgbAt(request, landmark.x, landmark.y)),
+      color.lab,
+      'delta-e-2000',
+    ) / 15)
+    return {
+      landmark,
+      cell: center,
+      area: featureCells.length,
+      score: sourceMatch * (areaScore * 0.35 + contrastScore * 0.65),
+    }
   })
-  const uniqueRatio = new Set(mapped.map((entry) => entry.cell)).size / mapped.length
-  const symmetryGroups = new Map<string, typeof mapped>()
-  for (const entry of mapped) {
+  const baseScore = evaluated.reduce((sum, entry) => sum + entry.score, 0) / evaluated.length
+  const symmetryGroups = new Map<string, typeof evaluated>()
+  for (const entry of evaluated) {
     if (entry.landmark.symmetryGroup === undefined) continue
     const group = symmetryGroups.get(entry.landmark.symmetryGroup) ?? []
     group.push(entry)
     symmetryGroups.set(entry.landmark.symmetryGroup, group)
   }
-  let groupScore = uniqueRatio
-  if (symmetryGroups.size > 0) {
-    groupScore = [...symmetryGroups.values()].reduce((sum, group) =>
-      sum + new Set(group.map((entry) => entry.cell)).size / group.length,
-    0) / symmetryGroups.size
+  const groupScores = [...symmetryGroups.values()]
+    .filter((group) => group.length > 1)
+    .map((group) => {
+      const uniqueRatio = new Set(group.map((entry) => entry.cell)).size / group.length
+      const areas = group.map((entry) => entry.area)
+      const maximumArea = Math.max(...areas, 1)
+      const minimumArea = Math.min(...areas)
+      return uniqueRatio * (minimumArea / maximumArea)
+    })
+  const symmetryScore = groupScores.length === 0
+    ? baseScore
+    : groupScores.reduce((sum, score) => sum + score, 0) / groupScores.length
+  const confidence = evaluated.reduce((sum, entry) =>
+    sum + landmarkEffectiveConfidence(entry.landmark, analysisConfidence), 0) / evaluated.length
+  return {
+    score: clamp(baseScore * 0.85 + symmetryScore * 0.15, 0, 1),
+    confidence: clamp(confidence, 0, 1),
   }
-  return clamp(uniqueRatio * 0.65 + groupScore * 0.35, 0, 1)
 }
 
 function scoreCandidate(
   style: PatternStyle,
   totalCells: number,
   maxColors: number,
-  meanColorDistance: number,
+  sourceMeanColorDistance: number,
+  planMeanColorDistance: number,
   structure: number,
-  featureExpressibilityScore: number,
+  feature: FeatureVisibilityResult,
   isolatedCells: number,
   thinStripes: number,
   uniqueColors: number,
 ): CandidateScore {
-  const colorFidelity = 1 / (1 + meanColorDistance / 15)
-  const featureProtection = featureExpressibilityScore
+  const sourceFidelity = 1 / (1 + sourceMeanColorDistance / 15)
+  const planFidelity = 1 / (1 + planMeanColorDistance / 15)
+  const colorFidelity = sourceFidelity
+  const featureProtection = feature.score
   const cleanliness = clamp(1 - (isolatedCells * 2 + thinStripes) / Math.max(1, totalCells), 0, 1)
   const craftEase = clamp(
     1 - uniqueColors / Math.max(1, maxColors) * 0.25 - isolatedCells / Math.max(1, totalCells),
     0,
     1,
   )
-  const canvasFit = clamp(0.6 + Math.sqrt(totalCells) / 160 - totalCells / 40000, 0, 1)
+  const beadCostScore = 1 / (1 + totalCells / 1024)
+  const canvasFit = feature.confidence > 0
+    ? clamp(feature.score * 0.45 + structure * 0.3 + beadCostScore * 0.25, 0, 1)
+    : clamp(structure * 0.55 + beadCostScore * 0.45, 0, 1)
   const styleBias: Record<PatternStyle, number> = {
     faithful: 0.015,
     cute: 0,
@@ -529,18 +660,23 @@ function scoreCandidate(
     'high-contrast': 0.005,
     soft: 0,
   }
-  const total = colorFidelity * 0.27
+  const featureWeight = 0.18 * feature.confidence
+  const weightedTotal = sourceFidelity * 0.18
+    + planFidelity * 0.09
     + structure * 0.22
-    + featureProtection * 0.18
+    + featureProtection * featureWeight
     + cleanliness * 0.14
     + craftEase * 0.11
     + canvasFit * 0.08
-    + styleBias[style]
+  const total = weightedTotal / (0.82 + featureWeight) + styleBias[style]
   return {
     total,
     colorFidelity,
+    sourceFidelity,
+    planFidelity,
     structure,
     featureProtection,
+    featureProtectionConfidence: feature.confidence,
     cleanliness,
     craftEase,
     canvasFit,
@@ -554,6 +690,7 @@ function metadata(
   baseline: BaselineMode,
   totalBeads: number,
   generatedAt: number,
+  engine: AlgorithmEngine,
 ): PatternMetadata {
   const result: PatternMetadata = {
     sourceWidth: request.image.width,
@@ -564,6 +701,7 @@ function metadata(
     aiEnhanced: Boolean(request.options.aiEnhancement && request.analysis !== undefined),
     style,
     baseline,
+    engine,
   }
   if (request.options.beadDiameterMm !== undefined) {
     result.beadDiameterMm = request.options.beadDiameterMm
@@ -575,6 +713,7 @@ function generateCandidate(
   context: CandidateContext,
   version: string,
   clock: () => number,
+  engine: AlgorithmEngine,
 ): PatternCandidate {
   const startedAt = performance.now()
   const { request, crop, size, style, baseline, resizeMethod, distanceMethod } = context
@@ -601,6 +740,7 @@ function generateCandidate(
     resized.fit,
     resized.activeMask,
   )
+  const sourceLabs = resized.pixels.map(rgbToLab)
   const styledPixels = resized.pixels.map((pixel) => applyStyle(pixel, style))
   const valueLevels = structureOptions.valueLevels
     ?? (style === 'simple' ? 2 : 3)
@@ -626,7 +766,14 @@ function generateCandidate(
     distanceMethod,
   )
   const assigned = assignGrid(pixels, pixelLabs, selectedPalette, baseline, distanceMethod)
-  const protectedSet = protectedCells(request.analysis, crop, size.width, resized.fit)
+  const protectedSet = protectedCells(
+    request.analysis,
+    crop,
+    size.width,
+    size.height,
+    resized.fit,
+    resized.activeMask,
+  )
   const paletteOptimization = baseline === 'mvp'
     ? optimizePaletteAssignments({
       pixelLabs,
@@ -702,21 +849,38 @@ function generateCandidate(
     size.height,
     resized.activeMask,
   )
-  const meanColorDistance = finalMeanColorDistance(
+  const planMeanColorDistance = finalMeanColorDistance(
     pixelLabs,
     optimization.colorIds,
     selectedPalette,
     resized.activeMask,
   )
+  const sourceMeanColorDistance = finalMeanColorDistance(
+    sourceLabs,
+    optimization.colorIds,
+    selectedPalette,
+    resized.activeMask,
+  )
   const totalBeads = cells.length
-  const expressibility = featureExpressibility(request.analysis, crop, size.width, resized.fit)
+  const visibility = featureVisibility(
+    request,
+    request.analysis,
+    crop,
+    size.width,
+    size.height,
+    resized.fit,
+    optimization.colorIds,
+    selectedPalette,
+    resized.activeMask,
+  )
   const score = scoreCandidate(
     style,
     totalBeads,
     request.options.maxColors,
-    meanColorDistance,
+    sourceMeanColorDistance,
+    planMeanColorDistance,
     structure,
-    expressibility,
+    visibility,
     isolatedCells,
     thinStripes,
     counts.length,
@@ -729,7 +893,7 @@ function generateCandidate(
       height: size.height,
       palette: usedPalette,
       cells,
-      metadata: metadata(request, version, style, baseline, totalBeads, clock()),
+      metadata: metadata(request, version, style, baseline, totalBeads, clock(), engine),
     },
     materialCounts: counts,
     metrics: {
@@ -737,10 +901,13 @@ function generateCandidate(
       uniqueColors: counts.length,
       removedSmallRegions: optimization.removedSmallRegions,
       totalBeads,
-      meanColorDistance,
+      meanColorDistance: planMeanColorDistance,
+      sourceMeanColorDistance,
+      planMeanColorDistance,
       isolatedCells,
       thinStripes,
-      featureExpressibility: expressibility,
+      featureExpressibility: visibility.score,
+      featureVisibilityConfidence: visibility.confidence,
       paletteOptimizationChanges: paletteOptimization.changedCells,
       topologyEdits: optimization.topologyEdits,
     },
@@ -758,10 +925,12 @@ function evaluateCandidates(candidates: readonly PatternCandidate[]): CandidateE
 
 export class DeterministicPatternAlgorithm {
   readonly version: string
+  readonly engine: AlgorithmEngine
   readonly #clock: () => number
 
-  constructor(config: { version?: string; clock?: () => number }) {
-    this.version = config.version ?? '0.2.0-structure'
+  constructor(config: { version?: string; clock?: () => number; engine?: AlgorithmEngine }) {
+    this.engine = config.engine ?? 'legacy'
+    this.version = config.version ?? (this.engine === 'v2' ? '0.2.1-baseline-v2-contracts' : '0.2.1-baseline')
     this.#clock = config.clock ?? Date.now
   }
 
@@ -792,7 +961,7 @@ export class DeterministicPatternAlgorithm {
           distanceMethod,
           preparedPalette,
           sourceGuidance,
-        }, this.version, this.#clock))
+        }, this.version, this.#clock, request.options.engine ?? this.engine))
       }
     }
     candidates.sort((first, second) => second.score.total - first.score.total || first.id.localeCompare(second.id))

@@ -54,7 +54,7 @@ function chooseNeighborColor(
   height: number,
   component: readonly number[],
   activeMask?: Uint8Array,
-): string | undefined {
+): { colorId: string; support: number } | undefined {
   const componentSet = new Set(component)
   const counts = new Map<string, number>()
   for (const current of component) {
@@ -70,8 +70,9 @@ function chooseNeighborColor(
       if (colorId !== undefined) counts.set(colorId, (counts.get(colorId) ?? 0) + 1)
     }
   }
-  return [...counts.entries()]
-    .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0]?.[0]
+  const selected = [...counts.entries()]
+    .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0]
+  return selected === undefined ? undefined : { colorId: selected[0], support: selected[1] }
 }
 
 export function optimizeGrid(
@@ -87,6 +88,7 @@ export function optimizeGrid(
   const edits: GridEditRecord[] = []
   const pendingEdits: GridEditRecord[] = []
   const minimumRegionSize = Math.max(1, Math.floor(options.minRegionSize ?? 2))
+  const isolatedPixelPenalty = Math.max(0, options.isolatedPixelPenalty ?? 1)
   const visited = new Uint8Array(colorIds.length)
   let removedSmallRegions = 0
   let topologyEdits = 0
@@ -99,14 +101,15 @@ export function optimizeGrid(
     const component = collectComponent(sourceColorIds, width, height, start, visited, activeMask)
     if (component.length >= minimumRegionSize || component.some((cell) => protectedCells.has(cell))) continue
     const replacement = chooseNeighborColor(sourceColorIds, width, height, component, activeMask)
-    if (replacement === undefined || replacement === sourceColorIds[start]) continue
+    if (replacement === undefined || replacement.colorId === sourceColorIds[start]
+      || isolatedPixelPenalty * replacement.support <= component.length) continue
     removedSmallRegions += 1
     for (const cell of component) {
       pendingEdits.push({
         x: cell % width,
         y: Math.floor(cell / width),
         fromColorId: sourceColorIds[cell]!,
-        toColorId: replacement,
+        toColorId: replacement.colorId,
         reason: component.length === 1 ? 'isolated-cell' : 'small-region',
       })
     }
@@ -116,6 +119,7 @@ export function optimizeGrid(
     edits.push(edit)
   }
   if ((options.stripePenalty ?? 0) > 0) {
+    const stripePenalty = Math.max(0, options.stripePenalty ?? 0)
     const snapshot = [...colorIds]
     for (let y = 1; y < height - 1; y += 1) {
       for (let x = 1; x < width - 1; x += 1) {
@@ -131,10 +135,11 @@ export function optimizeGrid(
         const right = snapshot[rightIndex]
         const top = snapshot[topIndex]
         const bottom = snapshot[bottomIndex]
-        const replacement = left === right && left !== snapshot[current]
-          ? left
-          : top === bottom && top !== snapshot[current] ? top : undefined
-        if (replacement !== undefined) {
+        const horizontal = left === right && left !== snapshot[current] ? left : undefined
+        const vertical = top === bottom && top !== snapshot[current] ? top : undefined
+        const replacement = horizontal ?? vertical
+        const support = Number(horizontal !== undefined) + Number(vertical !== undefined)
+        if (replacement !== undefined && stripePenalty * support > 0.5) {
           const fromColorId = colorIds[current]!
           colorIds[current] = replacement
           edits.push({ x, y, fromColorId, toColorId: replacement, reason: 'stripe' })
@@ -143,6 +148,7 @@ export function optimizeGrid(
     }
   }
   if ((options.aliasPenalty ?? 0) > 0) {
+    const aliasPenalty = Math.max(0, options.aliasPenalty ?? 0)
     const snapshot = [...colorIds]
     for (let y = 1; y < height - 1; y += 1) {
       for (let x = 1; x < width - 1; x += 1) {
@@ -164,8 +170,10 @@ export function optimizeGrid(
         }
         const dominant = [...counts.entries()]
           .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))[0]
+        const currentSupport = counts.get(snapshot[current]!) ?? 0
         if (dominant === undefined || dominant[0] === snapshot[current]
-          || dominant[1] < 6 || matchingOrthogonal > 1) continue
+          || dominant[1] < 6 || matchingOrthogonal > 1
+          || aliasPenalty * (dominant[1] - currentSupport) <= 1) continue
         const fromColorId = colorIds[current]!
         colorIds[current] = dominant[0]
         edits.push({ x, y, fromColorId, toColorId: dominant[0], reason: 'topology' })

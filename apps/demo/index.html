@@ -420,10 +420,6 @@
         <h2 class="section-title">整理</h2>
         <div class="check-list">
           <label class="check-item">
-            <span>特征保护</span>
-            <span class="switch"><input id="protectFeatures" type="checkbox" checked><span class="switch-track"></span></span>
-          </label>
-          <label class="check-item">
             <span>网格整理</span>
             <span class="switch"><input id="cleanGrid" type="checkbox" checked><span class="switch-track"></span></span>
           </label>
@@ -467,7 +463,6 @@
           <div class="summary-item"><span class="summary-value" id="beadCount">0</span><span class="summary-label">豆数</span></div>
           <div class="summary-item"><span class="summary-value" id="uniqueColors">0</span><span class="summary-label">颜色</span></div>
           <div class="summary-item"><span class="summary-value" id="qualityScore">0</span><span class="summary-label">评分</span></div>
-          <div class="summary-item"><span class="summary-value" id="featureScore">0</span><span class="summary-label">特征</span></div>
           <div class="summary-item"><span class="summary-value" id="paletteChanges">0</span><span class="summary-label">配色调整</span></div>
           <div class="summary-item"><span class="summary-value" id="gridEdits">0</span><span class="summary-label">网格整理</span></div>
         </div>
@@ -506,7 +501,6 @@
       valueLevelsControl: document.querySelector('#valueLevelsControl'),
       valueLevelsValue: document.querySelector('#valueLevelsValue'),
       styleControl: document.querySelector('#styleControl'),
-      protectFeatures: document.querySelector('#protectFeatures'),
       cleanGrid: document.querySelector('#cleanGrid'),
       generateButton: document.querySelector('#generateButton'),
       stage: document.querySelector('#stage'),
@@ -520,7 +514,6 @@
       beadCount: document.querySelector('#beadCount'),
       uniqueColors: document.querySelector('#uniqueColors'),
       qualityScore: document.querySelector('#qualityScore'),
-      featureScore: document.querySelector('#featureScore'),
       paletteChanges: document.querySelector('#paletteChanges'),
       gridEdits: document.querySelector('#gridEdits'),
     }
@@ -637,30 +630,6 @@
       context.drawImage(buffer, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
     }
 
-    function buildImportanceMap(image) {
-      const weights = new Float32Array(image.width * image.height)
-      const luminance = new Float32Array(image.width * image.height)
-      for (let index = 0; index < luminance.length; index += 1) {
-        const offset = index * 4
-        luminance[index] = (image.data[offset] ?? 0) * 0.2126
-          + (image.data[offset + 1] ?? 0) * 0.7152
-          + (image.data[offset + 2] ?? 0) * 0.0722
-      }
-      for (let y = 0; y < image.height; y += 1) {
-        for (let x = 0; x < image.width; x += 1) {
-          const index = y * image.width + x
-          const right = luminance[y * image.width + Math.min(image.width - 1, x + 1)]
-          const bottom = luminance[Math.min(image.height - 1, y + 1) * image.width + x]
-          const edge = Math.min(1, (Math.abs(luminance[index] - right) + Math.abs(luminance[index] - bottom)) / 100)
-          const centerX = (x + 0.5) / image.width - 0.5
-          const centerY = (y + 0.5) / image.height - 0.5
-          const center = Math.max(0, 1 - Math.hypot(centerX, centerY) * 1.5)
-          weights[index] = Math.min(1, 0.2 + edge * 0.55 + center * 0.35)
-        }
-      }
-      return { width: image.width, height: image.height, weights }
-    }
-
     function selectedStyles() {
       const styles = [...elements.styleControl.querySelectorAll('input:checked')].map((input) => input.value)
       return styles.length > 0 ? styles : ['faithful']
@@ -685,9 +654,6 @@
       setBusy(true)
       await new Promise((resolve) => requestAnimationFrame(resolve))
       try {
-        const analysis = elements.protectFeatures.checked
-          ? { importanceMap: buildImportanceMap(sourceImage) }
-          : undefined
         const result = await algorithm.generate({
           image: sourceImage,
           palette,
@@ -699,8 +665,8 @@
             baseline: selectedBaseline,
             backgroundRgb: [245, 245, 242],
             structure: {
-              importanceStrength: elements.protectFeatures.checked ? 4 : 0,
-              edgeStrength: elements.protectFeatures.checked ? 1.25 : 0,
+              importanceStrength: 0,
+              edgeStrength: 0.35,
               valueLevels: selectedValueLevels,
             },
             optimization: elements.cleanGrid.checked
@@ -722,7 +688,6 @@
                 localSearchIterations: 0,
               },
           },
-          ...(analysis === undefined ? {} : { analysis }),
         })
         candidates = [result.recommended, ...result.alternatives]
         selectCandidate(result.recommended.id)
@@ -763,7 +728,6 @@
       elements.beadCount.textContent = candidate.pattern.metadata.totalBeads.toLocaleString('zh-CN')
       elements.uniqueColors.textContent = String(candidate.materialCounts.length)
       elements.qualityScore.textContent = String(Math.round(candidate.score.total * 100))
-      elements.featureScore.textContent = String(Math.round(candidate.metrics.featureExpressibility * 100))
       elements.paletteChanges.textContent = String(candidate.metrics.paletteOptimizationChanges)
       elements.gridEdits.textContent = String(candidate.edits.length - candidate.metrics.paletteOptimizationChanges)
     }

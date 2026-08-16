@@ -28,6 +28,7 @@ export type ResizeMethod = 'area' | 'bilinear' | 'nearest'
 export type ColorDistanceMethod = 'delta-e-76' | 'delta-e-2000'
 export type PatternStyle = 'faithful' | 'cute' | 'simple' | 'high-contrast' | 'soft'
 export type BaselineMode = 'a0' | 'a1' | 'mvp'
+export type AlgorithmEngine = 'legacy' | 'v2'
 
 export interface GridSize {
   width: number
@@ -66,6 +67,7 @@ export interface PatternOptions {
   resizeMethod?: ResizeMethod
   colorDistanceMethod?: ColorDistanceMethod
   baseline?: BaselineMode
+  engine?: AlgorithmEngine
   backgroundRgb?: RGB
   aiEnhancement?: boolean
   structure?: StructureOptions
@@ -114,6 +116,11 @@ export interface ImageLandmark {
   y: number
   confidence: number
   priority: LandmarkPriority
+  /** Radius in source-image pixels for importance-map expansion. */
+  sourceRadiusPx?: number
+  /** Radius in output grid cells for feature constraints and hard locks. */
+  gridRadiusCells?: number
+  /** @deprecated Prefer sourceRadiusPx and gridRadiusCells. */
   radius?: number
   symmetryGroup?: string
 }
@@ -151,6 +158,7 @@ export interface PatternMetadata {
   aiEnhanced: boolean
   style: PatternStyle
   baseline: BaselineMode
+  engine?: AlgorithmEngine
   aiProvider?: string
   aiModel?: string
   beadDiameterMm?: number
@@ -184,9 +192,12 @@ export interface GenerationMetrics {
   removedSmallRegions: number
   totalBeads: number
   meanColorDistance: number
+  sourceMeanColorDistance: number
+  planMeanColorDistance: number
   isolatedCells: number
   thinStripes: number
   featureExpressibility: number
+  featureVisibilityConfidence: number
   paletteOptimizationChanges: number
   topologyEdits: number
 }
@@ -194,8 +205,11 @@ export interface GenerationMetrics {
 export interface CandidateScore {
   total: number
   colorFidelity: number
+  sourceFidelity: number
+  planFidelity: number
   structure: number
   featureProtection: number
+  featureProtectionConfidence: number
   cleanliness: number
   craftEase: number
   canvasFit: number

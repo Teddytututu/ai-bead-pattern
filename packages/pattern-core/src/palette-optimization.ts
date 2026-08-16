@@ -40,11 +40,11 @@ export function optimizePaletteAssignments(input: PaletteOptimizationInput): Pal
         const index = y * input.width + x
         if (input.activeMask[index] !== 1) continue
         const protectedCell = input.protectedCells.has(index)
+        if (protectedCell) continue
         let bestId = colorIds[index]!
         let bestEnergy = Number.POSITIVE_INFINITY
         for (const candidate of input.colors) {
-          const dataWeight = (0.75 + (input.importance[index] ?? 1) * 0.55)
-            * (protectedCell ? 2.5 : 1)
+          const dataWeight = 0.75 + (input.importance[index] ?? 1) * 0.55
           let energy = colorDistance(
             input.pixelLabs[index]!,
             candidate.lab,
@@ -62,7 +62,7 @@ export function optimizePaletteAssignments(input: PaletteOptimizationInput): Pal
               'delta-e-76',
             ) / 60, 0, 1)
             const boundaryAllowance = 1 - sourceBoundary * clamp(input.edgeProtection, 0, 1)
-            energy += input.coherence * 16 * boundaryAllowance * (protectedCell ? 0.15 : 1)
+            energy += input.coherence * 16 * boundaryAllowance
           }
           const currentBest = colorsById.get(bestId)
           if (energy < bestEnergy
