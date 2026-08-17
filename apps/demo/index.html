@@ -275,7 +275,7 @@
       padding: 14px;
     }
 
-    #patternCanvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+    #patternCanvas { width: auto; height: auto; max-width: 100%; max-height: 100%; display: block; image-rendering: pixelated; }
     .stage[data-busy="true"] #patternCanvas { opacity: 0.38; }
 
     .candidate-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -291,7 +291,7 @@
 
     .candidate:hover { border-color: var(--border-strong); }
     .candidate[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-    .candidate canvas { width: 100%; aspect-ratio: 1; display: block; background: var(--surface-alt); image-rendering: pixelated; }
+    .candidate canvas { width: 100%; height: auto; display: block; background: var(--surface-alt); image-rendering: pixelated; }
     .candidate-name { display: block; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; text-align: center; }
 
     .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
@@ -397,6 +397,14 @@
           </div>
         </div>
         <div class="control-group">
+          <div class="control-label"><span>主体范围</span><span class="control-value" id="occupancyValue">自动</span></div>
+          <div class="segmented three" id="occupancyControl" aria-label="主体范围">
+            <button type="button" data-occupancy="auto" aria-pressed="true">自动</button>
+            <button type="button" data-occupancy="subject-shape" aria-pressed="false">主体</button>
+            <button type="button" data-occupancy="full-frame" aria-pressed="false">全图</button>
+          </div>
+        </div>
+        <div class="control-group">
           <div class="control-label"><span>明暗</span><span class="control-value" id="valueLevelsValue">3 档</span></div>
           <div class="segmented three" id="valueLevelsControl" aria-label="明暗层级">
             <button type="button" data-levels="2" aria-pressed="false">2</button>
@@ -466,6 +474,10 @@
           <div class="summary-item"><span class="summary-value" id="qualityScore">0</span><span class="summary-label">评分</span></div>
           <div class="summary-item"><span class="summary-value" id="paletteChanges">0</span><span class="summary-label">配色调整</span></div>
           <div class="summary-item"><span class="summary-value" id="gridEdits">0</span><span class="summary-label">网格整理</span></div>
+          <div class="summary-item"><span class="summary-value" id="shapeScore">--</span><span class="summary-label">轮廓吻合</span></div>
+          <div class="summary-item"><span class="summary-value" id="shapeCoverage">--</span><span class="summary-label">覆盖吻合</span></div>
+          <div class="summary-item"><span class="summary-value" id="shapeComponents">--</span><span class="summary-label">连通块</span></div>
+          <div class="summary-item"><span class="summary-value" id="shapeHoles">--</span><span class="summary-label">孔洞</span></div>
         </div>
       </section>
 
@@ -480,6 +492,7 @@
 
   <script type="module">
     import { createPatternAlgorithm } from '/packages/pattern-core/dist/index.js'
+    import { inferSubjectAnalysis } from './subject-mask.mjs'
 
     const palette = await fetch('/assets/palettes/generic-24.json').then((response) => {
       if (response.ok === false) throw new Error('色板读取失败')
@@ -499,6 +512,8 @@
       colorValue: document.querySelector('#colorValue'),
       baselineControl: document.querySelector('#baselineControl'),
       baselineValue: document.querySelector('#baselineValue'),
+      occupancyControl: document.querySelector('#occupancyControl'),
+      occupancyValue: document.querySelector('#occupancyValue'),
       valueLevelsControl: document.querySelector('#valueLevelsControl'),
       valueLevelsValue: document.querySelector('#valueLevelsValue'),
       styleControl: document.querySelector('#styleControl'),
@@ -517,13 +532,19 @@
       qualityScore: document.querySelector('#qualityScore'),
       paletteChanges: document.querySelector('#paletteChanges'),
       gridEdits: document.querySelector('#gridEdits'),
+      shapeScore: document.querySelector('#shapeScore'),
+      shapeCoverage: document.querySelector('#shapeCoverage'),
+      shapeComponents: document.querySelector('#shapeComponents'),
+      shapeHoles: document.querySelector('#shapeHoles'),
     }
 
     let sourceImage = createSampleImage()
+    let sourceAnalysis = inferSubjectAnalysis(sourceImage)
     let candidates = []
     let selectedCandidate = null
     let selectedSize = 'auto'
     let selectedBaseline = 'mvp'
+    let selectedOccupancy = 'auto'
     let selectedValueLevels = 3
     let showGrid = true
 
@@ -543,12 +564,6 @@
       canvas.width = 420
       canvas.height = 420
       const context = canvas.getContext('2d')
-      context.fillStyle = '#8ec9d0'
-      context.fillRect(0, 0, 420, 420)
-      context.fillStyle = '#f1d35e'
-      context.beginPath()
-      context.arc(335, 78, 38, 0, Math.PI * 2)
-      context.fill()
       context.fillStyle = '#d97745'
       context.beginPath()
       context.moveTo(105, 152)
@@ -658,6 +673,11 @@
         const result = await algorithm.generate({
           image: sourceImage,
           palette,
+          analysis: {
+            subjectMask: sourceAnalysis.subjectMask,
+            confidence: sourceAnalysis.confidence,
+            modelVersions: sourceAnalysis.modelVersions,
+          },
           options: {
             canvas: canvasOptions(),
             maxColors: Number(elements.maxColors.value),
@@ -669,6 +689,9 @@
               importanceStrength: 0,
               edgeStrength: 0.35,
               valueLevels: selectedValueLevels,
+              occupancyMode: selectedOccupancy,
+              subjectThreshold: 0.5,
+              shapeRefinementIterations: 2,
             },
             optimization: elements.cleanGrid.checked
               ? {
@@ -698,7 +721,8 @@
         elements.downloadButton.disabled = result.status !== 'success'
         const modeName = { mvp: '结构版', a1: '面积缩放', a0: '最近邻' }[selectedBaseline]
         if (result.status === 'success') {
-          setStatus(`${modeName} · ${Math.round(primary.metrics.processingTimeMs)} ms`)
+          const shapeName = primary.metrics.shapeApplied ? '主体形状' : '全画面'
+          setStatus(`${modeName} · ${shapeName} · ${Math.round(primary.metrics.processingTimeMs)} ms`)
         } else {
           setStatus('关键特征表达不足，请扩大画布、缩小主体范围或调整关键点', 'warning')
         }
@@ -737,6 +761,18 @@
       elements.qualityScore.textContent = String(Math.round(candidate.score.total * 100))
       elements.paletteChanges.textContent = String(candidate.metrics.paletteOptimizationChanges)
       elements.gridEdits.textContent = String(candidate.edits.length - candidate.metrics.paletteOptimizationChanges)
+      elements.shapeScore.textContent = candidate.metrics.shapeApplied
+        ? `${Math.round(candidate.metrics.silhouetteBoundaryIoU * 100)}%`
+        : '--'
+      elements.shapeCoverage.textContent = candidate.metrics.shapeApplied
+        ? `${Math.round(candidate.metrics.subjectCoverageIoU * 100)}%`
+        : '--'
+      elements.shapeComponents.textContent = candidate.metrics.shapeApplied
+        ? `${candidate.metrics.targetShapeComponents}/${candidate.metrics.sourceShapeComponents}`
+        : '--'
+      elements.shapeHoles.textContent = candidate.metrics.shapeApplied
+        ? `${candidate.metrics.targetShapeHoles}/${candidate.metrics.sourceShapeHoles}`
+        : '--'
     }
 
     function drawPattern(canvas, pattern, options = {}) {
@@ -837,6 +873,7 @@
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
       bitmap.close()
       sourceImage = canvasToPixelImage(canvas)
+      sourceAnalysis = inferSubjectAnalysis(sourceImage)
       elements.fileName.textContent = file.name
       renderSourcePreview()
       await generate()
@@ -874,6 +911,22 @@
       }
       for (const item of elements.valueLevelsControl.querySelectorAll('button')) {
         item.disabled = selectedBaseline !== 'mvp'
+      }
+      for (const item of elements.occupancyControl.querySelectorAll('button')) {
+        item.disabled = selectedBaseline !== 'mvp'
+      }
+    })
+    elements.occupancyControl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-occupancy]')
+      if (button === null) return
+      selectedOccupancy = button.dataset.occupancy
+      elements.occupancyValue.textContent = {
+        auto: '自动',
+        'subject-shape': '主体形状',
+        'full-frame': '全画面',
+      }[selectedOccupancy]
+      for (const item of elements.occupancyControl.querySelectorAll('button')) {
+        item.setAttribute('aria-pressed', String(item === button))
       }
     })
     elements.valueLevelsControl.addEventListener('click', (event) => {

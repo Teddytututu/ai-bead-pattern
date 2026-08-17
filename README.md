@@ -15,7 +15,7 @@ tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
 ```
 
-当前阶段已完成 v0.2.3 API 加固与首个视觉模型接入。`pattern-core` 可以从标准 RGBA 像素生成固定或自动尺寸的拼豆候选，并输出明确的成功或 best-effort 状态、两层候选 ID、材料统计、局部整理记录、分类型特征可见度与统一参考尺度评分。`ai-gateway` 已通过 rembg 调用 `birefnet-general-lite`，将主体掩码、边界重要度、建议裁剪和模型版本转换为 `ImageAnalysis`。V2 已建立带完整运行时校验的画布、特征、结构、明暗和色卡规划合同。
+当前阶段已完成 v0.3.0 主体形状重构。`pattern-core` 将视觉模型提供的主体 mask 转为目标豆格占用区域，保留连通块、孔洞和硬关键点，并输出轮廓、覆盖率与拓扑诊断。`ai-gateway` 通过 rembg 调用 `birefnet-general-lite`，将主体掩码、边界重要度、建议裁剪和模型版本转换为 `ImageAnalysis`。A0/A1 继续提供全画面对照，结构版负责主体形状、颜色设计和网格整理。
 
 ## 文档
 
@@ -43,6 +43,8 @@ docs/                  架构、隐私与路线说明
 - Lab 与 CIEDE2000 材料配色
 - 自动尺寸和五种风格候选
 - 长方形图片等比缩放、居中留白
+- 主体 mask 驱动的目标格形状重构
+- 连通块、孔洞、边界与关键点保护
 - 关键点锁定与网格工艺整理
 - 推荐项、备选项、评分和材料统计
 
@@ -61,6 +63,8 @@ docs/                  架构、隐私与路线说明
 - 结构版、面积缩放、最近邻三路浏览器对照
 - rembg + BiRefNet 主体分割适配器
 - 主体边界重要度、自动裁剪与分析版本追踪
+- 线性轮廓追踪、面积覆盖栅格化与 Signed Distance Field
+- 主体形状、全画面和置信度自动选择
 
 下一批工作安排为人物与宠物语义分析、FeatureConstraint 模板搜索和 PIA-lite 空间重组。
 
@@ -75,6 +79,7 @@ pnpm typecheck
 pnpm build
 pnpm --filter @ai-bead-pattern/pattern-core example
 pnpm benchmark
+pnpm benchmark:shape
 pnpm demo
 ```
 

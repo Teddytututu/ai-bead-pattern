@@ -53,6 +53,9 @@ export interface StructureOptions {
   importanceStrength?: number
   edgeStrength?: number
   valueLevels?: 2 | 3 | 4
+  occupancyMode?: 'auto' | 'full-frame' | 'subject-shape'
+  subjectThreshold?: number
+  shapeRefinementIterations?: number
 }
 
 export interface PatternOptions {
@@ -215,6 +218,16 @@ export interface GenerationMetrics {
   referenceBoundaryAgreement: number
   paletteOptimizationChanges: number
   topologyEdits: number
+  shapeApplied: boolean
+  subjectOccupancyRatio: number
+  silhouetteBoundaryIoU: number
+  subjectCoverageIoU: number
+  shapeMeanBoundaryDistance: number
+  sourceShapeComponents: number
+  targetShapeComponents: number
+  sourceShapeHoles: number
+  targetShapeHoles: number
+  shapeEdits: number
 }
 
 export interface CandidateScore {

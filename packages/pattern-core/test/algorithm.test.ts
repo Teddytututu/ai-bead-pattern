@@ -656,6 +656,72 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(candidate(structural).pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'blue')
   })
 
+  it('uses a confident subject mask as MVP bead occupancy', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const red = [255, 0, 0] as const
+    const source = image(4, 4, Array.from({ length: 16 }, () => red))
+    const subjectValues = new Float32Array(16)
+    subjectValues[5] = 1
+    subjectValues[6] = 1
+    subjectValues[9] = 1
+    subjectValues[10] = 1
+    const analysis = {
+      confidence: 1,
+      subjectMask: { width: 4, height: 4, values: subjectValues },
+    }
+
+    const result = await algorithm.generate({
+      ...fixedRequest(source),
+      analysis,
+    })
+
+    assert.equal(candidate(result).pattern.cells.length, 4)
+    assert.deepEqual(
+      candidate(result).pattern.cells.map((cell) => [cell.x, cell.y]),
+      [[1, 1], [2, 1], [1, 2], [2, 2]],
+    )
+    assert.equal(candidate(result).metrics.shapeApplied, true)
+    assert.equal(candidate(result).metrics.targetShapeComponents, 1)
+  })
+
+  it('keeps A1 as a full-frame comparison when a subject mask exists', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+    const analysis = {
+      confidence: 1,
+      subjectMask: { width: 2, height: 2, values: new Float32Array([1, 0, 0, 0]) },
+    }
+
+    const result = await algorithm.generate({
+      image: source,
+      palette,
+      analysis,
+      options: {
+        canvas: { mode: 'fixed', size: { width: 2, height: 2 } },
+        maxColors: 2,
+        baseline: 'a1',
+      },
+    })
+
+    assert.equal(candidate(result).pattern.cells.length, 4)
+    assert.equal(candidate(result).metrics.shapeApplied, false)
+  })
+
+  it('falls back to full-frame occupancy for a low-confidence subject mask', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+    const request = fixedRequest(source)
+    request.analysis = {
+      confidence: 0.2,
+      subjectMask: { width: 2, height: 2, values: new Float32Array([1, 0, 0, 0]) },
+    }
+
+    const result = await algorithm.generate(request)
+
+    assert.equal(candidate(result).pattern.cells.length, 4)
+    assert.equal(candidate(result).metrics.shapeApplied, false)
+  })
+
   it('reports zero feature confidence when visual analysis is absent', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
@@ -1165,6 +1231,21 @@ describe('deterministic pattern algorithm', () => {
     await assert.rejects(() => algorithm.generate(fixedRequest(source, {
       structure: { valueLevels: 5 as never },
     })), /valueLevels/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      structure: { occupancyMode: 'outline' as never },
+    })), /occupancyMode/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      structure: { subjectThreshold: 1.01 },
+    })), /subjectThreshold/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      structure: { subjectThreshold: Number.NaN },
+    })), /subjectThreshold/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      structure: { shapeRefinementIterations: 1.5 },
+    })), /shapeRefinementIterations/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      structure: { shapeRefinementIterations: 33 },
+    })), /shapeRefinementIterations/)
     await assert.rejects(() => algorithm.generate(fixedRequest(source, {
       beadDiameterMm: Number.NaN,
     })), /beadDiameterMm/)

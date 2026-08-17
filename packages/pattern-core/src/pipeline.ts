@@ -24,6 +24,11 @@ import {
   landmarkGridRadiusCells,
 } from './landmarks.js'
 import { optimizePaletteAssignments } from './palette-optimization.js'
+import {
+  buildSourceShapeModel,
+  rasterizeSourceShape,
+  type SourceShapeModel,
+} from './shape.js'
 import { buildSourceGuidance, designRegionValues, type SourceGuidance } from './structure.js'
 import type {
   AlgorithmEngine,
@@ -61,6 +66,7 @@ interface CandidateContext {
   distanceMethod: ColorDistanceMethod
   preparedPalette: readonly PreparedColor[]
   sourceGuidance: SourceGuidance
+  sourceShape: SourceShapeModel | undefined
 }
 
 interface AssignedGrid {
@@ -227,6 +233,19 @@ function validateRequest(request: PatternGenerationRequest): void {
     && [2, 3, 4].includes(request.options.structure.valueLevels) === false) {
     throw new RangeError('valueLevels must be 2, 3, or 4')
   }
+  validateEnum(
+    request.options.structure?.occupancyMode,
+    new Set(['auto', 'full-frame', 'subject-shape']),
+    'occupancyMode',
+  )
+  validateUnitInterval(request.options.structure?.subjectThreshold, 'subjectThreshold')
+  if (request.options.structure?.shapeRefinementIterations !== undefined
+    && (Number.isFinite(request.options.structure.shapeRefinementIterations) === false
+      || request.options.structure.shapeRefinementIterations < 0
+      || Number.isInteger(request.options.structure.shapeRefinementIterations) === false
+      || request.options.structure.shapeRefinementIterations > 32)) {
+    throw new RangeError('shapeRefinementIterations must be an integer within 0..32')
+  }
   if (request.options.beadDiameterMm !== undefined
     && (Number.isFinite(request.options.beadDiameterMm) === false
       || request.options.beadDiameterMm <= 0)) {
@@ -384,7 +403,8 @@ function validateRequest(request: PatternGenerationRequest): void {
     }
   }
   for (const [name, value] of Object.entries(request.options.structure ?? {})) {
-    if (value !== undefined && (Number.isFinite(value) === false || value < 0)) {
+    if (name === 'occupancyMode') continue
+    if (value !== undefined && (typeof value !== 'number' || Number.isFinite(value) === false || value < 0)) {
       throw new RangeError(`Structure option ${name} must be a finite non-negative number`)
     }
   }
@@ -456,6 +476,14 @@ function resolveResizeMethod(options: PatternOptions, baseline: BaselineMode): R
 function resolveDistanceMethod(options: PatternOptions, baseline: BaselineMode): ColorDistanceMethod {
   if (baseline === 'a0') return 'delta-e-76'
   return options.colorDistanceMethod ?? 'delta-e-2000'
+}
+
+function shouldUseSubjectShape(request: PatternGenerationRequest, baseline: BaselineMode): boolean {
+  if (baseline !== 'mvp' || request.analysis?.subjectMask === undefined) return false
+  const mode = request.options.structure?.occupancyMode ?? 'auto'
+  if (mode === 'full-frame') return false
+  if (mode === 'subject-shape') return true
+  return (request.analysis.confidence ?? 1) >= 0.5
 }
 
 function styleColorLimit(style: PatternStyle, maximum: number): number {
@@ -1173,6 +1201,25 @@ function generateCandidate(
       request.options.backgroundRgb,
     )
     : resized
+  const shapeRasterization = context.sourceShape === undefined
+    ? undefined
+    : rasterizeSourceShape(
+      context.sourceShape,
+      crop,
+      resized.fit,
+      size.width,
+      size.height,
+      request.analysis?.landmarks ?? [],
+      {
+        ...(structureOptions.subjectThreshold === undefined
+          ? {}
+          : { threshold: structureOptions.subjectThreshold }),
+        ...(structureOptions.shapeRefinementIterations === undefined
+          ? {}
+          : { refinementIterations: structureOptions.shapeRefinementIterations }),
+      },
+    )
+  const activeMask = shapeRasterization?.activeMask ?? resized.activeMask
   const weights = buildImportanceWeights(
     request.analysis,
     context.sourceGuidance,
@@ -1180,7 +1227,7 @@ function generateCandidate(
     size.width,
     size.height,
     resized.fit,
-    resized.activeMask,
+    activeMask,
   )
   const sourceLabs = rawResized.pixels.map(rgbToLab)
   const styledPixels = resized.pixels.map((pixel) => applyStyle(pixel, style))
@@ -1192,12 +1239,12 @@ function generateCandidate(
     size.width,
     size.height,
     resized.fit,
-    resized.activeMask,
+    activeMask,
   )
   const pixels = baseline === 'mvp'
     ? designRegionValues(
       styledPixels,
-      resized.activeMask,
+      activeMask,
       valueLevels,
       weights,
       regionIds,
@@ -1216,14 +1263,18 @@ function generateCandidate(
     distanceMethod,
   )
   const assigned = assignGrid(pixels, pixelLabs, selectedPalette, baseline, distanceMethod)
-  const protectedSet = protectedCells(
+  const landmarkProtected = protectedCells(
     request.analysis,
     crop,
     size.width,
     size.height,
     resized.fit,
-    resized.activeMask,
+    activeMask,
   )
+  const protectedSet = new Set([
+    ...landmarkProtected,
+    ...(shapeRasterization?.protectedCells ?? []),
+  ])
   const paletteOptimization = baseline === 'mvp'
     ? optimizePaletteAssignments({
       pixelLabs,
@@ -1231,7 +1282,7 @@ function generateCandidate(
       colors: selectedPalette,
       width: size.width,
       height: size.height,
-      activeMask: resized.activeMask,
+      activeMask,
       importance: weights,
       protectedCells: protectedSet,
       coherence: Math.max(0, request.options.optimization?.paletteCoherence ?? 1.15),
@@ -1242,7 +1293,7 @@ function generateCandidate(
     : { colorIds: assigned.colorIds, changedCells: 0 }
   const paletteEdits = paletteOptimization.colorIds.flatMap((colorId, index) => {
     const fromColorId = assigned.colorIds[index]
-    if (resized.activeMask[index] !== 1 || fromColorId === undefined || fromColorId === colorId) return []
+    if (activeMask[index] !== 1 || fromColorId === undefined || fromColorId === colorId) return []
     return [{
       x: index % size.width,
       y: Math.floor(index / size.width),
@@ -1266,14 +1317,14 @@ function generateCandidate(
       size.height,
       protectedSet,
       optimizationOptions,
-      resized.activeMask,
+      activeMask,
     )
-  const counts = materialCounts(optimization.colorIds, selectedPalette, resized.activeMask)
+  const counts = materialCounts(optimization.colorIds, selectedPalette, activeMask)
   const usedIds = new Set(counts.map((entry) => entry.colorId))
   const usedPalette = selectedPalette.filter((color) => usedIds.has(color.id))
   const cells: PatternCell[] = []
   for (let index = 0; index < optimization.colorIds.length; index += 1) {
-    if (resized.activeMask[index] !== 1) continue
+    if (activeMask[index] !== 1) continue
     cells.push({
       x: index % size.width,
       y: Math.floor(index / size.width),
@@ -1284,27 +1335,27 @@ function generateCandidate(
     optimization.colorIds,
     size.width,
     size.height,
-    resized.activeMask,
+    activeMask,
   )
   const thinStripes = countThinStripes(
     optimization.colorIds,
     size.width,
     size.height,
-    resized.activeMask,
+    activeMask,
   )
   const sourceBoundaryAgreement = boundaryAgreement(
     sourceLabs,
     optimization.colorIds,
     size.width,
     size.height,
-    resized.activeMask,
+    activeMask,
   )
   const planBoundaryAgreement = boundaryAgreement(
     pixelLabs,
     optimization.colorIds,
     size.width,
     size.height,
-    resized.activeMask,
+    activeMask,
   )
   const reference = referenceMetrics(
     request,
@@ -1314,22 +1365,38 @@ function generateCandidate(
     size.height,
     optimization.colorIds,
     selectedPalette,
-    resized.activeMask,
+    activeMask,
   )
-  const structure = sourceBoundaryAgreement * 0.3
+  const colorStructure = sourceBoundaryAgreement * 0.3
     + planBoundaryAgreement * 0.2
     + reference.boundaryAgreement * 0.5
+  const topologyAgreement = shapeRasterization === undefined
+    ? 1
+    : 1 - clamp(
+      Math.abs(shapeRasterization.diagnostics.sourceComponents - shapeRasterization.diagnostics.targetComponents) * 0.25
+        + Math.abs(shapeRasterization.diagnostics.sourceHoles - shapeRasterization.diagnostics.targetHoles) * 0.25,
+      0,
+      1,
+    )
+  const shapeStructure = shapeRasterization === undefined
+    ? 1
+    : shapeRasterization.diagnostics.boundaryIoU * 0.4
+      + shapeRasterization.diagnostics.coverageIoU * 0.4
+      + topologyAgreement * 0.2
+  const structure = shapeRasterization === undefined
+    ? colorStructure
+    : colorStructure * 0.55 + shapeStructure * 0.45
   const planMeanColorDistance = finalMeanColorDistance(
     pixelLabs,
     optimization.colorIds,
     selectedPalette,
-    resized.activeMask,
+    activeMask,
   )
   const sourceMeanColorDistance = finalMeanColorDistance(
     sourceLabs,
     optimization.colorIds,
     selectedPalette,
-    resized.activeMask,
+    activeMask,
   )
   const totalBeads = cells.length
   const visibility = featureVisibility(
@@ -1341,7 +1408,7 @@ function generateCandidate(
     resized.fit,
     optimization.colorIds,
     selectedPalette,
-    resized.activeMask,
+    activeMask,
     regionIds,
   )
   const score = scoreCandidate(
@@ -1418,6 +1485,16 @@ function generateCandidate(
       referenceBoundaryAgreement: reference.boundaryAgreement,
       paletteOptimizationChanges: paletteOptimization.changedCells,
       topologyEdits: optimization.topologyEdits,
+      shapeApplied: shapeRasterization !== undefined,
+      subjectOccupancyRatio: shapeRasterization?.diagnostics.occupancyRatio ?? 1,
+      silhouetteBoundaryIoU: shapeRasterization?.diagnostics.boundaryIoU ?? 1,
+      subjectCoverageIoU: shapeRasterization?.diagnostics.coverageIoU ?? 1,
+      shapeMeanBoundaryDistance: shapeRasterization?.diagnostics.meanBoundaryDistance ?? 0,
+      sourceShapeComponents: shapeRasterization?.diagnostics.sourceComponents ?? 0,
+      targetShapeComponents: shapeRasterization?.diagnostics.targetComponents ?? 0,
+      sourceShapeHoles: shapeRasterization?.diagnostics.sourceHoles ?? 0,
+      targetShapeHoles: shapeRasterization?.diagnostics.targetHoles ?? 0,
+      shapeEdits: shapeRasterization?.diagnostics.shapeEdits ?? 0,
     },
     score,
     edits: [...paletteEdits, ...optimization.edits],
@@ -1438,7 +1515,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.2.3-baseline'
+    this.version = config.version ?? '0.3.0-shape'
     this.#clock = config.clock ?? Date.now
   }
 
@@ -1454,6 +1531,13 @@ export class DeterministicPatternAlgorithm {
       request.analysis,
       request.options.backgroundRgb,
     )
+    const sourceShape = shouldUseSubjectShape(request, baseline)
+      ? buildSourceShapeModel(
+        request.analysis!.subjectMask!,
+        request.analysis?.confidence ?? 1,
+        request.analysis?.landmarks ?? [],
+      )
+      : undefined
     const resizeMethod = resolveResizeMethod(request.options, baseline)
     const distanceMethod = resolveDistanceMethod(request.options, baseline)
     const generationId = await generationFingerprint(request, this.version)
@@ -1470,6 +1554,9 @@ export class DeterministicPatternAlgorithm {
           distanceMethod,
           preparedPalette,
           sourceGuidance,
+          sourceShape: sourceShape !== undefined && sourceShape.foregroundArea > 0
+            ? sourceShape
+            : undefined,
         }, generationId, this.version, this.#clock))
       }
     }

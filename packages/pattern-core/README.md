@@ -9,6 +9,8 @@
 - sRGB 到 CIELAB、ΔE76 与 CIEDE2000
 - 全图有限色板选择和合法色号映射
 - 带来源和置信度的建议裁剪、重要性地图与硬关键点锁定
+- 主体 mask 的面积覆盖栅格化、连通块与孔洞保持
+- 目标格形状整理、对角连接修正和形状诊断
 - 小连通域、孤立豆和细条纹整理
 - 五种风格参数与规则候选排序
 - 材料数量、颜色误差和工艺指标
@@ -34,12 +36,18 @@ const result = await algorithm.generate({
     },
     maxColors: 24,
     styles: ['faithful', 'simple', 'high-contrast'],
+    structure: {
+      occupancyMode: 'auto',
+      subjectThreshold: 0.5,
+      shapeRefinementIterations: 2,
+    },
   },
   analysis: {
     suggestedCrop,
     suggestedCropSource: 'automatic',
     suggestedCropConfidence: 0.9,
     importanceMap,
+    subjectMask,
     landmarks,
   },
 })
@@ -64,4 +72,5 @@ pnpm typecheck
 pnpm build
 pnpm --filter @ai-bead-pattern/pattern-core example
 pnpm --filter @ai-bead-pattern/pattern-core benchmark
+pnpm --filter @ai-bead-pattern/pattern-core benchmark:shape
 ```

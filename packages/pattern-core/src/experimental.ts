@@ -21,3 +21,19 @@ export type {
   ValueRole,
   ValueRoleKind,
 } from './contracts.js'
+export {
+  buildSourceShapeModel,
+  rasterizeSourceShape,
+} from './shape.js'
+export type {
+  LandmarkAllocation,
+  ShapeAnchor,
+  ShapeBounds,
+  ShapeComponent,
+  ShapeContour,
+  ShapeDiagnostics,
+  ShapePoint,
+  ShapeRasterization,
+  ShapeRasterizationOptions,
+  SourceShapeModel,
+} from './shape.js'

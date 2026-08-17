@@ -1,6 +1,6 @@
 {
   "name": "@ai-bead-pattern/pattern-core",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "type": "module",
   "exports": {
     ".": {
@@ -18,6 +18,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "benchmark": "pnpm build && node examples/benchmark.mjs",
+    "benchmark:shape": "pnpm build && node examples/shape-benchmark.mjs",
     "benchmark:max": "pnpm build && node examples/benchmark.mjs --max",
     "example": "pnpm build && node examples/basic.mjs",
     "test": "tsc -p tsconfig.test.json && node --test .test-dist/test/*.test.js",

@@ -5,9 +5,10 @@
   "scripts": {
     "build": "pnpm --filter @ai-bead-pattern/pattern-core build && pnpm --filter @ai-bead-pattern/ai-gateway build",
     "benchmark": "pnpm --filter @ai-bead-pattern/pattern-core benchmark",
+    "benchmark:shape": "pnpm --filter @ai-bead-pattern/pattern-core benchmark:shape",
     "benchmark:max": "pnpm --filter @ai-bead-pattern/pattern-core benchmark:max",
     "demo": "pnpm build && node scripts/serve-demo.mjs",
-    "test": "pnpm --filter @ai-bead-pattern/pattern-core test && pnpm --filter @ai-bead-pattern/ai-gateway test",
+    "test": "pnpm --filter @ai-bead-pattern/pattern-core test && pnpm --filter @ai-bead-pattern/ai-gateway test && node --test apps/demo/*.test.mjs",
     "typecheck": "pnpm --filter @ai-bead-pattern/pattern-core typecheck && pnpm --filter @ai-bead-pattern/pattern-core build && pnpm --filter @ai-bead-pattern/ai-gateway typecheck"
   },
   "devDependencies": {
