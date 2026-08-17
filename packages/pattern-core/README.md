@@ -11,6 +11,8 @@
 - 带来源和置信度的建议裁剪、重要性地图与硬关键点锁定
 - 主体 mask 的面积覆盖栅格化、连通块与孔洞保持
 - 目标格形状整理、对角连接修正和形状诊断
+- 画布尺寸的主体占用、轮廓、构图、豆数成本联合规划
+- 五官与身份特征的最小/理想/最大格数预算和成对特征可行性检查
 - 小连通域、孤立豆和细条纹整理
 - 五种风格参数与规则候选排序
 - 材料数量、颜色误差和工艺指标
@@ -62,7 +64,7 @@ console.log(result.alternatives)
 
 外部人物、宠物和分割模型通过 `ImageAnalysis` 注入主体掩码、语义区域、关键点、裁剪和重要性地图。核心包保持纯 TypeScript 与平台无关。
 
-V2 规划合同从 `@ai-bead-pattern/pattern-core/experimental` 导出，并配有 CanvasPlan 与 StructurePlan 校验器。
+V2 规划能力从 `@ai-bead-pattern/pattern-core/experimental` 导出。`planCanvases()` 可独立比较多个画布尺寸；每个生成候选也会携带经过校验的 `canvasPlan`，供服务端记录和界面解释自动选型。
 
 ## 验证
 

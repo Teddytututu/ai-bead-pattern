@@ -929,6 +929,7 @@ describe('deterministic pattern algorithm', () => {
 
     assert.equal(result.status, 'best-effort')
     assert.equal(result.bestEffort?.pattern.width, 8)
+    assert.equal(result.bestEffort?.canvasPlan?.size.width, 8)
     assert.ok(result.bestEffort!.metrics.featureExpressibility > result.alternatives[0]!.metrics.featureExpressibility)
   })
 

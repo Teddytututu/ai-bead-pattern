@@ -25,6 +25,8 @@ export {
   buildSourceShapeModel,
   rasterizeSourceShape,
 } from './shape.js'
+export { planCanvases } from './planning/canvas-planner.js'
+export type { CanvasPlanningInput } from './planning/canvas-planner.js'
 export type {
   LandmarkAllocation,
   ShapeAnchor,

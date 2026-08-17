@@ -1,3 +1,5 @@
+import type { CanvasPlan } from './contracts.js'
+
 export type RGB = readonly [red: number, green: number, blue: number]
 
 export type Lab = readonly [lightness: number, a: number, b: number]
@@ -254,6 +256,8 @@ export interface PatternCandidate {
   materialCounts: readonly MaterialCount[]
   metrics: GenerationMetrics
   score: CandidateScore
+  /** @experimental Executable V2 planning diagnostics for this candidate. */
+  canvasPlan?: CanvasPlan
   edits: readonly GridEditRecord[]
 }
 

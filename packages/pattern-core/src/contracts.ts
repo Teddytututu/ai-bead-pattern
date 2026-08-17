@@ -25,6 +25,8 @@ export interface FeatureBudget {
   minimumCells: number
   preferredCells: number
   maximumCells: number
+  allocatedCells: number
+  feasible: boolean
   minimumContrast: number
   allowedShiftCells: number
   symmetryGroup?: string
@@ -222,10 +224,20 @@ export function validateCanvasPlan(plan: CanvasPlan): void {
     assertNonNegativeInteger(budget.minimumCells, `Feature budget ${budget.featureId} minimum cells`)
     assertNonNegativeInteger(budget.preferredCells, `Feature budget ${budget.featureId} preferred cells`)
     assertNonNegativeInteger(budget.maximumCells, `Feature budget ${budget.featureId} maximum cells`)
+    assertNonNegativeInteger(budget.allocatedCells, `Feature budget ${budget.featureId} allocated cells`)
     assertNonNegativeInteger(budget.allowedShiftCells, `Feature budget ${budget.featureId} shift`)
     if (budget.minimumCells > budget.preferredCells
       || budget.preferredCells > budget.maximumCells) {
       throw new RangeError(`Feature budget ${budget.featureId} must satisfy minimum <= preferred <= maximum`)
+    }
+    if (budget.allocatedCells > budget.maximumCells) {
+      throw new RangeError(`Feature budget ${budget.featureId} allocation exceeds its maximum`)
+    }
+    if (typeof budget.feasible !== 'boolean') {
+      throw new RangeError(`Feature budget ${budget.featureId} feasibility must be boolean`)
+    }
+    if (budget.feasible && budget.allocatedCells < budget.minimumCells) {
+      throw new RangeError(`Feature budget ${budget.featureId} has an infeasible allocation`)
     }
     assertUnitInterval(budget.confidence, `Feature budget ${budget.featureId} confidence`)
     assertFinite(budget.minimumContrast, `Feature budget ${budget.featureId} contrast`)

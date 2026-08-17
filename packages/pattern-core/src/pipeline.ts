@@ -25,6 +25,10 @@ import {
 } from './landmarks.js'
 import { optimizePaletteAssignments } from './palette-optimization.js'
 import {
+  planCanvases,
+  planCanvasesWithSourceShape,
+} from './planning/canvas-planner.js'
+import {
   buildSourceShapeModel,
   rasterizeSourceShape,
   type SourceShapeModel,
@@ -67,6 +71,7 @@ interface CandidateContext {
   preparedPalette: readonly PreparedColor[]
   sourceGuidance: SourceGuidance
   sourceShape: SourceShapeModel | undefined
+  canvasPlan: import('./contracts.js').CanvasPlan
 }
 
 interface AssignedGrid {
@@ -1099,6 +1104,7 @@ function scoreCandidate(
   isolatedCells: number,
   thinStripes: number,
   uniqueColors: number,
+  canvasPlanScore: number,
 ): CandidateScore {
   const sourceFidelity = 1 / (1 + (sourceMeanColorDistance * 0.35 + referenceMeanColorDistance * 0.65) / 15)
   const planFidelity = 1 / (1 + planMeanColorDistance / 15)
@@ -1110,8 +1116,7 @@ function scoreCandidate(
     0,
     1,
   )
-  const beadCostScore = 1 / (1 + totalCells / 1024)
-  const canvasFit = beadCostScore
+  const canvasFit = canvasPlanScore
   const styleBias: Record<PatternStyle, number> = {
     faithful: 0.015,
     cute: 0,
@@ -1423,6 +1428,9 @@ function generateCandidate(
     isolatedCells,
     thinStripes,
     counts.length,
+    baseline === 'mvp'
+      ? context.canvasPlan.score.total
+      : 1 / (1 + totalBeads / 1024),
   )
   const variantIdentity = stableSerialize({
     size,
@@ -1497,6 +1505,7 @@ function generateCandidate(
       shapeEdits: shapeRasterization?.diagnostics.shapeEdits ?? 0,
     },
     score,
+    canvasPlan: context.canvasPlan,
     edits: [...paletteEdits, ...optimization.edits],
   }
 }
@@ -1515,7 +1524,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.3.0-shape'
+    this.version = config.version ?? '0.3.1-canvas-planning'
     this.#clock = config.clock ?? Date.now
   }
 
@@ -1531,13 +1540,35 @@ export class DeterministicPatternAlgorithm {
       request.analysis,
       request.options.backgroundRgb,
     )
-    const sourceShape = shouldUseSubjectShape(request, baseline)
-      ? buildSourceShapeModel(
+    const hasTrustedSubjectMask = baseline === 'mvp'
+      && request.analysis?.subjectMask !== undefined
+      && (request.analysis.confidence ?? 1) >= 0.5
+    const analysisShape = hasTrustedSubjectMask === false
+      ? undefined
+      : buildSourceShapeModel(
         request.analysis!.subjectMask!,
         request.analysis?.confidence ?? 1,
         request.analysis?.landmarks ?? [],
       )
-      : undefined
+    const sourceShape = shouldUseSubjectShape(request, baseline) ? analysisShape : undefined
+    const occupancyMode = sourceShape === undefined ? 'full-frame' : 'subject-shape'
+    const canvasPlanningInput = {
+      image: { width: request.image.width, height: request.image.height },
+      ...(request.analysis === undefined ? {} : { analysis: request.analysis }),
+      crop,
+      candidates: sizes,
+      occupancyMode,
+      ...(request.options.beadDiameterMm === undefined
+        ? {}
+        : { beadDiameterMm: request.options.beadDiameterMm }),
+    } as const
+    const canvasPlans = analysisShape === undefined
+      ? planCanvases(canvasPlanningInput)
+      : planCanvasesWithSourceShape(canvasPlanningInput, analysisShape)
+    const canvasPlansBySize = new Map(canvasPlans.map((plan) => [
+      `${plan.size.width}x${plan.size.height}`,
+      plan,
+    ]))
     const resizeMethod = resolveResizeMethod(request.options, baseline)
     const distanceMethod = resolveDistanceMethod(request.options, baseline)
     const generationId = await generationFingerprint(request, this.version)
@@ -1557,6 +1588,7 @@ export class DeterministicPatternAlgorithm {
           sourceShape: sourceShape !== undefined && sourceShape.foregroundArea > 0
             ? sourceShape
             : undefined,
+          canvasPlan: canvasPlansBySize.get(`${size.width}x${size.height}`)!,
         }, generationId, this.version, this.#clock))
       }
     }
