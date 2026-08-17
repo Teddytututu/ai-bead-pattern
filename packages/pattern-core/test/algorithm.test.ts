@@ -673,6 +673,10 @@ describe('deterministic pattern algorithm', () => {
     const result = await algorithm.generate({
       ...fixedRequest(source),
       analysis,
+      options: {
+        ...fixedRequest(source).options,
+        structure: { occupancyMode: 'subject-shape' },
+      },
     })
 
     assert.equal(candidate(result).pattern.cells.length, 4)
@@ -682,6 +686,112 @@ describe('deterministic pattern algorithm', () => {
     )
     assert.equal(candidate(result).metrics.shapeApplied, true)
     assert.equal(candidate(result).metrics.targetShapeComponents, 1)
+    assert.equal(candidate(result).metrics.referenceShapeComponents, 1)
+  })
+
+  it('compares full-frame and subject-shape candidates in automatic occupancy mode', async () => {
+    const source = image(4, 4, Array.from({ length: 16 }, () => [255, 0, 0] as const))
+    const subjectValues = new Float32Array(16)
+    subjectValues[5] = 1
+    subjectValues[6] = 1
+    subjectValues[9] = 1
+    subjectValues[10] = 1
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: source,
+      palette,
+      analysis: {
+        confidence: 1,
+        subjectMask: { width: 4, height: 4, values: subjectValues },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 4, height: 4 } },
+        maxColors: 2,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'auto' },
+      },
+    })
+    const candidates = [result.recommended ?? result.bestEffort, ...result.alternatives]
+      .filter((entry) => entry !== undefined)
+
+    assert.deepEqual(
+      new Set(candidates.map((entry) => entry!.canvasPlan?.occupancyMode)),
+      new Set(['full-frame', 'subject-shape']),
+    )
+    assert.deepEqual(
+      new Set(candidates.map((entry) => entry!.metrics.shapeApplied)),
+      new Set([false, true]),
+    )
+  })
+
+  it('honors explicit occupancy selection', async () => {
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+    const base = {
+      image: source,
+      palette,
+      analysis: {
+        confidence: 0.2,
+        subjectMask: { width: 2, height: 2, values: new Float32Array([1, 0, 0, 0]) },
+      },
+      options: {
+        canvas: { mode: 'fixed' as const, size: { width: 2, height: 2 } },
+        maxColors: 2,
+        styles: ['faithful' as const],
+      },
+    }
+    const subject = await createPatternAlgorithm().generate({
+      ...base,
+      options: { ...base.options, structure: { occupancyMode: 'subject-shape' as const } },
+    })
+    const full = await createPatternAlgorithm().generate({
+      ...base,
+      options: { ...base.options, structure: { occupancyMode: 'full-frame' as const } },
+    })
+
+    assert.equal(candidate(subject).metrics.shapeApplied, true)
+    assert.equal(candidate(full).metrics.shapeApplied, false)
+  })
+
+  it('rejects an empty mask for explicit subject occupancy', async () => {
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+    const request = fixedRequest(source, {
+      structure: { occupancyMode: 'subject-shape' },
+    })
+    request.analysis = {
+      confidence: 1,
+      subjectMask: { width: 2, height: 2, values: new Float32Array(4).fill(0.49) },
+    }
+
+    await assert.rejects(() => createPatternAlgorithm().generate(request), /non-empty subject mask/)
+  })
+
+  it('keeps automatic occupancy within the eighteen-candidate default budget', async () => {
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+    const result = await createPatternAlgorithm().generate({
+      image: source,
+      palette,
+      analysis: {
+        confidence: 1,
+        subjectMask: { width: 2, height: 2, values: new Float32Array([1, 0, 0, 0]) },
+      },
+      options: {
+        canvas: {
+          mode: 'auto',
+          candidates: [
+            { width: 2, height: 2 },
+            { width: 3, height: 3 },
+            { width: 4, height: 4 },
+          ],
+        },
+        maxColors: 2,
+        maxCandidates: 18,
+        styles: ['faithful', 'simple', 'high-contrast'],
+        structure: { occupancyMode: 'auto' },
+      },
+    })
+
+    assert.equal([result.recommended ?? result.bestEffort, ...result.alternatives]
+      .filter((entry) => entry !== undefined).length, 18)
   })
 
   it('keeps A1 as a full-frame comparison when a subject mask exists', async () => {
@@ -1002,6 +1112,84 @@ describe('deterministic pattern algorithm', () => {
     assert.ok(result.alternatives[0]?.rejectionReasons.includes('hard-feature-collision'))
   })
 
+  it('lets canvas planning veto a hard pair before final feature scoring', async () => {
+    const skin = [240, 190, 160] as const
+    const black = [0, 0, 0] as const
+    const pixels: Array<readonly [number, number, number]> = Array.from(
+      { length: 96 * 96 },
+      () => skin,
+    )
+    pixels[34 * 96 + 42] = black
+    pixels[34 * 96 + 46] = black
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: image(96, 96, pixels),
+      palette: {
+        id: 'face',
+        name: 'Face',
+        colors: [
+          { id: 'black', name: 'Black', hex: '#000000', rgb: black },
+          { id: 'skin', name: 'Skin', hex: '#f0bea0', rgb: skin },
+        ],
+      },
+      analysis: {
+        confidence: 1,
+        landmarks: [
+          { id: 'left-eye', kind: 'eye', x: 42, y: 34, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+          { id: 'right-eye', kind: 'eye', x: 46, y: 34, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+        ],
+      },
+      options: {
+        canvas: { mode: 'auto', candidates: [{ width: 12, height: 12 }, { width: 48, height: 48 }] },
+        maxColors: 2,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        optimization: { minRegionSize: 1 },
+      },
+    })
+
+    assert.equal(result.recommended?.pattern.width, 48)
+    const small = result.alternatives.find((entry) => entry.pattern.width === 12)
+    assert.equal(small?.valid, false)
+    assert.ok(small?.rejectionReasons.includes('canvas-hard-feature-collision'))
+  })
+
+  it('prefers the smaller canvas when both satisfy hard feature planning', async () => {
+    const skin = [240, 190, 160] as const
+    const black = [0, 0, 0] as const
+    const pixels: Array<readonly [number, number, number]> = Array.from(
+      { length: 48 * 48 },
+      () => skin,
+    )
+    pixels[20 * 48 + 24] = black
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: image(48, 48, pixels),
+      palette: {
+        id: 'face',
+        name: 'Face',
+        colors: [
+          { id: 'black', name: 'Black', hex: '#000000', rgb: black },
+          { id: 'skin', name: 'Skin', hex: '#f0bea0', rgb: skin },
+        ],
+      },
+      analysis: {
+        confidence: 1,
+        landmarks: [{ id: 'eye', kind: 'eye', x: 24, y: 20, confidence: 1, priority: 'hard' }],
+      },
+      options: {
+        canvas: { mode: 'auto', candidates: [{ width: 24, height: 24 }, { width: 48, height: 48 }] },
+        maxColors: 2,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        optimization: { minRegionSize: 1 },
+      },
+    })
+
+    assert.equal(result.recommended?.pattern.width, 24)
+    assert.ok([result.recommended, ...result.alternatives]
+      .filter((entry) => entry !== undefined)
+      .every((entry) => entry!.canvasPlan?.feasible))
+  })
+
   it('penalizes fragmented feature regions in the final grid', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const skin = [240, 190, 160] as const
@@ -1250,6 +1438,23 @@ describe('deterministic pattern algorithm', () => {
     await assert.rejects(() => algorithm.generate(fixedRequest(source, {
       beadDiameterMm: Number.NaN,
     })), /beadDiameterMm/)
+
+    const invalidOccupancyLandmark = fixedRequest(source)
+    invalidOccupancyLandmark.analysis = {
+      landmarks: [{
+        id: 'ear',
+        kind: 'ear',
+        x: 0,
+        y: 0,
+        confidence: 1,
+        priority: 'hard',
+        affectsOccupancy: 'yes' as never,
+      }],
+    }
+    await assert.rejects(
+      () => algorithm.generate(invalidOccupancyLandmark),
+      /affectsOccupancy/,
+    )
 
     const duplicateIds = fixedRequest(source)
     duplicateIds.analysis = {

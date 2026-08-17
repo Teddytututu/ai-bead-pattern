@@ -136,7 +136,8 @@
     }
 
     .file-meta { min-width: 0; }
-    .file-name { margin: 0 0 8px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-name { margin: 0 0 3px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .analysis-source { margin: 0 0 8px; color: var(--muted); font-size: 11px; }
 
     .file-button {
       display: inline-flex;
@@ -311,7 +312,8 @@
 
     @media (max-width: 1120px) {
       .workspace { grid-template-columns: 260px minmax(360px, 1fr); }
-      .inspector { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr 1fr; }
+      .inspector { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr; }
+      .inspector .section:first-child { grid-column: 1 / -1; }
       .inspector .section { border-bottom: 0; border-right: 1px solid var(--border); }
       .inspector .section:last-child { border-right: 0; }
     }
@@ -326,6 +328,7 @@
       .canvas-shell { padding: 12px; }
       .pattern-frame { padding: 8px; }
       .inspector { display: block; }
+      .inspector .section:first-child { grid-column: auto; }
       .inspector .section { border-right: 0; border-bottom: 1px solid var(--border); }
       .candidate-list { grid-template-columns: repeat(4, minmax(72px, 1fr)); overflow-x: auto; }
     }
@@ -364,6 +367,7 @@
           <canvas class="source-preview" id="sourcePreview" width="144" height="144" aria-label="原图预览"></canvas>
           <div class="file-meta">
             <p class="file-name" id="fileName">示例猫咪</p>
+            <p class="analysis-source" id="analysisSource" aria-live="polite">透明通道</p>
             <label class="file-button">
               <span aria-hidden="true">＋</span>
               选择图片
@@ -505,6 +509,7 @@
       statusText: document.querySelector('#statusText'),
       fileInput: document.querySelector('#fileInput'),
       fileName: document.querySelector('#fileName'),
+      analysisSource: document.querySelector('#analysisSource'),
       sourcePreview: document.querySelector('#sourcePreview'),
       sizeControl: document.querySelector('#sizeControl'),
       sizeValue: document.querySelector('#sizeValue'),
@@ -557,6 +562,15 @@
       elements.generateButton.disabled = busy
       elements.stage.dataset.busy = String(busy)
       if (busy) setStatus('生成中', 'busy')
+    }
+
+    function renderAnalysisSource() {
+      const segmentationVersion = sourceAnalysis.modelVersions?.segmentation
+      elements.analysisSource.textContent = sourceAnalysis.source === 'alpha'
+        ? '透明通道'
+        : segmentationVersion?.startsWith('rembg/')
+          ? 'AI 分割'
+          : '本地粗分割'
     }
 
     function createSampleImage() {
@@ -681,7 +695,7 @@
           options: {
             canvas: canvasOptions(),
             maxColors: Number(elements.maxColors.value),
-            maxCandidates: 5,
+            maxCandidates: 10,
             styles: selectedStyles(),
             baseline: selectedBaseline,
             backgroundRgb: [245, 245, 242],
@@ -752,9 +766,13 @@
       return { mvp: '结构', a1: '面积', a0: '最近邻' }[baseline] ?? baseline
     }
 
+    function occupancyName(candidate) {
+      return candidate.canvasPlan?.occupancyMode === 'subject-shape' ? '主体' : '全图'
+    }
+
     function renderPattern(candidate) {
       drawPattern(elements.patternCanvas, candidate.pattern, { grid: showGrid, beads: true })
-      elements.patternTitle.textContent = `${baselineName(candidate.pattern.metadata.baseline)} · ${styleName(candidate.style)}方案`
+      elements.patternTitle.textContent = `${baselineName(candidate.pattern.metadata.baseline)} · ${occupancyName(candidate)} · ${styleName(candidate.style)}方案`
       elements.patternDetail.textContent = `${candidate.pattern.width} × ${candidate.pattern.height} · ${candidate.materialCounts.length} 色`
       elements.beadCount.textContent = candidate.pattern.metadata.totalBeads.toLocaleString('zh-CN')
       elements.uniqueColors.textContent = String(candidate.materialCounts.length)
@@ -768,10 +786,10 @@
         ? `${Math.round(candidate.metrics.subjectCoverageIoU * 100)}%`
         : '--'
       elements.shapeComponents.textContent = candidate.metrics.shapeApplied
-        ? `${candidate.metrics.targetShapeComponents}/${candidate.metrics.sourceShapeComponents}`
+        ? `${candidate.metrics.targetShapeComponents}/${candidate.metrics.referenceShapeComponents}`
         : '--'
       elements.shapeHoles.textContent = candidate.metrics.shapeApplied
-        ? `${candidate.metrics.targetShapeHoles}/${candidate.metrics.sourceShapeHoles}`
+        ? `${candidate.metrics.targetShapeHoles}/${candidate.metrics.referenceShapeHoles}`
         : '--'
     }
 
@@ -827,12 +845,12 @@
         button.className = 'candidate'
         button.dataset.id = candidate.id
         button.setAttribute('aria-pressed', String(candidate.id === selectedCandidate?.id))
-        button.setAttribute('aria-label', `${baselineName(candidate.pattern.metadata.baseline)} ${styleName(candidate.style)} ${candidate.pattern.width}乘${candidate.pattern.height}`)
+        button.setAttribute('aria-label', `${baselineName(candidate.pattern.metadata.baseline)} ${occupancyName(candidate)} ${styleName(candidate.style)} ${candidate.pattern.width}乘${candidate.pattern.height}`)
         const canvas = document.createElement('canvas')
         drawPattern(canvas, candidate.pattern, { maximum: 160 })
         const label = document.createElement('span')
         label.className = 'candidate-name'
-        label.textContent = `${baselineName(candidate.pattern.metadata.baseline)} ${styleName(candidate.style)} ${candidate.pattern.width}${candidate.valid ? '' : ' · 需调整'}`
+        label.textContent = `${occupancyName(candidate)} ${styleName(candidate.style)} ${candidate.pattern.width}${candidate.valid ? '' : ' · 需调整'}`
         button.append(canvas, label)
         button.addEventListener('click', () => selectCandidate(candidate.id))
         elements.candidateList.append(button)
@@ -875,6 +893,7 @@
       sourceImage = canvasToPixelImage(canvas)
       sourceAnalysis = inferSubjectAnalysis(sourceImage)
       elements.fileName.textContent = file.name
+      renderAnalysisSource()
       renderSourcePreview()
       await generate()
     }
@@ -958,6 +977,7 @@
     elements.downloadButton.addEventListener('click', downloadPattern)
 
     renderSourcePreview()
+    renderAnalysisSource()
     await generate()
   </script>
 </body>

@@ -61,6 +61,34 @@ describe('V2 canvas planning', () => {
     assert.equal(plans[1]!.featureBudgets.every((budget) => budget.feasible), true)
   })
 
+  it('turns hard feature infeasibility into a canvas veto with a specific reason', () => {
+    const plans = planCanvases(portraitInput([
+      { id: 'left-eye', kind: 'eye', x: 42, y: 34, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+      { id: 'right-eye', kind: 'eye', x: 46, y: 34, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+    ]))
+
+    assert.equal(plans[0]!.feasible, false)
+    assert.deepEqual(plans[0]!.rejectionReasons, ['canvas-hard-feature-collision'])
+    assert.equal(plans[1]!.feasible, true)
+    assert.deepEqual(plans[1]!.rejectionReasons, [])
+    assert.ok(plans[0]!.featureBudgets.every((budget) => budget.hard))
+  })
+
+  it('keeps a soft underbudget feature as a score penalty', () => {
+    const input = portraitInput([
+      { id: 'face', kind: 'face-contour', x: 48, y: 42, confidence: 1, priority: 'soft' },
+    ])
+    const plan = planCanvases({
+      ...input,
+      candidates: [{ width: 4, height: 4 }],
+    })[0]!
+
+    assert.equal(plan.featureBudgets[0]!.feasible, false)
+    assert.equal(plan.featureBudgets[0]!.hard, false)
+    assert.equal(plan.feasible, true)
+    assert.deepEqual(plan.rejectionReasons, [])
+  })
+
   it('reports a multi-cell contour as infeasible on a tiny canvas', () => {
     const input = portraitInput([
       { id: 'face', kind: 'face-contour', x: 48, y: 42, confidence: 1, priority: 'hard' },
@@ -77,20 +105,38 @@ describe('V2 canvas planning', () => {
     assert.equal(large.feasible, true)
   })
 
-  it('lets low-confidence landmarks exert less influence on size selection', () => {
-    const landmark = {
-      id: 'identity-mark',
-      kind: 'identity-mark',
-      x: 48,
-      y: 40,
-      priority: 'soft',
-    } as const
-    const high = planCanvases(portraitInput([{ ...landmark, confidence: 1 }]))
-    const low = planCanvases(portraitInput([{ ...landmark, confidence: 0.05 }]))
-    const highGap = high[1]!.score.total - high[0]!.score.total
-    const lowGap = low[1]!.score.total - low[0]!.score.total
+  it('removes zero-confidence landmarks from feature-score normalization', () => {
+    const eye = { id: 'eye', kind: 'eye', x: 32, y: 34, confidence: 1, priority: 'hard' } as const
+    const base = planCanvases(portraitInput([eye]))
+    const withUnknown = planCanvases(portraitInput([
+      eye,
+      { id: 'unknown-face', kind: 'face-contour', x: 48, y: 42, confidence: 0, priority: 'soft' },
+    ]))
 
-    assert.ok(highGap > lowGap)
+    assert.equal(withUnknown[0]!.score.feature, base[0]!.score.feature)
+    assert.equal(withUnknown[1]!.score.feature, base[1]!.score.feature)
+  })
+
+  it('limits feature allocation to active subject cells near the landmark', () => {
+    const mask = new Float32Array(96 * 96)
+    for (let y = 8; y < 24; y += 1) {
+      for (let x = 8; x < 24; x += 1) mask[y * 96 + x] = 1
+    }
+    const plan = planCanvases({
+      image: { width: 96, height: 96 },
+      analysis: {
+        confidence: 1,
+        subjectMask: { width: 96, height: 96, values: mask },
+        landmarks: [{ id: 'eye', kind: 'eye', x: 72, y: 72, confidence: 1, priority: 'hard' }],
+      },
+      candidates: [{ width: 48, height: 48 }],
+      occupancyMode: 'subject-shape',
+    })[0]!
+
+    assert.equal(plan.featureBudgets[0]!.allocatedCells, 0)
+    assert.equal(plan.featureBudgets[0]!.feasible, false)
+    assert.equal(plan.feasible, false)
+    assert.deepEqual(plan.rejectionReasons, ['canvas-hard-feature-underbudget'])
   })
 
   it('uses subject occupancy to estimate bead count', () => {
@@ -168,5 +214,30 @@ describe('V2 canvas planning', () => {
 
     assert.equal(fitted.estimatedBeads, 200)
     assert.equal(solid.estimatedBeads, 400)
+  })
+
+  it('uses crop and occupancy identity in stable canvas plan ids', () => {
+    const base = {
+      image: { width: 40, height: 40 },
+      candidates: [{ width: 24, height: 24 }],
+    } as const
+    const first = planCanvases({
+      ...base,
+      crop: { x: 0, y: 0, width: 30, height: 30 },
+      occupancyMode: 'full-frame',
+    })[0]!
+    const repeated = planCanvases({
+      ...base,
+      crop: { x: 0, y: 0, width: 30, height: 30 },
+      occupancyMode: 'full-frame',
+    })[0]!
+    const shifted = planCanvases({
+      ...base,
+      crop: { x: 5, y: 5, width: 30, height: 30 },
+      occupancyMode: 'full-frame',
+    })[0]!
+
+    assert.equal(first.id, repeated.id)
+    assert.notEqual(first.id, shifted.id)
   })
 })

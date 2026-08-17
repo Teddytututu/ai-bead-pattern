@@ -218,6 +218,8 @@ export interface CanvasPlan {
   estimatedWidthMm?: number
   estimatedHeightMm?: number
   featureBudgets: readonly FeatureBudget[]
+  feasible: boolean
+  rejectionReasons: readonly string[]
   score: CanvasPlanScore
 }
 ```
@@ -237,9 +239,12 @@ export interface CanvasPlan {
 export interface FeatureBudget {
   featureId: string
   kind: LandmarkKind
+  hard: boolean
   minimumCells: number
   preferredCells: number
   maximumCells: number
+  allocatedCells: number
+  feasible: boolean
   minimumContrast: number
   allowedShiftCells: number
   symmetryGroup?: string
@@ -263,6 +268,7 @@ export interface FeatureConstraint {
   allowedShiftCells: number
   minimumContrastDeltaE: number
   hard: boolean
+  affectsOccupancy: boolean
   symmetryGroup?: string
 }
 ```

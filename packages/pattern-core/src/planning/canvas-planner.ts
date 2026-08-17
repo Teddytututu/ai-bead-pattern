@@ -42,6 +42,7 @@ const maximumOnlineGridCells = 96 * 96
 const maximumImageSide = 2_048
 const maximumImagePixels = 4_000_000
 const maximumCanvasCandidates = 12
+const plannerVersion = 'canvas-v1'
 
 function clamp(value: number, minimum = 0, maximum = 1): number {
   return Math.min(maximum, Math.max(minimum, value))
@@ -131,27 +132,94 @@ function allocatedCells(
   return clamp(Math.max(1, estimate), 0, profile.maximum)
 }
 
+function localFeatureCapacity(
+  centerX: number,
+  centerY: number,
+  theoreticalCells: number,
+  allowedShiftCells: number,
+  activeMask: Uint8Array,
+  width: number,
+  height: number,
+): number {
+  const footprintRadius = Math.max(0, Math.ceil((Math.sqrt(theoreticalCells) - 1) / 2))
+  const searchRadius = allowedShiftCells + footprintRadius
+  let capacity = 0
+  for (let offsetY = -searchRadius; offsetY <= searchRadius; offsetY += 1) {
+    for (let offsetX = -searchRadius; offsetX <= searchRadius; offsetX += 1) {
+      const x = centerX + offsetX
+      const y = centerY + offsetY
+      if (x < 0 || y < 0 || x >= width || y >= height) continue
+      capacity += activeMask[y * width + x] === 1 ? 1 : 0
+    }
+  }
+  return capacity
+}
+
+function fittedActiveMask(width: number, height: number, fit: CanvasFit): Uint8Array {
+  const activeMask = new Uint8Array(width * height)
+  for (let y = fit.y; y < fit.y + fit.height; y += 1) {
+    for (let x = fit.x; x < fit.x + fit.width; x += 1) activeMask[y * width + x] = 1
+  }
+  return activeMask
+}
+
+function stableHash(value: string): string {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(36).padStart(7, '0')
+}
+
+function canvasPlanId(
+  size: GridSize,
+  crop: CropRect,
+  occupancyMode: OccupancyMode,
+): string {
+  const identity = JSON.stringify({ plannerVersion, size, crop, occupancyMode })
+  return `canvas-${size.width}x${size.height}-${stableHash(identity)}`
+}
+
 function featureBudgets(
   landmarks: readonly ImageLandmark[],
   analysisConfidence: number,
   crop: CropRect,
   fit: CanvasFit,
+  activeMask: Uint8Array,
   canvasWidth: number,
-): { budgets: FeatureBudget[]; score: number } {
+  canvasHeight: number,
+): { budgets: FeatureBudget[]; score: number; rejectionReasons: string[] } {
+  const activeCellCount = activeMask.reduce((sum, value) => sum + value, 0)
   const entries = landmarks
     .filter((landmark) => landmark.x >= crop.x && landmark.y >= crop.y
       && landmark.x < crop.x + crop.width && landmark.y < crop.y + crop.height)
     .map((landmark) => {
       const profile = featureProfiles[landmark.kind]
-      const allocation = allocatedCells(landmark, profile, crop, fit)
+      const theoreticalAllocation = allocatedCells(landmark, profile, crop, fit)
       const [gridX, gridY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
+      const localCapacity = localFeatureCapacity(
+        gridX,
+        gridY,
+        theoreticalAllocation,
+        profile.shift,
+        activeMask,
+        canvasWidth,
+        canvasHeight,
+      )
+      const allocation = landmark.kind === 'body'
+        ? Math.min(profile.maximum, activeCellCount)
+        : Math.min(theoreticalAllocation, localCapacity)
+      const confidence = landmarkEffectiveConfidence(landmark, analysisConfidence)
       return {
         landmark,
         profile,
         allocation,
         cell: gridY * canvasWidth + gridX,
-        confidence: landmarkEffectiveConfidence(landmark, analysisConfidence),
+        confidence,
+        hard: landmark.priority === 'hard' && confidence >= 0.5,
         feasible: allocation >= profile.minimum,
+        collision: false,
       }
     })
 
@@ -165,7 +233,10 @@ function featureBudgets(
   for (const group of groups.values()) {
     const enforced = group.filter((entry) => entry.landmark.priority === 'hard' && entry.confidence >= 0.5)
     if (enforced.length > 1 && new Set(enforced.map((entry) => entry.cell)).size < enforced.length) {
-      for (const entry of enforced) entry.feasible = false
+      for (const entry of enforced) {
+        entry.feasible = false
+        entry.collision = true
+      }
     }
   }
 
@@ -173,14 +244,19 @@ function featureBudgets(
   let totalWeight = 0
   const budgets = entries.map((entry): FeatureBudget => {
     const baseWeight = entry.profile.weight * (entry.landmark.priority === 'hard' ? 1.25 : 1)
+    const effectiveWeight = baseWeight * entry.confidence
+    const preferredProgress = clamp(entry.allocation / entry.profile.preferred)
     const satisfaction = entry.feasible
-      ? clamp(entry.allocation / entry.profile.preferred)
+      ? entry.hard
+        ? 0.8 + preferredProgress * 0.2
+        : preferredProgress
       : 0
-    missedWeight += baseWeight * entry.confidence * (1 - satisfaction)
-    totalWeight += baseWeight
+    missedWeight += effectiveWeight * (1 - satisfaction)
+    totalWeight += effectiveWeight
     return {
       featureId: entry.landmark.id,
       kind: entry.landmark.kind,
+      hard: entry.hard,
       minimumCells: entry.profile.minimum,
       preferredCells: entry.profile.preferred,
       maximumCells: entry.profile.maximum,
@@ -194,7 +270,18 @@ function featureBudgets(
       confidence: entry.confidence,
     }
   })
-  return { budgets, score: totalWeight === 0 ? 1 : clamp(1 - missedWeight / totalWeight) }
+  const rejectionReasons = new Set<string>()
+  for (const entry of entries) {
+    if (entry.hard === false || entry.feasible) continue
+    rejectionReasons.add(entry.collision
+      ? 'canvas-hard-feature-collision'
+      : 'canvas-hard-feature-underbudget')
+  }
+  return {
+    budgets,
+    score: totalWeight === 0 ? 1 : clamp(1 - missedWeight / totalWeight),
+    rejectionReasons: [...rejectionReasons].sort(),
+  }
 }
 
 function compositionScore(shape: ShapeRasterization | undefined): number {
@@ -252,7 +339,12 @@ function buildCanvasPlans(
       : occupancyMode === 'solid-background'
         ? size.width * size.height
         : fittedCells
-    return { size, fit, shape, subjectCells, estimatedBeads }
+    const activeMask = occupancyMode === 'subject-shape'
+      ? shape?.activeMask ?? new Uint8Array(size.width * size.height)
+      : occupancyMode === 'solid-background'
+        ? new Uint8Array(size.width * size.height).fill(1)
+        : fittedActiveMask(size.width, size.height, fit)
+    return { size, fit, shape, subjectCells, estimatedBeads, activeMask }
   })
   return drafts.map((draft) => {
     const feature = featureBudgets(
@@ -260,14 +352,24 @@ function buildCanvasPlans(
       input.analysis?.confidence ?? 1,
       crop,
       draft.fit,
+      draft.activeMask,
       draft.size.width,
+      draft.size.height,
     )
     const subjectCoverage = clamp(draft.subjectCells / (draft.size.width * draft.size.height))
-    const subject = draft.shape === undefined
+    const occupancyComposition = draft.shape === undefined
       ? 1
       : clamp(1 - Math.abs(subjectCoverage - 0.55) / 0.55)
+    const subject = draft.shape === undefined
+      ? occupancyComposition
+      : clamp(occupancyComposition * 0.45 + draft.shape.diagnostics.coverageIoU * 0.55)
     const composition = compositionScore(draft.shape)
-    const boundary = draft.shape?.diagnostics.coverageIoU ?? 1
+    const boundary = draft.shape === undefined
+      ? 1
+      : clamp(
+        draft.shape.diagnostics.boundaryIoU * 0.65
+          + (1 / (1 + draft.shape.diagnostics.meanBoundaryDistance)) * 0.35,
+      )
     const beadCost = clamp(draft.estimatedBeads / maximumOnlineGridCells)
     const buildTimeCost = Math.sqrt(beadCost)
     const total = clamp(
@@ -275,11 +377,11 @@ function buildCanvasPlans(
         + subject * 0.18
         + composition * 0.16
         + boundary * 0.28
-        - beadCost * 0.12
-        - buildTimeCost * 0.04,
+        - beadCost * 0.3
+        - buildTimeCost * 0.1,
     )
     const plan: CanvasPlan = {
-      id: `canvas-${draft.size.width}x${draft.size.height}`,
+      id: canvasPlanId(draft.size, crop, occupancyMode),
       size: draft.size,
       crop,
       occupancyMode,
@@ -290,6 +392,8 @@ function buildCanvasPlans(
         estimatedHeightMm: draft.size.height * input.beadDiameterMm,
       }),
       featureBudgets: feature.budgets,
+      feasible: feature.rejectionReasons.length === 0,
+      rejectionReasons: feature.rejectionReasons,
       score: {
         total,
         feature: feature.score,

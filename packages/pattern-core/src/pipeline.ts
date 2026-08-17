@@ -28,6 +28,7 @@ import {
   planCanvases,
   planCanvasesWithSourceShape,
 } from './planning/canvas-planner.js'
+import type { CanvasPlan, OccupancyMode } from './contracts.js'
 import {
   buildSourceShapeModel,
   rasterizeSourceShape,
@@ -71,8 +72,11 @@ interface CandidateContext {
   preparedPalette: readonly PreparedColor[]
   sourceGuidance: SourceGuidance
   sourceShape: SourceShapeModel | undefined
-  canvasPlan: import('./contracts.js').CanvasPlan
+  occupancyMode: ResolvedOccupancyMode
+  canvasPlan: CanvasPlan
 }
+
+type ResolvedOccupancyMode = Extract<OccupancyMode, 'full-frame' | 'subject-shape'>
 
 interface AssignedGrid {
   colorIds: readonly string[]
@@ -296,6 +300,11 @@ function validateRequest(request: PatternGenerationRequest): void {
       'Subject mask',
     )
   }
+  if (request.options.structure?.occupancyMode === 'subject-shape'
+    && (analysis?.subjectMask === undefined
+      || analysis.subjectMask.values.some((value) => value >= 0.5) === false)) {
+    throw new RangeError('subject-shape occupancy requires a non-empty subject mask')
+  }
   if (analysis?.importanceMap !== undefined) {
     validateMask(
       analysis.importanceMap.width,
@@ -335,6 +344,9 @@ function validateRequest(request: PatternGenerationRequest): void {
       `Landmark ${landmark.id} kind`,
     )
     validateEnum(landmark.priority, new Set(['hard', 'soft']), `Landmark ${landmark.id} priority`)
+    if (landmark.affectsOccupancy !== undefined && typeof landmark.affectsOccupancy !== 'boolean') {
+      throw new RangeError(`Landmark ${landmark.id} affectsOccupancy must be boolean`)
+    }
     for (const regionId of [landmark.featureRegionId, landmark.carrierRegionId]) {
       if (regionId !== undefined && semanticRegionIds.has(regionId) === false) {
         throw new RangeError(`Landmark ${landmark.id} references an unknown semantic region`)
@@ -422,7 +434,9 @@ function validateRequest(request: PatternGenerationRequest): void {
     }
   })
   const baseline = request.options.baseline ?? 'mvp'
-  if (resolveSizes(request.options).length * resolveStyles(request.options, baseline).length
+  if (resolveSizes(request.options).length
+    * resolveStyles(request.options, baseline).length
+    * resolveOccupancyModes(request, baseline).length
     > maxGeneratedCandidates) {
     throw new RangeError('Generated candidate count exceeds the MVP processing limit')
   }
@@ -483,12 +497,18 @@ function resolveDistanceMethod(options: PatternOptions, baseline: BaselineMode):
   return options.colorDistanceMethod ?? 'delta-e-2000'
 }
 
-function shouldUseSubjectShape(request: PatternGenerationRequest, baseline: BaselineMode): boolean {
-  if (baseline !== 'mvp' || request.analysis?.subjectMask === undefined) return false
+function resolveOccupancyModes(
+  request: PatternGenerationRequest,
+  baseline: BaselineMode,
+): readonly ResolvedOccupancyMode[] {
+  if (baseline !== 'mvp' || request.analysis?.subjectMask === undefined) return ['full-frame']
   const mode = request.options.structure?.occupancyMode ?? 'auto'
-  if (mode === 'full-frame') return false
-  if (mode === 'subject-shape') return true
+  if (mode === 'full-frame') return ['full-frame']
+  if (mode === 'subject-shape') return ['subject-shape']
   return (request.analysis.confidence ?? 1) >= 0.5
+    && request.analysis.subjectMask.values.some((value) => value >= 0.5)
+    ? ['full-frame', 'subject-shape']
+    : ['full-frame']
 }
 
 function styleColorLimit(style: PatternStyle, maximum: number): number {
@@ -1378,8 +1398,8 @@ function generateCandidate(
   const topologyAgreement = shapeRasterization === undefined
     ? 1
     : 1 - clamp(
-      Math.abs(shapeRasterization.diagnostics.sourceComponents - shapeRasterization.diagnostics.targetComponents) * 0.25
-        + Math.abs(shapeRasterization.diagnostics.sourceHoles - shapeRasterization.diagnostics.targetHoles) * 0.25,
+      Math.abs(shapeRasterization.diagnostics.referenceComponents - shapeRasterization.diagnostics.targetComponents) * 0.25
+        + Math.abs(shapeRasterization.diagnostics.referenceHoles - shapeRasterization.diagnostics.targetHoles) * 0.25,
       0,
       1,
     )
@@ -1416,6 +1436,10 @@ function generateCandidate(
     activeMask,
     regionIds,
   )
+  const rejectionReasons = [...new Set([
+    ...context.canvasPlan.rejectionReasons,
+    ...visibility.rejectionReasons,
+  ])].sort()
   const score = scoreCandidate(
     style,
     totalBeads,
@@ -1436,6 +1460,7 @@ function generateCandidate(
     size,
     style,
     baseline,
+    occupancyMode: context.occupancyMode,
     crop,
     resizeMethod,
     distanceMethod,
@@ -1461,8 +1486,8 @@ function generateCandidate(
     generationId,
     variantId,
     style,
-    valid: visibility.valid,
-    rejectionReasons: visibility.rejectionReasons,
+    valid: context.canvasPlan.feasible && visibility.valid,
+    rejectionReasons,
     pattern: {
       width: size.width,
       height: size.height,
@@ -1498,9 +1523,9 @@ function generateCandidate(
       silhouetteBoundaryIoU: shapeRasterization?.diagnostics.boundaryIoU ?? 1,
       subjectCoverageIoU: shapeRasterization?.diagnostics.coverageIoU ?? 1,
       shapeMeanBoundaryDistance: shapeRasterization?.diagnostics.meanBoundaryDistance ?? 0,
-      sourceShapeComponents: shapeRasterization?.diagnostics.sourceComponents ?? 0,
+      referenceShapeComponents: shapeRasterization?.diagnostics.referenceComponents ?? 0,
       targetShapeComponents: shapeRasterization?.diagnostics.targetComponents ?? 0,
-      sourceShapeHoles: shapeRasterization?.diagnostics.sourceHoles ?? 0,
+      referenceShapeHoles: shapeRasterization?.diagnostics.referenceHoles ?? 0,
       targetShapeHoles: shapeRasterization?.diagnostics.targetHoles ?? 0,
       shapeEdits: shapeRasterization?.diagnostics.shapeEdits ?? 0,
     },
@@ -1540,56 +1565,63 @@ export class DeterministicPatternAlgorithm {
       request.analysis,
       request.options.backgroundRgb,
     )
-    const hasTrustedSubjectMask = baseline === 'mvp'
-      && request.analysis?.subjectMask !== undefined
-      && (request.analysis.confidence ?? 1) >= 0.5
-    const analysisShape = hasTrustedSubjectMask === false
+    const occupancyModes = resolveOccupancyModes(request, baseline)
+    const hasSubjectOccupancy = occupancyModes.includes('subject-shape')
+    const analysisShape = hasSubjectOccupancy === false
       ? undefined
       : buildSourceShapeModel(
         request.analysis!.subjectMask!,
         request.analysis?.confidence ?? 1,
         request.analysis?.landmarks ?? [],
       )
-    const sourceShape = shouldUseSubjectShape(request, baseline) ? analysisShape : undefined
-    const occupancyMode = sourceShape === undefined ? 'full-frame' : 'subject-shape'
-    const canvasPlanningInput = {
-      image: { width: request.image.width, height: request.image.height },
-      ...(request.analysis === undefined ? {} : { analysis: request.analysis }),
-      crop,
-      candidates: sizes,
-      occupancyMode,
-      ...(request.options.beadDiameterMm === undefined
-        ? {}
-        : { beadDiameterMm: request.options.beadDiameterMm }),
-    } as const
-    const canvasPlans = analysisShape === undefined
-      ? planCanvases(canvasPlanningInput)
-      : planCanvasesWithSourceShape(canvasPlanningInput, analysisShape)
-    const canvasPlansBySize = new Map(canvasPlans.map((plan) => [
-      `${plan.size.width}x${plan.size.height}`,
-      plan,
-    ]))
+    const occupancyVariants = occupancyModes.map((occupancyMode) => {
+      const sourceShape = occupancyMode === 'subject-shape' && (analysisShape?.foregroundArea ?? 0) > 0
+        ? analysisShape
+        : undefined
+      const canvasPlanningInput = {
+        image: { width: request.image.width, height: request.image.height },
+        ...(request.analysis === undefined ? {} : { analysis: request.analysis }),
+        crop,
+        candidates: sizes,
+        occupancyMode,
+        ...(request.options.beadDiameterMm === undefined
+          ? {}
+          : { beadDiameterMm: request.options.beadDiameterMm }),
+      } as const
+      const canvasPlans = sourceShape === undefined
+        ? planCanvases(canvasPlanningInput)
+        : planCanvasesWithSourceShape(canvasPlanningInput, sourceShape)
+      return {
+        occupancyMode,
+        sourceShape,
+        canvasPlansBySize: new Map(canvasPlans.map((plan) => [
+          `${plan.size.width}x${plan.size.height}`,
+          plan,
+        ])),
+      }
+    })
     const resizeMethod = resolveResizeMethod(request.options, baseline)
     const distanceMethod = resolveDistanceMethod(request.options, baseline)
     const generationId = await generationFingerprint(request, this.version)
     const candidates: PatternCandidate[] = []
     for (const size of sizes) {
-      for (const style of styles) {
-        candidates.push(generateCandidate({
-          request,
-          crop,
-          size,
-          style,
-          baseline,
-          resizeMethod,
-          distanceMethod,
-          preparedPalette,
-          sourceGuidance,
-          sourceShape: sourceShape !== undefined && sourceShape.foregroundArea > 0
-            ? sourceShape
-            : undefined,
-          canvasPlan: canvasPlansBySize.get(`${size.width}x${size.height}`)!,
-        }, generationId, this.version, this.#clock))
+      for (const occupancy of occupancyVariants) {
+        for (const style of styles) {
+          candidates.push(generateCandidate({
+            request,
+            crop,
+            size,
+            style,
+            baseline,
+            resizeMethod,
+            distanceMethod,
+            preparedPalette,
+            sourceGuidance,
+            sourceShape: occupancy.sourceShape,
+            occupancyMode: occupancy.occupancyMode,
+            canvasPlan: occupancy.canvasPlansBySize.get(`${size.width}x${size.height}`)!,
+          }, generationId, this.version, this.#clock))
+        }
       }
     }
     candidates.sort((first, second) => Number(second.valid) - Number(first.valid)
