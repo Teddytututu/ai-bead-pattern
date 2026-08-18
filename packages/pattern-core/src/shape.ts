@@ -96,9 +96,10 @@ export interface ShapeRasterization {
 }
 
 export interface ShapeRasterizationOptions {
-  threshold?: number
   refinementIterations?: number
 }
+
+export const shapeRasterizationThreshold = 0.5
 
 interface LabeledComponents {
   labels: Int32Array
@@ -397,7 +398,10 @@ export function buildSourceShapeModel(
   confidence: number,
   landmarks: readonly ImageLandmark[] = [],
 ): SourceShapeModel {
-  const binaryMask = Uint8Array.from(mask.values, (value) => value >= 0.5 ? 1 : 0)
+  const binaryMask = Uint8Array.from(
+    mask.values,
+    (value) => value >= shapeRasterizationThreshold ? 1 : 0,
+  )
   const labeled = labelComponents(binaryMask, mask.width, mask.height)
   const foregroundArea = binaryMask.reduce((sum, value) => sum + value, 0)
   const modelConfidence = clamp(confidence, 0, 1)
@@ -726,7 +730,7 @@ export function rasterizeSourceShape(
   landmarks: readonly ImageLandmark[],
   options: ShapeRasterizationOptions = {},
 ): ShapeRasterization {
-  const threshold = clamp(options.threshold ?? 0.5, 0, 1)
+  const threshold = shapeRasterizationThreshold
   const coverage = new Float32Array(width * height)
   const activeMask = new Uint8Array(width * height)
   const scaleX = crop.width / fit.width

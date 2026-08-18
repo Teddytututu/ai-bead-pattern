@@ -704,7 +704,6 @@
               edgeStrength: 0.35,
               valueLevels: selectedValueLevels,
               occupancyMode: selectedOccupancy,
-              subjectThreshold: 0.5,
               shapeRefinementIterations: 2,
             },
             optimization: elements.cleanGrid.checked
@@ -736,7 +735,7 @@
         const modeName = { mvp: '结构版', a1: '面积缩放', a0: '最近邻' }[selectedBaseline]
         if (result.status === 'success') {
           const shapeName = primary.metrics.shapeApplied ? '主体形状' : '全画面'
-          setStatus(`${modeName} · ${shapeName} · ${Math.round(primary.metrics.processingTimeMs)} ms`)
+          setStatus(`${modeName} · ${shapeName} · ${Math.round(result.timing.coreTotalMs)} ms`)
         } else {
           setStatus('关键特征表达不足，请扩大画布、缩小主体范围或调整关键点', 'warning')
         }

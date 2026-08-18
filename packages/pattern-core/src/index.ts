@@ -23,6 +23,7 @@ export type {
   CropRect,
   GenerationMetrics,
   GenerationStatus,
+  GenerationTiming,
   GridEditRecord,
   GridSize,
   ImageAnalysis,

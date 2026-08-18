@@ -56,7 +56,6 @@ export interface StructureOptions {
   edgeStrength?: number
   valueLevels?: 2 | 3 | 4
   occupancyMode?: 'auto' | 'full-frame' | 'subject-shape'
-  subjectThreshold?: number
   shapeRefinementIterations?: number
 }
 
@@ -201,6 +200,7 @@ export interface GridEditRecord {
 }
 
 export interface GenerationMetrics {
+  /** Time spent on this candidate after shared planning has completed. */
   processingTimeMs: number
   uniqueColors: number
   removedSmallRegions: number
@@ -232,6 +232,15 @@ export interface GenerationMetrics {
   referenceShapeHoles: number
   targetShapeHoles: number
   shapeEdits: number
+}
+
+export interface GenerationTiming {
+  /** End-to-end pattern-core generation time, including shared planning and ranking. */
+  coreTotalMs: number
+  shapeModelMs: number
+  shapePlanningMs: number
+  canvasPlanningMs: number
+  candidateGenerationMs: number
 }
 
 export interface CandidateScore {
@@ -280,6 +289,7 @@ export type GenerationStatus = 'success' | 'best-effort' | 'no-valid-candidate'
 interface PatternGenerationResultBase {
   status: GenerationStatus
   generationId: string
+  timing: GenerationTiming
   /** Compatibility aliases exist only when a valid recommendation exists. */
   pattern?: BeadPattern
   materialCounts?: readonly MaterialCount[]
