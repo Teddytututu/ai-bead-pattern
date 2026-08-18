@@ -22,9 +22,12 @@ export interface CanvasPlanScore {
 export interface FeatureBudget {
   featureId: string
   kind: LandmarkKind
+  hard: boolean
   minimumCells: number
   preferredCells: number
   maximumCells: number
+  allocatedCells: number
+  feasible: boolean
   minimumContrast: number
   allowedShiftCells: number
   symmetryGroup?: string
@@ -41,6 +44,8 @@ export interface CanvasPlan {
   estimatedWidthMm?: number
   estimatedHeightMm?: number
   featureBudgets: readonly FeatureBudget[]
+  feasible: boolean
+  rejectionReasons: readonly string[]
   score: CanvasPlanScore
 }
 
@@ -57,6 +62,7 @@ export interface FeatureConstraint {
   allowedShiftCells: number
   minimumContrastDeltaE: number
   hard: boolean
+  affectsOccupancy: boolean
   symmetryGroup?: string
 }
 
@@ -192,6 +198,7 @@ function assertLandmarkKind(value: LandmarkKind, label: string): void {
 }
 
 export function validateCanvasPlan(plan: CanvasPlan): void {
+  if (plan.id.trim().length === 0) throw new RangeError('Canvas plan id must be non-empty')
   if (Number.isInteger(plan.size.width) === false || plan.size.width <= 0
     || Number.isInteger(plan.size.height) === false || plan.size.height <= 0) {
     throw new RangeError('Canvas plan size must contain positive integers')
@@ -222,16 +229,40 @@ export function validateCanvasPlan(plan: CanvasPlan): void {
     assertNonNegativeInteger(budget.minimumCells, `Feature budget ${budget.featureId} minimum cells`)
     assertNonNegativeInteger(budget.preferredCells, `Feature budget ${budget.featureId} preferred cells`)
     assertNonNegativeInteger(budget.maximumCells, `Feature budget ${budget.featureId} maximum cells`)
+    assertNonNegativeInteger(budget.allocatedCells, `Feature budget ${budget.featureId} allocated cells`)
     assertNonNegativeInteger(budget.allowedShiftCells, `Feature budget ${budget.featureId} shift`)
     if (budget.minimumCells > budget.preferredCells
       || budget.preferredCells > budget.maximumCells) {
       throw new RangeError(`Feature budget ${budget.featureId} must satisfy minimum <= preferred <= maximum`)
+    }
+    if (budget.allocatedCells > budget.maximumCells) {
+      throw new RangeError(`Feature budget ${budget.featureId} allocation exceeds its maximum`)
+    }
+    if (typeof budget.hard !== 'boolean') {
+      throw new RangeError(`Feature budget ${budget.featureId} hard flag must be boolean`)
+    }
+    if (typeof budget.feasible !== 'boolean') {
+      throw new RangeError(`Feature budget ${budget.featureId} feasibility must be boolean`)
+    }
+    if (budget.feasible && budget.allocatedCells < budget.minimumCells) {
+      throw new RangeError(`Feature budget ${budget.featureId} has an infeasible allocation`)
     }
     assertUnitInterval(budget.confidence, `Feature budget ${budget.featureId} confidence`)
     assertFinite(budget.minimumContrast, `Feature budget ${budget.featureId} contrast`)
     if (budget.minimumContrast < 0) {
       throw new RangeError(`Feature budget ${budget.featureId} contrast must be non-negative`)
     }
+  }
+  if (typeof plan.feasible !== 'boolean') {
+    throw new RangeError('Canvas plan feasibility must be boolean')
+  }
+  assertUniqueStrings(plan.rejectionReasons, 'Canvas rejection reasons')
+  const hardFeaturesFeasible = plan.featureBudgets.every((budget) => budget.hard === false || budget.feasible)
+  if (plan.feasible !== hardFeaturesFeasible) {
+    throw new RangeError('Canvas plan feasibility must match hard feature budgets')
+  }
+  if (plan.feasible !== (plan.rejectionReasons.length === 0)) {
+    throw new RangeError('Canvas rejection reasons must match feasibility')
   }
   for (const [label, value] of Object.entries(plan.score)) assertUnitInterval(value, `Canvas score ${label}`)
 }
@@ -321,6 +352,9 @@ export function validateStructurePlan(plan: StructurePlan): void {
     assertNonNegativeInteger(constraint.allowedShiftCells, `Feature constraint ${constraint.id} shift`)
     if (constraint.minimumCells > constraint.maximumCells) {
       throw new RangeError(`Feature constraint ${constraint.id} has an invalid cell budget`)
+    }
+    if (typeof constraint.affectsOccupancy !== 'boolean') {
+      throw new RangeError(`Feature constraint ${constraint.id} occupancy flag must be boolean`)
     }
     if (constraint.candidateTemplates.length === 0) {
       throw new RangeError(`Feature constraint ${constraint.id} requires a candidate template`)

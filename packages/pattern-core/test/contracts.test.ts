@@ -31,6 +31,7 @@ describe('V2 planning contracts', () => {
       allowedShiftCells: 1,
       minimumContrastDeltaE: 18,
       hard: true,
+      affectsOccupancy: false,
       symmetryGroup: 'eyes',
     }
     const canvas: CanvasPlan = {
@@ -41,6 +42,8 @@ describe('V2 planning contracts', () => {
       subjectCoverage: 0.7,
       estimatedBeads: 1_600,
       featureBudgets: [],
+      feasible: true,
+      rejectionReasons: [],
       score: {
         total: 0.8,
         feature: 0.9,
@@ -91,13 +94,18 @@ describe('V2 planning contracts', () => {
       featureBudgets: [{
         featureId: 'eye',
         kind: 'eye',
+        hard: true,
         minimumCells: 4,
         preferredCells: 2,
         maximumCells: 3,
+        allocatedCells: 2,
+        feasible: false,
         minimumContrast: 12,
         allowedShiftCells: 1,
         confidence: 1,
       }],
+      feasible: false,
+      rejectionReasons: ['canvas-hard-feature-underbudget'],
       score: {
         total: 0.5,
         feature: 0.5,
@@ -135,13 +143,18 @@ describe('V2 planning contracts', () => {
       featureBudgets: [{
         featureId: 'feature',
         kind: 'eye',
+        hard: false,
         minimumCells: 0,
         preferredCells: 0,
         maximumCells: 0,
+        allocatedCells: 0,
+        feasible: true,
         minimumContrast: 0,
         allowedShiftCells: 0,
         confidence: 1,
       }],
+      feasible: true,
+      rejectionReasons: [],
       score: {
         total: 1,
         feature: 1,
@@ -194,6 +207,7 @@ describe('V2 planning contracts', () => {
           allowedShiftCells: -1,
           minimumContrastDeltaE: -1,
           hard: true,
+          affectsOccupancy: false,
         },
       ],
       confidence: 1,
@@ -222,6 +236,7 @@ describe('V2 planning contracts', () => {
         allowedShiftCells: 0,
         minimumContrastDeltaE: 0,
         hard: false,
+        affectsOccupancy: false,
       }],
       confidence: 1,
     } as unknown as StructurePlan

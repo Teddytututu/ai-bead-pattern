@@ -36,7 +36,7 @@ describe('source shape planning', () => {
     assert.equal(raster.activeMask.reduce((sum, value) => sum + value, 0), 9)
     assert.equal(raster.activeMask[0], 0)
     assert.equal(raster.activeMask[12], 1)
-    assert.equal(raster.diagnostics.sourceComponents, 1)
+    assert.equal(raster.diagnostics.referenceComponents, 1)
     assert.equal(raster.diagnostics.targetComponents, 1)
   })
 
@@ -80,9 +80,9 @@ describe('source shape planning', () => {
     )
 
     assert.equal(raster.activeMask[8], 0)
-    assert.equal(raster.diagnostics.sourceComponents, 2)
+    assert.equal(raster.diagnostics.referenceComponents, 2)
     assert.equal(raster.diagnostics.targetComponents, 2)
-    assert.equal(raster.diagnostics.sourceHoles, 1)
+    assert.equal(raster.diagnostics.referenceHoles, 1)
     assert.equal(raster.diagnostics.targetHoles, 1)
   })
 
@@ -103,7 +103,7 @@ describe('source shape planning', () => {
       [],
     )
 
-    assert.equal(raster.diagnostics.sourceComponents, 1)
+    assert.equal(raster.diagnostics.referenceComponents, 1)
     assert.equal(raster.diagnostics.targetComponents, 1)
   })
 
@@ -122,6 +122,7 @@ describe('source shape planning', () => {
       confidence: 1,
       priority: 'hard',
       gridRadiusCells: 0,
+      affectsOccupancy: true,
     }]
     const crop = fullCrop(4, 4)
     const raster = rasterizeSourceShape(
@@ -136,6 +137,58 @@ describe('source shape planning', () => {
     assert.equal(raster.activeMask[13], 1)
     assert.deepEqual(raster.protectedCells, new Set([13]))
     assert.equal(raster.landmarkAllocations[0]?.allocatedCells.length, 1)
+  })
+
+  it('keeps internal hard features out of the subject silhouette', () => {
+    const subject = mask(4, 4, [
+      0, 0, 0, 0,
+      0, 1, 1, 0,
+      0, 1, 1, 0,
+      0, 0, 0, 0,
+    ])
+    const landmarks: readonly ImageLandmark[] = [{
+      id: 'eye',
+      kind: 'eye',
+      x: 0,
+      y: 0,
+      confidence: 1,
+      priority: 'hard',
+      gridRadiusCells: 0,
+    }]
+    const crop = fullCrop(4, 4)
+    const raster = rasterizeSourceShape(
+      buildSourceShapeModel(subject, 1, landmarks),
+      crop,
+      fitCropToCanvas(crop, 4, 4),
+      4,
+      4,
+      landmarks,
+    )
+
+    assert.equal(raster.activeMask[0], 0)
+    assert.equal(raster.landmarkAllocations.length, 0)
+    assert.equal(raster.protectedCells.size, 0)
+  })
+
+  it('projects the source SDF into target-cell units', () => {
+    const subject = mask(8, 8, Array.from({ length: 64 }, (_, index) => {
+      const x = index % 8
+      const y = Math.floor(index / 8)
+      return x >= 2 && x < 6 && y >= 2 && y < 6 ? 1 : 0
+    }))
+    const crop = fullCrop(8, 8)
+    const raster = rasterizeSourceShape(
+      buildSourceShapeModel(subject, 1),
+      crop,
+      fitCropToCanvas(crop, 4, 4),
+      4,
+      4,
+      [],
+    )
+
+    assert.ok(Math.abs(raster.signedDistance[5]!) < 1)
+    assert.ok(Number.isFinite(raster.diagnostics.energyBefore))
+    assert.ok(raster.diagnostics.energyAfter <= raster.diagnostics.energyBefore + 1e-9)
   })
 
   it('reports overlap against the projected source coverage', () => {
@@ -174,6 +227,7 @@ describe('source shape planning', () => {
       confidence: 1,
       priority: 'hard',
       gridRadiusCells: 0,
+      affectsOccupancy: true,
     }]
     const raster = rasterizeSourceShape(
       buildSourceShapeModel(subject, 1, landmarks),

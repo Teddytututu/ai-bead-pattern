@@ -1,3 +1,5 @@
+import type { CanvasPlan } from './contracts.js'
+
 export type RGB = readonly [red: number, green: number, blue: number]
 
 export type Lab = readonly [lightness: number, a: number, b: number]
@@ -129,6 +131,8 @@ export interface ImageLandmark {
   featureRegionId?: string
   /** Semantic region that visually carries the feature, such as face around an eye. */
   carrierRegionId?: string
+  /** Allows a silhouette anchor to add occupied subject cells. Internal features leave this unset. */
+  affectsOccupancy?: boolean
 }
 
 export interface ImageAnalysis {
@@ -223,9 +227,9 @@ export interface GenerationMetrics {
   silhouetteBoundaryIoU: number
   subjectCoverageIoU: number
   shapeMeanBoundaryDistance: number
-  sourceShapeComponents: number
+  referenceShapeComponents: number
   targetShapeComponents: number
-  sourceShapeHoles: number
+  referenceShapeHoles: number
   targetShapeHoles: number
   shapeEdits: number
 }
@@ -254,6 +258,8 @@ export interface PatternCandidate {
   materialCounts: readonly MaterialCount[]
   metrics: GenerationMetrics
   score: CandidateScore
+  /** @experimental Executable V2 planning diagnostics for this candidate. */
+  canvasPlan?: CanvasPlan
   edits: readonly GridEditRecord[]
 }
 

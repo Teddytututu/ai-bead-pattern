@@ -1,5 +1,6 @@
 import {
   gridCellForSourcePoint,
+  sourcePointForGridCell,
   type CanvasFit,
 } from './image.js'
 import {
@@ -69,15 +70,17 @@ export interface LandmarkAllocation {
 }
 
 export interface ShapeDiagnostics {
-  sourceComponents: number
+  referenceComponents: number
   targetComponents: number
-  sourceHoles: number
+  referenceHoles: number
   targetHoles: number
   boundaryIoU: number
   coverageIoU: number
   meanBoundaryDistance: number
   occupancyRatio: number
   shapeEdits: number
+  energyBefore: number
+  energyAfter: number
 }
 
 export interface ShapeRasterization {
@@ -407,7 +410,7 @@ export function buildSourceShapeModel(
     contours: traceContours(labeled, mask.width, mask.height),
     components: labeled.components,
     holes: countHoles(binaryMask, mask.width, mask.height),
-    anchors: landmarks.map((landmark) => ({
+    anchors: landmarks.filter((landmark) => landmark.affectsOccupancy === true).map((landmark) => ({
       landmarkId: landmark.id,
       kind: landmark.kind,
       source: [landmark.x, landmark.y],
@@ -486,21 +489,75 @@ function dilate(values: Uint8Array, width: number, height: number): Uint8Array {
   return output
 }
 
-function boundaryIoU(
-  first: Uint8Array,
-  second: Uint8Array,
+function sampleSdf(model: SourceShapeModel, sourceX: number, sourceY: number): number {
+  const x = clamp(sourceX, 0, model.width - 1)
+  const y = clamp(sourceY, 0, model.height - 1)
+  const left = Math.floor(x)
+  const top = Math.floor(y)
+  const right = Math.min(model.width - 1, left + 1)
+  const bottom = Math.min(model.height - 1, top + 1)
+  const tx = x - left
+  const ty = y - top
+  const topValue = model.signedDistance[top * model.width + left]! * (1 - tx)
+    + model.signedDistance[top * model.width + right]! * tx
+  const bottomValue = model.signedDistance[bottom * model.width + left]! * (1 - tx)
+    + model.signedDistance[bottom * model.width + right]! * tx
+  return topValue * (1 - ty) + bottomValue * ty
+}
+
+function projectSignedDistance(
+  model: SourceShapeModel,
+  crop: CropRect,
+  fit: CanvasFit,
+  width: number,
+  height: number,
+): Float32Array {
+  const projected = new Float32Array(width * height)
+  const sourceCellScale = Math.max(1e-6, (crop.width / fit.width + crop.height / fit.height) / 2)
+  projected.fill(-Math.hypot(width, height))
+  for (let y = fit.y; y < fit.y + fit.height; y += 1) {
+    for (let x = fit.x; x < fit.x + fit.width; x += 1) {
+      const source = sourcePointForGridCell(crop, fit, x, y)
+      if (source === undefined) continue
+      projected[y * width + x] = sampleSdf(model, source[0], source[1]) / sourceCellScale
+    }
+  }
+  return projected
+}
+
+function sdfBoundaryIoU(
+  values: Uint8Array,
+  projectedSdf: Float32Array,
   width: number,
   height: number,
 ): number {
-  const firstBand = dilate(boundaryMask(first, width, height), width, height)
-  const secondBand = dilate(boundaryMask(second, width, height), width, height)
+  const targetBand = dilate(boundaryMask(values, width, height), width, height)
   let intersection = 0
   let union = 0
-  for (let index = 0; index < first.length; index += 1) {
-    if (firstBand[index] === 1 && secondBand[index] === 1) intersection += 1
-    if (firstBand[index] === 1 || secondBand[index] === 1) union += 1
+  for (let index = 0; index < values.length; index += 1) {
+    const sourceBoundary = Math.abs(projectedSdf[index] ?? 0) <= 1.25
+    const targetBoundary = targetBand[index] === 1
+    if (sourceBoundary && targetBoundary) intersection += 1
+    if (sourceBoundary || targetBoundary) union += 1
   }
   return union === 0 ? 1 : intersection / union
+}
+
+function sdfMeanBoundaryDistance(
+  values: Uint8Array,
+  projectedSdf: Float32Array,
+  width: number,
+  height: number,
+): number {
+  const boundary = boundaryMask(values, width, height)
+  let total = 0
+  let count = 0
+  for (let index = 0; index < boundary.length; index += 1) {
+    if (boundary[index] === 0) continue
+    total += Math.abs(projectedSdf[index] ?? 0)
+    count += 1
+  }
+  return count === 0 ? 0 : clamp(total / count / Math.max(1, Math.hypot(width, height)), 0, 1)
 }
 
 function coverageIoU(coverage: Float32Array, activeMask: Uint8Array): number {
@@ -513,110 +570,99 @@ function coverageIoU(coverage: Float32Array, activeMask: Uint8Array): number {
   return union === 0 ? 1 : intersection / union
 }
 
-function boundaryCoordinates(values: Uint8Array, width: number, height: number): readonly ShapePoint[] {
+function shapeEnergy(
+  values: Uint8Array,
+  coverage: Float32Array,
+  projectedSdf: Float32Array,
+  width: number,
+  height: number,
+  referenceComponents: number,
+  referenceHoles: number,
+): number {
   const boundary = boundaryMask(values, width, height)
-  const points: ShapePoint[] = []
-  for (let index = 0; index < boundary.length; index += 1) {
-    if (boundary[index] === 1) points.push({ x: index % width, y: Math.floor(index / width) })
-  }
-  return points
-}
-
-function directedBoundaryDistance(first: readonly ShapePoint[], second: readonly ShapePoint[]): number {
-  if (first.length === 0 || second.length === 0) return first.length === second.length ? 0 : 1
-  let total = 0
-  for (const point of first) {
-    let nearest = Number.POSITIVE_INFINITY
-    for (const candidate of second) {
-      nearest = Math.min(nearest, Math.hypot(point.x - candidate.x, point.y - candidate.y))
-    }
-    total += nearest
-  }
-  return total / first.length
-}
-
-function meanBoundaryDistance(
-  first: Uint8Array,
-  second: Uint8Array,
-  width: number,
-  height: number,
-): number {
-  const firstBoundary = boundaryCoordinates(first, width, height)
-  const secondBoundary = boundaryCoordinates(second, width, height)
-  const distance = (directedBoundaryDistance(firstBoundary, secondBoundary)
-    + directedBoundaryDistance(secondBoundary, firstBoundary)) / 2
-  return clamp(distance / Math.max(1, Math.hypot(width, height)), 0, 1)
-}
-
-function resolveDiagonalConnectivity(
-  activeMask: Uint8Array,
-  coverage: Float32Array,
-  width: number,
-  height: number,
-  sourceComponents: number,
-  protectedCells: ReadonlySet<number>,
-): number {
-  if (sourceComponents !== 1) return 0
-  let edits = 0
-  for (let y = 0; y + 1 < height; y += 1) {
-    for (let x = 0; x + 1 < width; x += 1) {
-      const topLeft = y * width + x
-      const topRight = topLeft + 1
-      const bottomLeft = topLeft + width
-      const bottomRight = bottomLeft + 1
-      const firstDiagonal = activeMask[topLeft] === 1 && activeMask[bottomRight] === 1
-        && activeMask[topRight] === 0 && activeMask[bottomLeft] === 0
-      const secondDiagonal = activeMask[topRight] === 1 && activeMask[bottomLeft] === 1
-        && activeMask[topLeft] === 0 && activeMask[bottomRight] === 0
-      if (firstDiagonal === false && secondDiagonal === false) continue
-      const candidates = firstDiagonal ? [topRight, bottomLeft] : [topLeft, bottomRight]
-      const selected = candidates.reduce((best, candidate) =>
-        (coverage[candidate] ?? 0) > (coverage[best] ?? 0) ? candidate : best)
-      activeMask[selected] = 1
-      if (protectedCells.has(selected) === false) edits += 1
+  let energy = 0
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x
+      const active = values[index] ?? 0
+      const cellCoverage = coverage[index] ?? 0
+      const sdf = projectedSdf[index] ?? 0
+      energy += Math.abs(active - cellCoverage)
+      if (active === 1 && sdf < 0) energy += Math.min(2, -sdf) * 0.35
+      if (active === 0 && sdf > 0) energy += Math.min(2, sdf) * 0.35
+      if (boundary[index] === 1) energy += Math.min(2, Math.abs(sdf)) * 0.25
+      if (active === 0) continue
+      let neighbors = 0
+      for (const [offsetX, offsetY] of orthogonalOffsets) {
+        const nextX = x + offsetX
+        const nextY = y + offsetY
+        if (nextX >= 0 && nextY >= 0 && nextX < width && nextY < height
+          && values[nextY * width + nextX] === 1) neighbors += 1
+      }
+      if (neighbors === 0) energy += 0.8
+      else if (neighbors === 1) energy += 0.12
     }
   }
-  return edits
+  const topology = labelComponents(values, width, height)
+  energy += Math.abs(topology.components.length - referenceComponents) * 1.5
+  energy += Math.abs(countHoles(values, width, height) - referenceHoles) * 1.5
+  return energy
 }
 
-function refineBoundary(
+function optimizeBoundaryEnergy(
   activeMask: Uint8Array,
   coverage: Float32Array,
+  projectedSdf: Float32Array,
   width: number,
   height: number,
-  sourceHoles: number,
+  referenceComponents: number,
+  referenceHoles: number,
   protectedCells: ReadonlySet<number>,
   iterations: number,
-): number {
+): { edits: number; before: number; after: number } {
+  const referenceBand = dilate(boundaryMask(activeMask, width, height), width, height)
+  const candidates: number[] = []
+  for (let index = 0; index < activeMask.length; index += 1) {
+    const cellCoverage = coverage[index] ?? 0
+    if (referenceBand[index] === 1 || (cellCoverage > 0.05 && cellCoverage < 0.95)
+      || Math.abs(projectedSdf[index] ?? 0) <= 1.5) candidates.push(index)
+  }
+  let current = shapeEnergy(
+    activeMask,
+    coverage,
+    projectedSdf,
+    width,
+    height,
+    referenceComponents,
+    referenceHoles,
+  )
+  const before = current
   let edits = 0
   for (let iteration = 0; iteration < iterations; iteration += 1) {
-    const snapshot = activeMask.slice()
-    let iterationEdits = 0
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const index = y * width + x
-        if (protectedCells.has(index)) continue
-        let orthogonal = 0
-        for (const [offsetX, offsetY] of orthogonalOffsets) {
-          const nextX = x + offsetX
-          const nextY = y + offsetY
-          if (nextX >= 0 && nextY >= 0 && nextX < width && nextY < height
-            && snapshot[nextY * width + nextX] === 1) orthogonal += 1
-        }
-        if (snapshot[index] === 1 && orthogonal === 0 && (coverage[index] ?? 0) < 0.75) {
-          activeMask[index] = 0
-          iterationEdits += 1
-        } else if (snapshot[index] === 0 && sourceHoles === 0 && orthogonal === 4
-          && (coverage[index] ?? 0) >= 0.15) {
-          activeMask[index] = 1
-          iterationEdits += 1
-        }
+    let accepted = 0
+    for (const index of candidates) {
+      if (protectedCells.has(index)) continue
+      activeMask[index] = activeMask[index] === 1 ? 0 : 1
+      const next = shapeEnergy(
+        activeMask,
+        coverage,
+        projectedSdf,
+        width,
+        height,
+        referenceComponents,
+        referenceHoles,
+      )
+      if (next + 1e-9 < current) {
+        current = next
+        accepted += 1
+        edits += 1
+      } else {
+        activeMask[index] = activeMask[index] === 1 ? 0 : 1
       }
     }
-    edits += iterationEdits
-    if (iterationEdits === 0) break
+    if (accepted === 0) break
   }
-  return edits
+  return { edits, before, after: current }
 }
 
 function allocateLandmarks(
@@ -633,7 +679,7 @@ function allocateLandmarks(
   let edits = 0
   for (const landmark of landmarks) {
     const confidence = landmarkEffectiveConfidence(landmark, analysisConfidence)
-    if (landmark.priority !== 'hard' || confidence < 0.5) continue
+    if (landmark.affectsOccupancy !== true || landmark.priority !== 'hard' || confidence < 0.5) continue
     if (landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) continue
     const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
@@ -710,6 +756,7 @@ export function rasterizeSourceShape(
   const referenceMask = activeMask.slice()
   const referenceTopology = labelComponents(referenceMask, width, height)
   const referenceHoles = countHoles(referenceMask, width, height)
+  const projectedSdf = projectSignedDistance(model, crop, fit, width, height)
   const allocation = allocateLandmarks(
     landmarks,
     model.confidence,
@@ -720,23 +767,18 @@ export function rasterizeSourceShape(
     activeMask,
   )
   let shapeEdits = allocation.edits
-  shapeEdits += resolveDiagonalConnectivity(
+  const energy = optimizeBoundaryEnergy(
     activeMask,
     coverage,
+    projectedSdf,
     width,
     height,
     referenceTopology.components.length,
-    allocation.protectedCells,
-  )
-  shapeEdits += refineBoundary(
-    activeMask,
-    coverage,
-    width,
-    height,
     referenceHoles,
     allocation.protectedCells,
     Math.max(0, Math.floor(options.refinementIterations ?? 2)),
   )
+  shapeEdits += energy.edits
 
   const target = labelComponents(activeMask, width, height)
   const boundaryBand = dilate(boundaryMask(activeMask, width, height), width, height)
@@ -746,20 +788,22 @@ export function rasterizeSourceShape(
     height,
     coverage,
     activeMask,
-    signedDistance: signedDistanceField(referenceMask, width, height),
+    signedDistance: projectedSdf,
     boundaryBand,
     protectedCells: allocation.protectedCells,
     landmarkAllocations: allocation.allocations,
     diagnostics: {
-      sourceComponents: referenceTopology.components.length,
+      referenceComponents: referenceTopology.components.length,
       targetComponents: target.components.length,
-      sourceHoles: referenceHoles,
+      referenceHoles,
       targetHoles: countHoles(activeMask, width, height),
-      boundaryIoU: boundaryIoU(activeMask, referenceMask, width, height),
+      boundaryIoU: sdfBoundaryIoU(activeMask, projectedSdf, width, height),
       coverageIoU: coverageIoU(coverage, activeMask),
-      meanBoundaryDistance: meanBoundaryDistance(activeMask, referenceMask, width, height),
+      meanBoundaryDistance: sdfMeanBoundaryDistance(activeMask, projectedSdf, width, height),
       occupancyRatio: occupied / Math.max(1, fit.width * fit.height),
       shapeEdits,
+      energyBefore: energy.before,
+      energyAfter: energy.after,
     },
   }
 }
