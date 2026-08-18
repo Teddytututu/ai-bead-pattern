@@ -11,6 +11,11 @@ export {
 } from './color.js'
 export { optimizeGrid } from './grid.js'
 export { adaptPattern } from './adaptation.js'
+export {
+  normalizeEvidenceProvenance,
+  resolvedSubjectMask,
+  subjectMaskConfidence,
+} from './analysis-evidence.js'
 export type {
   AlgorithmEngine,
   BaselineMode,
@@ -21,6 +26,8 @@ export type {
   CanvasOptions,
   ColorDistanceMethod,
   CropRect,
+  EvidenceOrigin,
+  EvidenceProvenance,
   GenerationMetrics,
   GenerationStatus,
   GenerationTiming,
@@ -56,4 +63,6 @@ export type {
   ResizeMethod,
   RGB,
   SemanticRegion,
+  SubjectMaskEvidence,
+  SubjectMaskSource,
 } from './types.js'

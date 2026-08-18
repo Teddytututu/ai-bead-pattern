@@ -20,7 +20,6 @@ export function landmarkGridRadiusCells(
 
 export function landmarkEffectiveConfidence(
   landmark: ImageLandmark,
-  analysisConfidence = 1,
 ): number {
-  return Math.min(1, Math.max(0, landmark.confidence * analysisConfidence))
+  return Math.min(1, Math.max(0, landmark.confidence))
 }

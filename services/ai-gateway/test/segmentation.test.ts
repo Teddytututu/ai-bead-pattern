@@ -49,6 +49,15 @@ describe('rembg HTTP segmentation provider', () => {
     assert.deepEqual(result.analysis.suggestedCrop, { x: 0, y: 1, width: 2, height: 1 })
     assert.equal(result.analysis.suggestedCropSource, 'automatic')
     assert.equal(result.analysis.modelVersions?.segmentation, 'rembg/birefnet-general-lite')
+    assert.equal(result.analysis.subjectMaskEvidence?.confidence, result.analysis.confidence)
+    assert.equal(result.analysis.subjectMaskEvidence?.source, 'ai')
+    assert.equal(result.analysis.subjectMaskEvidence?.revision, 'rembg-http:birefnet-general-lite:mask-v1')
+    assert.deepEqual(result.analysis.subjectMaskEvidence?.provenance, [{
+      origin: 'model',
+      provider: 'rembg-http',
+      model: 'birefnet-general-lite',
+      version: 'mask-v1',
+    }])
     assert.deepEqual(
       [...result.analysis.subjectMask!.values].map((value) => Math.round(value * 255)),
       [0, 64, 160, 255],

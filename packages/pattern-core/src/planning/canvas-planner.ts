@@ -1,4 +1,5 @@
 import { validateCanvasPlan, type CanvasPlan, type FeatureBudget, type OccupancyMode } from '../contracts.js'
+import { resolvedSubjectMask, subjectMaskConfidence } from '../analysis-evidence.js'
 import { fitCropToCanvas, gridCellForSourcePoint, type CanvasFit } from '../image.js'
 import { landmarkEffectiveConfidence, landmarkGridRadiusCells } from '../landmarks.js'
 import {
@@ -87,7 +88,7 @@ function validateInput(input: CanvasPlanningInput): void {
       throw new RangeError('Canvas planning candidate exceeds the processing limit')
     }
   }
-  const mask = input.analysis?.subjectMask
+  const mask = resolvedSubjectMask(input.analysis)
   if (mask !== undefined && (mask.width !== input.image.width || mask.height !== input.image.height
     || mask.values.length !== mask.width * mask.height)) {
     throw new RangeError('Canvas planning subject mask must align with the source image')
@@ -193,13 +194,20 @@ function canvasPlanId(
 
 function analysisIdentity(input: CanvasPlanningInput): string {
   let maskHash = 0x811c9dc5
-  for (const value of input.analysis?.subjectMask?.values ?? []) {
+  for (const value of resolvedSubjectMask(input.analysis)?.values ?? []) {
     maskHash ^= Math.round(value * 65_535)
     maskHash = Math.imul(maskHash, 0x01000193)
   }
   return stableHash(JSON.stringify({
     image: input.image,
-    confidence: input.analysis?.confidence ?? 0,
+    subjectMaskConfidence: subjectMaskConfidence(input.analysis),
+    subjectMaskEvidence: input.analysis?.subjectMaskEvidence === undefined ? undefined : {
+      confidence: input.analysis.subjectMaskEvidence.confidence,
+      source: input.analysis.subjectMaskEvidence.source,
+      revision: input.analysis.subjectMaskEvidence.revision,
+      userConfirmed: input.analysis.subjectMaskEvidence.userConfirmed,
+      provenance: input.analysis.subjectMaskEvidence.provenance,
+    },
     maskHash: maskHash >>> 0,
     landmarks: (input.analysis?.landmarks ?? []).map((landmark) => ({
       id: landmark.id,
@@ -218,7 +226,6 @@ function analysisIdentity(input: CanvasPlanningInput): string {
 
 function featureBudgets(
   landmarks: readonly ImageLandmark[],
-  analysisConfidence: number,
   crop: CropRect,
   fit: CanvasFit,
   activeMask: Uint8Array,
@@ -245,7 +252,7 @@ function featureBudgets(
       const allocation = landmark.kind === 'body'
         ? Math.min(profile.maximum, activeCellCount)
         : Math.min(theoreticalAllocation, localCapacity)
-      const confidence = landmarkEffectiveConfidence(landmark, analysisConfidence)
+      const confidence = landmarkEffectiveConfidence(landmark)
       return {
         landmark,
         profile,
@@ -342,16 +349,17 @@ function buildCanvasPlans(
 ): readonly CanvasPlan[] {
   validateInput(input)
   const crop = normalizedCrop(input)
-  const occupancyMode = input.occupancyMode ?? (input.analysis?.subjectMask === undefined
+  const subjectMask = resolvedSubjectMask(input.analysis)
+  const occupancyMode = input.occupancyMode ?? (subjectMask === undefined
     ? 'full-frame'
     : 'subject-shape')
   const uniqueCandidates = [...new Map(input.candidates.map((size) => [`${size.width}x${size.height}`, size])).values()]
-  const shapeModel = preparedVariants !== undefined || input.analysis?.subjectMask === undefined
+  const shapeModel = preparedVariants !== undefined || subjectMask === undefined
     ? undefined
     : buildSourceShapeModel(
-      input.analysis.subjectMask,
-      input.analysis.confidence ?? 1,
-      input.analysis.landmarks ?? [],
+      subjectMask,
+      subjectMaskConfidence(input.analysis),
+      input.analysis?.landmarks ?? [],
     )
   const shapeCache = preparedVariants === undefined && shapeModel !== undefined
     ? new ShapeVariantCache(shapeModel, input.analysis?.landmarks ?? [])
@@ -388,7 +396,6 @@ function buildCanvasPlans(
   return drafts.map((draft) => {
     const feature = featureBudgets(
       input.analysis?.landmarks ?? [],
-      input.analysis?.confidence ?? 1,
       crop,
       draft.fit,
       draft.featureMask,

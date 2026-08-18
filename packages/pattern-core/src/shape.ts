@@ -420,7 +420,7 @@ export function buildSourceShapeModel(
       source: [landmark.x, landmark.y],
       minimumCells: anchorMinimumCells(landmark),
       hard: landmark.priority === 'hard',
-      confidence: landmarkEffectiveConfidence(landmark, modelConfidence),
+      confidence: landmarkEffectiveConfidence(landmark),
     })),
     foregroundArea,
     confidence: modelConfidence,
@@ -671,7 +671,6 @@ function optimizeBoundaryEnergy(
 
 function allocateLandmarks(
   landmarks: readonly ImageLandmark[],
-  analysisConfidence: number,
   crop: CropRect,
   fit: CanvasFit,
   width: number,
@@ -682,7 +681,7 @@ function allocateLandmarks(
   const protectedCells = new Set<number>()
   let edits = 0
   for (const landmark of landmarks) {
-    const confidence = landmarkEffectiveConfidence(landmark, analysisConfidence)
+    const confidence = landmarkEffectiveConfidence(landmark)
     if (landmark.affectsOccupancy !== true || landmark.priority !== 'hard' || confidence < 0.5) continue
     if (landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) continue
@@ -763,7 +762,6 @@ export function rasterizeSourceShape(
   const projectedSdf = projectSignedDistance(model, crop, fit, width, height)
   const allocation = allocateLandmarks(
     landmarks,
-    model.confidence,
     crop,
     fit,
     width,

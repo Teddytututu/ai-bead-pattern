@@ -193,9 +193,22 @@ function analysisFromMask(
   }
   const confidence = maskConfidence(mask.values)
   const crop = subjectCrop(mask, cropThreshold, cropPaddingRatio)
+  const provenance = [{
+    origin: 'model' as const,
+    provider: 'rembg-http',
+    model,
+    version: 'mask-v1',
+  }]
   const analysis: ImageAnalysis = {
     confidence,
     subjectMask,
+    subjectMaskEvidence: {
+      mask: subjectMask,
+      confidence,
+      source: 'ai',
+      revision: `rembg-http:${model}:mask-v1`,
+      provenance,
+    },
     importanceMap: {
       width: mask.width,
       height: mask.height,
@@ -207,8 +220,10 @@ function analysisFromMask(
       confidence,
       importance: 0.8,
       mask: subjectMask,
+      provenance,
     }],
     modelVersions: { segmentation: `rembg/${model}` },
+    provenance,
   }
   if (crop !== undefined) {
     analysis.suggestedCrop = crop

@@ -92,12 +92,33 @@ export interface BinaryMask {
   values: Float32Array
 }
 
+export type EvidenceOrigin = 'model' | 'manual' | 'fused'
+
+export interface EvidenceProvenance {
+  origin: EvidenceOrigin
+  provider: string
+  model?: string
+  version?: string
+}
+
+export type SubjectMaskSource = 'ai' | 'manual' | 'ai+manual' | 'fused'
+
+export interface SubjectMaskEvidence {
+  mask: BinaryMask
+  confidence: number
+  source: SubjectMaskSource
+  revision: string
+  userConfirmed?: boolean
+  provenance?: readonly EvidenceProvenance[]
+}
+
 export interface SemanticRegion {
   id: string
   label: string
   mask: BinaryMask
   confidence: number
   importance?: number
+  provenance?: readonly EvidenceProvenance[]
 }
 
 export type LandmarkKind =
@@ -132,10 +153,14 @@ export interface ImageLandmark {
   carrierRegionId?: string
   /** Allows a silhouette anchor to add occupied subject cells. Internal features leave this unset. */
   affectsOccupancy?: boolean
+  provenance?: readonly EvidenceProvenance[]
 }
 
 export interface ImageAnalysis {
+  /** Compatibility field. Prefer subjectMaskEvidence for new integrations. */
   subjectMask?: BinaryMask
+  /** Authoritative subject-mask evidence when both mask fields are present. */
+  subjectMaskEvidence?: SubjectMaskEvidence
   semanticRegions?: readonly SemanticRegion[]
   landmarks?: readonly ImageLandmark[]
   importanceMap?: ImportanceMap
@@ -146,6 +171,7 @@ export interface ImageAnalysis {
   confidence?: number
   /** Stable model names and versions used to produce this analysis. */
   modelVersions?: Readonly<Record<string, string>>
+  provenance?: readonly EvidenceProvenance[]
 }
 
 export interface CropRect {

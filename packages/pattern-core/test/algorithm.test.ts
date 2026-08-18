@@ -451,7 +451,7 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(success(result).pattern.cells[0]?.colorId, 'blue')
   })
 
-  it('ignores an automatic crop when analysis confidence is zero', async () => {
+  it('uses suggested crop confidence independently from the analysis summary', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const source = image(2, 1, [[255, 0, 0], [0, 0, 255]])
     const request = fixedRequest(source, {
@@ -459,10 +459,10 @@ describe('deterministic pattern algorithm', () => {
       baseline: 'a1',
     })
     request.analysis = {
-      confidence: 0,
+      confidence: 1,
       suggestedCrop: { x: 0, y: 0, width: 1, height: 1 },
       suggestedCropSource: 'automatic',
-      suggestedCropConfidence: 1,
+      suggestedCropConfidence: 0,
     }
 
     const result = await algorithm.generate(request)
@@ -887,7 +887,7 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(success(result).metrics.featureVisibilityConfidence, 0)
   })
 
-  it('ignores hard landmarks when total analysis confidence is zero', async () => {
+  it('keeps landmark confidence independent from the analysis summary', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
     const request = fixedRequest(source)
@@ -905,9 +905,8 @@ describe('deterministic pattern algorithm', () => {
 
     const result = await algorithm.generate(request)
 
-    assert.equal(success(result).recommended.valid, true)
-    assert.equal(success(result).metrics.featureExpressibility, 0)
-    assert.equal(success(result).metrics.featureVisibilityConfidence, 0)
+    assert.equal(candidate(result).metrics.featureVisibilityConfidence, 1)
+    assert.ok(candidate(result).metrics.featureExpressibility > 0)
   })
 
   it('scores feature visibility from the final grid colors', async () => {
@@ -981,7 +980,7 @@ describe('deterministic pattern algorithm', () => {
     assert.ok(success(result).recommended.score.total <= 1)
   })
 
-  it('ignores semantic regions when total analysis confidence is zero', async () => {
+  it('keeps semantic region confidence independent from the analysis summary', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const grayPalette: MaterialPalette = {
       id: 'gray',
@@ -1006,7 +1005,6 @@ describe('deterministic pattern algorithm', () => {
       },
     }
 
-    const withoutAnalysis = await algorithm.generate(base)
     const zeroConfidence = await algorithm.generate({
       ...base,
       analysis: {
@@ -1019,8 +1017,95 @@ describe('deterministic pattern algorithm', () => {
         }],
       },
     })
+    const fullConfidence = await algorithm.generate({
+      ...base,
+      analysis: {
+        confidence: 1,
+        semanticRegions: [{
+          id: 'face',
+          label: 'face',
+          confidence: 1,
+          mask: { width: 5, height: 1, values: new Float32Array([1, 1, 1, 1, 1]) },
+        }],
+      },
+    })
 
-    assert.deepEqual(success(zeroConfidence).pattern.cells, success(withoutAnalysis).pattern.cells)
+    assert.deepEqual(success(zeroConfidence).pattern.cells, success(fullConfidence).pattern.cells)
+  })
+
+  it('uses subject mask evidence confidence independently from the analysis summary', async () => {
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: source,
+      palette,
+      analysis: {
+        confidence: 0,
+        subjectMask: { width: 2, height: 2, values: new Float32Array(4) },
+        subjectMaskEvidence: {
+          mask: { width: 2, height: 2, values: new Float32Array([1, 0, 0, 0]) },
+          confidence: 0.9,
+          source: 'ai',
+          revision: 'segmentation-1',
+          provenance: [{
+            origin: 'model',
+            provider: 'rembg-http',
+            model: 'birefnet-general-lite',
+            version: '1',
+          }],
+        },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 2, height: 2 } },
+        maxColors: 2,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'auto' },
+      },
+    })
+    const candidates = [result.recommended ?? result.bestEffort, ...result.alternatives]
+      .filter((entry) => entry !== undefined)
+
+    assert.deepEqual(
+      new Set(candidates.map((entry) => entry!.canvasPlan?.occupancyMode)),
+      new Set(['full-frame', 'subject-shape']),
+    )
+  })
+
+  it('includes subject evidence revision and provenance in generation identity', async () => {
+    const source = image(1, 1, [[255, 0, 0]])
+    const request = (revision: string, legacyMaskValue?: number): PatternGenerationRequest => ({
+      image: source,
+      palette,
+      analysis: {
+        ...(legacyMaskValue === undefined ? {} : {
+          subjectMask: { width: 1, height: 1, values: new Float32Array([legacyMaskValue]) },
+        }),
+        subjectMaskEvidence: {
+          mask: { width: 1, height: 1, values: new Float32Array([1]) },
+          confidence: 1,
+          source: 'ai+manual',
+          revision,
+          userConfirmed: true,
+          provenance: [
+            { origin: 'model', provider: 'rembg-http', model: 'birefnet-general-lite' },
+            { origin: 'manual', provider: 'mask-editor', version: '1' },
+          ],
+        },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 1, height: 1 } },
+        maxColors: 2,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'subject-shape' },
+      },
+    })
+
+    const first = await createPatternAlgorithm().generate(request('revision-1'))
+    const second = await createPatternAlgorithm().generate(request('revision-2'))
+    const sameEvidenceWithLegacyDrift = await createPatternAlgorithm().generate(request('revision-1', 0))
+
+    assert.notEqual(first.generationId, second.generationId)
+    assert.equal(first.generationId, sameEvidenceWithLegacyDrift.generationId)
   })
 
   it('reduces a semantic gradient to a controlled three-level value design', async () => {
@@ -1564,7 +1649,7 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(result.recommended?.valid, true)
   })
 
-  it('rejects invalid runtime enums, duplicate analysis ids, and malformed adapter confidence', async () => {
+  it('rejects invalid runtime enums, duplicate analysis ids, and malformed evidence metadata', async () => {
     const source = image(1, 1, [[255, 0, 0]])
     const algorithm = createPatternAlgorithm()
 
@@ -1637,6 +1722,29 @@ describe('deterministic pattern algorithm', () => {
       }],
     }
     await assert.rejects(() => algorithm.generate(invalidConfidence), /Semantic region/)
+
+    const invalidProvenance = fixedRequest(source)
+    invalidProvenance.analysis = {
+      subjectMaskEvidence: {
+        mask: { width: 1, height: 1, values: new Float32Array([1]) },
+        confidence: 1,
+        source: 'ai',
+        revision: 'mask-1',
+        provenance: [{ origin: 'model', provider: ' ' }],
+      },
+    }
+    await assert.rejects(() => algorithm.generate(invalidProvenance), /provider/)
+
+    const invalidRevision = fixedRequest(source)
+    invalidRevision.analysis = {
+      subjectMaskEvidence: {
+        mask: { width: 1, height: 1, values: new Float32Array([1]) },
+        confidence: 1,
+        source: 'ai',
+        revision: ' ',
+      },
+    }
+    await assert.rejects(() => algorithm.generate(invalidRevision), /revision/)
   })
 
   it('requires confidence for automatic crop metadata', async () => {
