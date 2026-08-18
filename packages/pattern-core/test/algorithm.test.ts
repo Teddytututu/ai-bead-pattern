@@ -727,6 +727,48 @@ describe('deterministic pattern algorithm', () => {
     }
   })
 
+  it('uses the subject shape to evaluate explicit full-frame canvas plans', async () => {
+    const source = image(8, 8, Array.from({ length: 64 }, () => [255, 0, 0] as const))
+    const subjectValues = new Float32Array(64)
+    for (let y = 1; y < 4; y += 1) {
+      for (let x = 1; x < 3; x += 1) subjectValues[y * 8 + x] = 1
+    }
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: source,
+      palette,
+      analysis: {
+        confidence: 1,
+        subjectMask: { width: 8, height: 8, values: subjectValues },
+        landmarks: [
+          { id: 'eye', kind: 'eye', x: 7, y: 7, confidence: 1, priority: 'hard' },
+        ],
+      },
+      options: {
+        canvas: {
+          mode: 'auto',
+          candidates: [{ width: 8, height: 8 }, { width: 12, height: 12 }],
+        },
+        maxColors: 2,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'full-frame' },
+      },
+    })
+    const candidates = [result.recommended ?? result.bestEffort, ...result.alternatives]
+      .filter((entry) => entry !== undefined)
+
+    assert.equal(candidates.length, 2)
+    for (const entry of candidates) {
+      assert.equal(entry!.metrics.shapeApplied, false)
+      assert.ok(entry!.canvasPlan!.subjectCoverage < 1)
+      assert.ok(entry!.canvasPlan!.score.subject < 1)
+      assert.ok(entry!.canvasPlan!.score.composition < 1)
+      assert.equal(entry!.canvasPlan!.featureBudgets[0]!.allocatedCells, 0)
+      assert.equal(entry!.canvasPlan!.featureBudgets[0]!.feasible, false)
+      assert.equal(entry!.canvasPlan!.estimatedBeads, entry!.metrics.totalBeads)
+    }
+  })
+
   it('honors explicit occupancy selection', async () => {
     const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
     const base = {
@@ -1239,6 +1281,44 @@ describe('deterministic pattern algorithm', () => {
 
     assert.ok(planned.metrics.shapeEdits > 0)
     assert.equal(planned.canvasPlan?.estimatedBeads, planned.metrics.totalBeads)
+  })
+
+  it('reports total generation timing separately from candidate processing', async () => {
+    const source = image(4, 4, Array.from({ length: 16 }, () => [255, 0, 0] as const))
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: source,
+      palette,
+      analysis: {
+        confidence: 1,
+        subjectMask: {
+          width: 4,
+          height: 4,
+          values: new Float32Array([
+            0, 0, 0, 0,
+            0, 1, 1, 0,
+            0, 1, 1, 0,
+            0, 0, 0, 0,
+          ]),
+        },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 4, height: 4 } },
+        maxColors: 2,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'auto' },
+      },
+    })
+    const phases = [
+      result.timing.shapeModelMs,
+      result.timing.shapePlanningMs,
+      result.timing.canvasPlanningMs,
+      result.timing.candidateGenerationMs,
+    ]
+
+    assert.ok(phases.every((value) => Number.isFinite(value) && value >= 0))
+    assert.ok(result.timing.coreTotalMs >= phases.reduce((sum, value) => sum + value, 0))
+    assert.ok(result.timing.coreTotalMs >= candidate(result).metrics.processingTimeMs)
   })
 
   it('gives canvas plans distinct identities for different source generations', async () => {

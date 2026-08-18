@@ -1,4 +1,5 @@
-import { ShapeVariantCache, buildSourceShapeModel } from '../dist/experimental.js'
+import { buildSourceShapeModel } from '../dist/experimental.js'
+import { ShapeVariantCache } from '../dist/planning/shape-variant-cache.js'
 
 function benchmarkMask(size) {
   const values = new Float32Array(size * size)
@@ -21,7 +22,6 @@ for (const size of [512, 2048]) {
     cache.get({
       crop: { x: 0, y: 0, width: size, height: size },
       size: { width: side, height: side },
-      occupancyMode: 'subject-shape',
       refinementIterations: 2,
     })
   }

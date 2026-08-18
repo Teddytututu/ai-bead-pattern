@@ -364,7 +364,6 @@ function buildCanvasPlans(
       ?? shapeCache?.get({
         crop,
         size,
-        occupancyMode: 'subject-shape',
         refinementIterations,
       })
     if (shape !== undefined && (shape.width !== size.width || shape.height !== size.height)) {
@@ -383,7 +382,8 @@ function buildCanvasPlans(
       : occupancyMode === 'solid-background'
         ? new Uint8Array(size.width * size.height).fill(1)
         : fittedActiveMask(size.width, size.height, fit)
-    return { size, fit, shape, subjectCells, estimatedBeads, activeMask }
+    const featureMask = shape?.activeMask ?? activeMask
+    return { size, fit, shape, subjectCells, estimatedBeads, featureMask }
   })
   return drafts.map((draft) => {
     const feature = featureBudgets(
@@ -391,7 +391,7 @@ function buildCanvasPlans(
       input.analysis?.confidence ?? 1,
       crop,
       draft.fit,
-      draft.activeMask,
+      draft.featureMask,
       draft.size.width,
       draft.size.height,
     )

@@ -2,7 +2,7 @@
 
 ## Phase 1: Baseline
 
-状态：v0.3.1 主体形状、SDF 边界优化、CanvasPlan 与 FeatureBudget 已进入执行链路。
+状态：v0.3.2 Shape Planning Hardening 已完成，主体形状、SDF 边界优化、CanvasPlan 与 FeatureBudget 已进入执行链路。
 
 已交付 RGBA 输入、固定/自动画布、A0/A1/MVP 对照、Lab 配色、网格整理、多候选排序、材料统计、最终网格特征可见度、硬特征整区锁定和分项评分。
 

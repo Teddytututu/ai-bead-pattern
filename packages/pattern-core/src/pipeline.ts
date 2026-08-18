@@ -31,6 +31,7 @@ import {
 import type { CanvasPlan, OccupancyMode } from './contracts.js'
 import {
   buildSourceShapeModel,
+  shapeRasterizationThreshold,
   type ShapeRasterization,
 } from './shape.js'
 import { ShapeVariantCache } from './planning/shape-variant-cache.js'
@@ -43,6 +44,7 @@ import type {
   ColorDistanceMethod,
   CropRect,
   GridSize,
+  GenerationTiming,
   ImageAnalysis,
   ImageLandmark,
   LandmarkKind,
@@ -301,7 +303,9 @@ function validateRequest(request: PatternGenerationRequest): void {
   }
   if (request.options.structure?.occupancyMode === 'subject-shape'
     && (analysis?.subjectMask === undefined
-      || analysis.subjectMask.values.some((value) => value >= 0.5) === false)) {
+      || analysis.subjectMask.values.some(
+        (value) => value >= shapeRasterizationThreshold,
+      ) === false)) {
     throw new RangeError('subject-shape occupancy requires a non-empty subject mask')
   }
   if (analysis?.importanceMap !== undefined) {
@@ -504,10 +508,15 @@ function resolveOccupancyModes(
   const mode = request.options.structure?.occupancyMode ?? 'auto'
   if (mode === 'full-frame') return ['full-frame']
   if (mode === 'subject-shape') return ['subject-shape']
-  return (request.analysis.confidence ?? 1) >= 0.5
-    && request.analysis.subjectMask.values.some((value) => value >= 0.5)
+  return hasConfidentSubjectMask(request.analysis)
     ? ['full-frame', 'subject-shape']
     : ['full-frame']
+}
+
+function hasConfidentSubjectMask(analysis: ImageAnalysis | undefined): boolean {
+  return analysis?.subjectMask !== undefined
+    && (analysis.confidence ?? 1) >= 0.5
+    && analysis.subjectMask.values.some((value) => value >= shapeRasterizationThreshold)
 }
 
 function withoutSubjectMask(analysis: ImageAnalysis | undefined): ImageAnalysis | undefined {
@@ -1538,11 +1547,16 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.3.1-shape-cache'
+    this.version = config.version ?? '0.3.2-shape-planning'
     this.#clock = config.clock ?? Date.now
   }
 
   async generate(request: PatternGenerationRequest): Promise<PatternGenerationResult> {
+    const generationStartedAt = performance.now()
+    let shapeModelMs = 0
+    let shapePlanningMs = 0
+    let canvasPlanningMs = 0
+    let candidateGenerationMs = 0
     validateRequest(request)
     const baseline = request.options.baseline ?? 'mvp'
     const sizes = resolveSizes(request.options)
@@ -1556,30 +1570,35 @@ export class DeterministicPatternAlgorithm {
     )
     const occupancyModes = resolveOccupancyModes(request, baseline)
     const generationId = await generationFingerprint(request, this.version)
-    const hasSubjectOccupancy = occupancyModes.includes('subject-shape')
-    const analysisShape = hasSubjectOccupancy === false
+    const shouldBuildPlanningShape = baseline === 'mvp'
+      && (occupancyModes.includes('subject-shape') || hasConfidentSubjectMask(request.analysis))
+    const shapeModelStartedAt = performance.now()
+    const analysisShape = shouldBuildPlanningShape === false
       ? undefined
       : buildSourceShapeModel(
         request.analysis!.subjectMask!,
         request.analysis?.confidence ?? 1,
         request.analysis?.landmarks ?? [],
       )
+    shapeModelMs = Math.max(0, performance.now() - shapeModelStartedAt)
     const shapeCache = analysisShape === undefined
       ? undefined
       : new ShapeVariantCache(analysisShape, request.analysis?.landmarks ?? [])
     const shapeRefinementIterations = request.options.structure?.shapeRefinementIterations ?? 2
     const shapeVariants = new Map<string, ShapeRasterization>()
+    const shapePlanningStartedAt = performance.now()
     if (shapeCache !== undefined) {
       for (const size of sizes) {
         const shape = shapeCache.get({
           crop,
           size,
-          occupancyMode: 'subject-shape',
           refinementIterations: shapeRefinementIterations,
         })
         if (shape !== undefined) shapeVariants.set(`${size.width}x${size.height}`, shape)
       }
     }
+    shapePlanningMs = Math.max(0, performance.now() - shapePlanningStartedAt)
+    const canvasPlanningStartedAt = performance.now()
     const occupancyVariants = occupancyModes.map((occupancyMode) => {
       const usesSubjectShape = occupancyMode === 'subject-shape'
         && (analysisShape?.foregroundArea ?? 0) > 0
@@ -1610,9 +1629,11 @@ export class DeterministicPatternAlgorithm {
         ])),
       }
     })
+    canvasPlanningMs = Math.max(0, performance.now() - canvasPlanningStartedAt)
     const resizeMethod = resolveResizeMethod(request.options, baseline)
     const distanceMethod = resolveDistanceMethod(request.options, baseline)
     const candidates: PatternCandidate[] = []
+    const candidateGenerationStartedAt = performance.now()
     for (const size of sizes) {
       for (const occupancy of occupancyVariants) {
         for (const style of styles) {
@@ -1635,6 +1656,7 @@ export class DeterministicPatternAlgorithm {
         }
       }
     }
+    candidateGenerationMs = Math.max(0, performance.now() - candidateGenerationStartedAt)
     candidates.sort((first, second) => Number(second.valid) - Number(first.valid)
       || second.score.total - first.score.total
       || first.id.localeCompare(second.id))
@@ -1644,10 +1666,21 @@ export class DeterministicPatternAlgorithm {
     const rejectedCandidates = ranked.filter((candidate) => candidate.valid === false)
     const recommended = validCandidates[0]
     const evaluation = evaluateCandidates(ranked)
+    const timing = (): GenerationTiming => {
+      const phaseTotal = shapeModelMs + shapePlanningMs + canvasPlanningMs + candidateGenerationMs
+      return {
+        coreTotalMs: Math.max(phaseTotal, performance.now() - generationStartedAt),
+        shapeModelMs,
+        shapePlanningMs,
+        canvasPlanningMs,
+        candidateGenerationMs,
+      }
+    }
     if (recommended !== undefined) {
       return {
         status: 'success',
         generationId,
+        timing: timing(),
         pattern: recommended.pattern,
         materialCounts: recommended.materialCounts,
         metrics: recommended.metrics,
@@ -1662,6 +1695,7 @@ export class DeterministicPatternAlgorithm {
       return {
         status: 'best-effort',
         generationId,
+        timing: timing(),
         bestEffort,
         alternatives: ranked.slice(1),
         rejectedCandidates,
@@ -1671,6 +1705,7 @@ export class DeterministicPatternAlgorithm {
     return {
       status: 'no-valid-candidate',
       generationId,
+      timing: timing(),
       alternatives: [],
       rejectedCandidates: [],
       evaluation,

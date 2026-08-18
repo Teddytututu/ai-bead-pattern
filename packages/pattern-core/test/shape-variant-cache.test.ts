@@ -2,9 +2,9 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
-  ShapeVariantCache,
   buildSourceShapeModel,
 } from '../src/experimental.js'
+import { ShapeVariantCache } from '../src/planning/shape-variant-cache.js'
 
 describe('shape variant cache', () => {
   it('reuses one rasterization for repeated size and refinement requests', () => {
@@ -20,7 +20,6 @@ describe('shape variant cache', () => {
     const request = {
       crop: { x: 0, y: 0, width: 16, height: 16 },
       size: { width: 8, height: 8 },
-      occupancyMode: 'subject-shape' as const,
       refinementIterations: 2,
     }
 
@@ -32,14 +31,12 @@ describe('shape variant cache', () => {
       crop: { x: 1, y: 0, width: 15, height: 16 },
     })
     const changedSize = cache.get({ ...request, size: { width: 9, height: 8 } })
-    const changedOccupancy = cache.get({ ...request, occupancyMode: 'full-frame' })
 
     assert.equal(first, repeated)
     assert.notEqual(first, changedRefinement)
     assert.notEqual(first, changedCrop)
     assert.notEqual(first, changedSize)
-    assert.notEqual(first, changedOccupancy)
-    assert.equal(cache.size, 5)
+    assert.equal(cache.size, 4)
   })
 
   it('validates variant keys before reading the cache', () => {
@@ -52,13 +49,11 @@ describe('shape variant cache', () => {
     assert.throws(() => cache.get({
       crop: { x: 0, y: 0, width: 0, height: 1 },
       size: { width: 1, height: 1 },
-      occupancyMode: 'subject-shape',
       refinementIterations: 2,
     }), /crop/i)
     assert.throws(() => cache.get({
       crop: { x: 0, y: 0, width: 1, height: 1 },
       size: { width: 1, height: 1 },
-      occupancyMode: 'subject-shape',
       refinementIterations: 33,
     }), /refinement/i)
   })

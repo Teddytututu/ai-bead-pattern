@@ -6,12 +6,10 @@ import {
   type SourceShapeModel,
 } from '../shape.js'
 import type { CropRect, GridSize, ImageLandmark } from '../types.js'
-import type { OccupancyMode } from '../contracts.js'
 
 export interface ShapeVariantRequest {
   crop: CropRect
   size: GridSize
-  occupancyMode: OccupancyMode
   refinementIterations: number
 }
 
@@ -19,7 +17,6 @@ function variantKey(request: ShapeVariantRequest): string {
   return JSON.stringify({
     crop: request.crop,
     size: request.size,
-    occupancyMode: request.occupancyMode,
     threshold: shapeRasterizationThreshold,
     refinementIterations: request.refinementIterations,
   })
@@ -48,9 +45,6 @@ export class ShapeVariantCache {
     if (Number.isInteger(request.refinementIterations) === false
       || request.refinementIterations < 0 || request.refinementIterations > 32) {
       throw new RangeError('Shape variant refinement iterations must stay within 0..32')
-    }
-    if (['full-frame', 'subject-shape', 'solid-background'].includes(request.occupancyMode) === false) {
-      throw new RangeError('Shape variant occupancy mode is invalid')
     }
     if (this.#sourceShape.foregroundArea === 0) return undefined
     const key = variantKey(request)

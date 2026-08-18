@@ -15,7 +15,7 @@ tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
 ```
 
-当前阶段已完成 v0.3.1 画布规划、特征预算与 SDF 轮廓能量。`pattern-core` 将视觉模型提供的主体 mask 投影到目标豆格，使用连续 signed distance、覆盖率、拓扑与毛刺成本优化边界；CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization，多个颜色风格共享同一结构事实。内部五官继续进入特征保护，只有轮廓锚点允许改变主体占位。自动模式同时生成全图和主体形状候选，再按构图、特征格数、轮廓质量和制作成本排序。`ai-gateway` 通过 rembg 调用 `birefnet-general-lite`，将主体掩码、边界重要度、建议裁剪和模型版本转换为 `ImageAnalysis`。A0/A1 继续提供全画面对照，结构版负责主体形状、画布规划、颜色设计和网格整理。
+当前阶段已完成 v0.3.2 Shape Planning Hardening。`pattern-core` 将视觉模型提供的主体 mask 投影到目标豆格，使用连续 signed distance、覆盖率、拓扑与毛刺成本优化边界；CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization，多个颜色风格共享同一结构事实。全画面铺豆模式仍使用主体形状评价构图与边界，执行占位保持全画面。内部五官继续进入特征保护，只有轮廓锚点允许改变主体占位。自动模式同时生成全图和主体形状候选，再按构图、特征格数、轮廓质量和制作成本排序。`ai-gateway` 通过 rembg 调用 `birefnet-general-lite`，将主体掩码、边界重要度、建议裁剪和模型版本转换为 `ImageAnalysis`。A0/A1 继续提供全画面对照，结构版负责主体形状、画布规划、颜色设计和网格整理。
 
 ## 文档
 

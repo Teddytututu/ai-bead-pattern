@@ -398,7 +398,10 @@ export function buildSourceShapeModel(
   confidence: number,
   landmarks: readonly ImageLandmark[] = [],
 ): SourceShapeModel {
-  const binaryMask = Uint8Array.from(mask.values, (value) => value >= 0.5 ? 1 : 0)
+  const binaryMask = Uint8Array.from(
+    mask.values,
+    (value) => value >= shapeRasterizationThreshold ? 1 : 0,
+  )
   const labeled = labelComponents(binaryMask, mask.width, mask.height)
   const foregroundArea = binaryMask.reduce((sum, value) => sum + value, 0)
   const modelConfidence = clamp(confidence, 0, 1)

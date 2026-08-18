@@ -12,6 +12,7 @@
 - 主体 mask 的面积覆盖栅格化、连通块与孔洞保持
 - 连续 SDF、覆盖率、拓扑和毛刺成本驱动的目标格边界优化
 - CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization
+- 全画面占位继续使用主体形状评价构图与边界
 - 轮廓锚点与内部五官分层保护
 - 画布尺寸的主体占用、轮廓、构图、豆数成本联合规划
 - 五官与身份特征的最小/理想/最大格数预算和成对特征可行性检查
@@ -67,6 +68,8 @@ console.log(result.alternatives)
 外部人物、宠物和分割模型通过 `ImageAnalysis` 注入主体掩码、语义区域、关键点、裁剪和重要性地图。核心包保持纯 TypeScript 与平台无关。
 
 主体 mask 的结构阈值固定为 `0.5`，让 SourceShapeModel、SDF、CanvasPlan 与最终候选使用同一语义。
+
+生成结果的 `timing` 提供核心总耗时与 shape model、shape planning、canvas planning、candidate generation 分段耗时；候选 `metrics.processingTimeMs` 表示共享规划完成后的单候选处理耗时。
 
 V2 规划能力从 `@ai-bead-pattern/pattern-core/experimental` 导出。`planCanvases()` 可独立比较多个画布尺寸；每个生成候选也会携带经过校验的 `canvasPlan`，供服务端记录和界面解释自动选型。
 
