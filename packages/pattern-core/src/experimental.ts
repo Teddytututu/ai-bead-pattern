@@ -24,9 +24,12 @@ export type {
 export {
   buildSourceShapeModel,
   rasterizeSourceShape,
+  shapeRasterizationThreshold,
 } from './shape.js'
 export { planCanvases } from './planning/canvas-planner.js'
 export type { CanvasPlanningInput } from './planning/canvas-planner.js'
+export { ShapeVariantCache } from './planning/shape-variant-cache.js'
+export type { ShapeVariantRequest } from './planning/shape-variant-cache.js'
 export type {
   LandmarkAllocation,
   ShapeAnchor,

@@ -3,10 +3,9 @@ import { fitCropToCanvas, gridCellForSourcePoint, type CanvasFit } from '../imag
 import { landmarkEffectiveConfidence, landmarkGridRadiusCells } from '../landmarks.js'
 import {
   buildSourceShapeModel,
-  rasterizeSourceShape,
   type ShapeRasterization,
-  type SourceShapeModel,
 } from '../shape.js'
+import { ShapeVariantCache } from './shape-variant-cache.js'
 import type { CropRect, GridSize, ImageAnalysis, ImageLandmark, LandmarkKind } from '../types.js'
 
 export interface CanvasPlanningInput {
@@ -16,6 +15,8 @@ export interface CanvasPlanningInput {
   candidates: readonly GridSize[]
   occupancyMode?: OccupancyMode
   beadDiameterMm?: number
+  shapeRefinementIterations?: number
+  identitySeed?: string
 }
 
 interface FeatureProfile {
@@ -104,6 +105,14 @@ function validateInput(input: CanvasPlanningInput): void {
     && (Number.isFinite(input.beadDiameterMm) === false || input.beadDiameterMm <= 0)) {
     throw new RangeError('Canvas planning bead diameter must be a finite positive number')
   }
+  if (input.shapeRefinementIterations !== undefined
+    && (Number.isInteger(input.shapeRefinementIterations) === false
+      || input.shapeRefinementIterations < 0 || input.shapeRefinementIterations > 32)) {
+    throw new RangeError('Canvas planning refinement iterations must stay within 0..32')
+  }
+  if (input.identitySeed !== undefined && input.identitySeed.trim().length === 0) {
+    throw new RangeError('Canvas planning identity seed must be non-empty')
+  }
 }
 
 function diskCells(radius: number): number {
@@ -176,9 +185,35 @@ function canvasPlanId(
   size: GridSize,
   crop: CropRect,
   occupancyMode: OccupancyMode,
+  identitySeed: string,
 ): string {
-  const identity = JSON.stringify({ plannerVersion, size, crop, occupancyMode })
+  const identity = JSON.stringify({ plannerVersion, size, crop, occupancyMode, identitySeed })
   return `canvas-${size.width}x${size.height}-${stableHash(identity)}`
+}
+
+function analysisIdentity(input: CanvasPlanningInput): string {
+  let maskHash = 0x811c9dc5
+  for (const value of input.analysis?.subjectMask?.values ?? []) {
+    maskHash ^= Math.round(value * 65_535)
+    maskHash = Math.imul(maskHash, 0x01000193)
+  }
+  return stableHash(JSON.stringify({
+    image: input.image,
+    confidence: input.analysis?.confidence ?? 0,
+    maskHash: maskHash >>> 0,
+    landmarks: (input.analysis?.landmarks ?? []).map((landmark) => ({
+      id: landmark.id,
+      kind: landmark.kind,
+      x: landmark.x,
+      y: landmark.y,
+      confidence: landmark.confidence,
+      priority: landmark.priority,
+      affectsOccupancy: landmark.affectsOccupancy ?? false,
+      symmetryGroup: landmark.symmetryGroup,
+      sourceRadiusPx: landmark.sourceRadiusPx,
+      gridRadiusCells: landmark.gridRadiusCells,
+    })),
+  }))
 }
 
 function featureBudgets(
@@ -303,7 +338,7 @@ function compositionScore(shape: ShapeRasterization | undefined): number {
 
 function buildCanvasPlans(
   input: CanvasPlanningInput,
-  preparedShape?: SourceShapeModel,
+  preparedVariants?: ReadonlyMap<string, ShapeRasterization>,
 ): readonly CanvasPlan[] {
   validateInput(input)
   const crop = normalizedCrop(input)
@@ -311,26 +346,30 @@ function buildCanvasPlans(
     ? 'full-frame'
     : 'subject-shape')
   const uniqueCandidates = [...new Map(input.candidates.map((size) => [`${size.width}x${size.height}`, size])).values()]
-  const shapeModel = preparedShape ?? (input.analysis?.subjectMask === undefined
+  const shapeModel = preparedVariants !== undefined || input.analysis?.subjectMask === undefined
     ? undefined
     : buildSourceShapeModel(
       input.analysis.subjectMask,
       input.analysis.confidence ?? 1,
       input.analysis.landmarks ?? [],
-    ))
+    )
+  const shapeCache = preparedVariants === undefined && shapeModel !== undefined
+    ? new ShapeVariantCache(shapeModel, input.analysis?.landmarks ?? [])
+    : undefined
+  const refinementIterations = input.shapeRefinementIterations ?? 2
+  const identitySeed = input.identitySeed ?? analysisIdentity(input)
   const drafts = uniqueCandidates.map((size) => {
     const fit = fitCropToCanvas(crop, size.width, size.height)
-    const shape = shapeModel === undefined || shapeModel.foregroundArea === 0
-      ? undefined
-      : rasterizeSourceShape(
-        shapeModel,
+    const shape = preparedVariants?.get(`${size.width}x${size.height}`)
+      ?? shapeCache?.get({
         crop,
-        fit,
-        size.width,
-        size.height,
-        input.analysis?.landmarks ?? [],
-        { refinementIterations: 0 },
-      )
+        size,
+        occupancyMode: 'subject-shape',
+        refinementIterations,
+      })
+    if (shape !== undefined && (shape.width !== size.width || shape.height !== size.height)) {
+      throw new RangeError('Prepared shape variant must align with its canvas size')
+    }
     const subjectCells = shape?.activeMask.reduce((sum, value) => sum + value, 0)
       ?? fit.width * fit.height
     const fittedCells = fit.width * fit.height
@@ -381,7 +420,7 @@ function buildCanvasPlans(
         - buildTimeCost * 0.1,
     )
     const plan: CanvasPlan = {
-      id: canvasPlanId(draft.size, crop, occupancyMode),
+      id: canvasPlanId(draft.size, crop, occupancyMode, identitySeed),
       size: draft.size,
       crop,
       occupancyMode,
@@ -413,10 +452,10 @@ export function planCanvases(input: CanvasPlanningInput): readonly CanvasPlan[] 
   return buildCanvasPlans(input)
 }
 
-/** Internal pipeline entry that avoids parsing a trusted subject mask twice. */
-export function planCanvasesWithSourceShape(
+/** Internal pipeline entry that shares executed shape variants with candidate generation. */
+export function planCanvasesWithShapeVariants(
   input: CanvasPlanningInput,
-  sourceShape: SourceShapeModel,
+  variants: ReadonlyMap<string, ShapeRasterization>,
 ): readonly CanvasPlan[] {
-  return buildCanvasPlans(input, sourceShape)
+  return buildCanvasPlans(input, variants)
 }

@@ -56,7 +56,6 @@ export interface StructureOptions {
   edgeStrength?: number
   valueLevels?: 2 | 3 | 4
   occupancyMode?: 'auto' | 'full-frame' | 'subject-shape'
-  subjectThreshold?: number
   shapeRefinementIterations?: number
 }
 

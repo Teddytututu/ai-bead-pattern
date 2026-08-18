@@ -722,6 +722,9 @@ describe('deterministic pattern algorithm', () => {
       new Set(candidates.map((entry) => entry!.metrics.shapeApplied)),
       new Set([false, true]),
     )
+    for (const entry of candidates) {
+      assert.equal(entry!.canvasPlan?.estimatedBeads, entry!.metrics.totalBeads)
+    }
   })
 
   it('honors explicit occupancy selection', async () => {
@@ -1190,6 +1193,86 @@ describe('deterministic pattern algorithm', () => {
       .every((entry) => entry!.canvasPlan?.feasible))
   })
 
+  it('uses the executed shape rasterization as the canvas planning fact', async () => {
+    const rows = [
+      '0000000000000000',
+      '0000000000000000',
+      '0010110000111100',
+      '0010111001101000',
+      '0010111101000000',
+      '0001101110100100',
+      '0011101111101000',
+      '0011100010110100',
+      '0001010100111100',
+      '0010000001010100',
+      '0000011111111100',
+      '0000010011110000',
+      '0010001111100000',
+      '0000010101101000',
+      '0000000000000000',
+      '0000000000000000',
+    ]
+    const source = image(16, 16, Array.from({ length: 256 }, () => [255, 0, 0] as const))
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: source,
+      palette,
+      analysis: {
+        confidence: 1,
+        subjectMask: {
+          width: 16,
+          height: 16,
+          values: Float32Array.from([...rows.join('')], (value) => Number(value)),
+        },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 8, height: 8 } },
+        maxColors: 2,
+        maxCandidates: 1,
+        styles: ['faithful'],
+        structure: {
+          occupancyMode: 'subject-shape',
+          shapeRefinementIterations: 2,
+        },
+      },
+    })
+    const planned = candidate(result)
+
+    assert.ok(planned.metrics.shapeEdits > 0)
+    assert.equal(planned.canvasPlan?.estimatedBeads, planned.metrics.totalBeads)
+  })
+
+  it('gives canvas plans distinct identities for different source generations', async () => {
+    const subjectMask = {
+      width: 2,
+      height: 2,
+      values: new Float32Array([1, 1, 1, 1]),
+    }
+    const request = (source: PixelImage): PatternGenerationRequest => ({
+      image: source,
+      palette,
+      analysis: { confidence: 1, subjectMask },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 2, height: 2 } },
+        maxColors: 2,
+        maxCandidates: 1,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'subject-shape' },
+      },
+    })
+    const first = await createPatternAlgorithm({ clock: () => 123 }).generate(request(image(
+      2,
+      2,
+      Array.from({ length: 4 }, () => [255, 0, 0] as const),
+    )))
+    const second = await createPatternAlgorithm({ clock: () => 123 }).generate(request(image(
+      2,
+      2,
+      Array.from({ length: 4 }, () => [0, 0, 255] as const),
+    )))
+
+    assert.notEqual(candidate(first).canvasPlan?.id, candidate(second).canvasPlan?.id)
+  })
+
   it('penalizes fragmented feature regions in the final grid', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const skin = [240, 190, 160] as const
@@ -1423,12 +1506,6 @@ describe('deterministic pattern algorithm', () => {
     await assert.rejects(() => algorithm.generate(fixedRequest(source, {
       structure: { occupancyMode: 'outline' as never },
     })), /occupancyMode/)
-    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
-      structure: { subjectThreshold: 1.01 },
-    })), /subjectThreshold/)
-    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
-      structure: { subjectThreshold: Number.NaN },
-    })), /subjectThreshold/)
     await assert.rejects(() => algorithm.generate(fixedRequest(source, {
       structure: { shapeRefinementIterations: 1.5 },
     })), /shapeRefinementIterations/)

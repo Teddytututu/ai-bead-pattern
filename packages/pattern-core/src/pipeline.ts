@@ -26,14 +26,14 @@ import {
 import { optimizePaletteAssignments } from './palette-optimization.js'
 import {
   planCanvases,
-  planCanvasesWithSourceShape,
+  planCanvasesWithShapeVariants,
 } from './planning/canvas-planner.js'
 import type { CanvasPlan, OccupancyMode } from './contracts.js'
 import {
   buildSourceShapeModel,
-  rasterizeSourceShape,
-  type SourceShapeModel,
+  type ShapeRasterization,
 } from './shape.js'
+import { ShapeVariantCache } from './planning/shape-variant-cache.js'
 import { buildSourceGuidance, designRegionValues, type SourceGuidance } from './structure.js'
 import type {
   AlgorithmEngine,
@@ -71,7 +71,7 @@ interface CandidateContext {
   distanceMethod: ColorDistanceMethod
   preparedPalette: readonly PreparedColor[]
   sourceGuidance: SourceGuidance
-  sourceShape: SourceShapeModel | undefined
+  shapeRasterization: ShapeRasterization | undefined
   occupancyMode: ResolvedOccupancyMode
   canvasPlan: CanvasPlan
 }
@@ -247,7 +247,6 @@ function validateRequest(request: PatternGenerationRequest): void {
     new Set(['auto', 'full-frame', 'subject-shape']),
     'occupancyMode',
   )
-  validateUnitInterval(request.options.structure?.subjectThreshold, 'subjectThreshold')
   if (request.options.structure?.shapeRefinementIterations !== undefined
     && (Number.isFinite(request.options.structure.shapeRefinementIterations) === false
       || request.options.structure.shapeRefinementIterations < 0
@@ -509,6 +508,13 @@ function resolveOccupancyModes(
     && request.analysis.subjectMask.values.some((value) => value >= 0.5)
     ? ['full-frame', 'subject-shape']
     : ['full-frame']
+}
+
+function withoutSubjectMask(analysis: ImageAnalysis | undefined): ImageAnalysis | undefined {
+  if (analysis === undefined || analysis.subjectMask === undefined) return analysis
+  const copy: ImageAnalysis = { ...analysis }
+  delete copy.subjectMask
+  return copy
 }
 
 function styleColorLimit(style: PatternStyle, maximum: number): number {
@@ -1226,24 +1232,7 @@ function generateCandidate(
       request.options.backgroundRgb,
     )
     : resized
-  const shapeRasterization = context.sourceShape === undefined
-    ? undefined
-    : rasterizeSourceShape(
-      context.sourceShape,
-      crop,
-      resized.fit,
-      size.width,
-      size.height,
-      request.analysis?.landmarks ?? [],
-      {
-        ...(structureOptions.subjectThreshold === undefined
-          ? {}
-          : { threshold: structureOptions.subjectThreshold }),
-        ...(structureOptions.shapeRefinementIterations === undefined
-          ? {}
-          : { refinementIterations: structureOptions.shapeRefinementIterations }),
-      },
-    )
+  const shapeRasterization = context.shapeRasterization
   const activeMask = shapeRasterization?.activeMask ?? resized.activeMask
   const weights = buildImportanceWeights(
     request.analysis,
@@ -1549,7 +1538,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.3.1-canvas-planning'
+    this.version = config.version ?? '0.3.1-shape-cache'
     this.#clock = config.clock ?? Date.now
   }
 
@@ -1566,6 +1555,7 @@ export class DeterministicPatternAlgorithm {
       request.options.backgroundRgb,
     )
     const occupancyModes = resolveOccupancyModes(request, baseline)
+    const generationId = await generationFingerprint(request, this.version)
     const hasSubjectOccupancy = occupancyModes.includes('subject-shape')
     const analysisShape = hasSubjectOccupancy === false
       ? undefined
@@ -1574,26 +1564,46 @@ export class DeterministicPatternAlgorithm {
         request.analysis?.confidence ?? 1,
         request.analysis?.landmarks ?? [],
       )
+    const shapeCache = analysisShape === undefined
+      ? undefined
+      : new ShapeVariantCache(analysisShape, request.analysis?.landmarks ?? [])
+    const shapeRefinementIterations = request.options.structure?.shapeRefinementIterations ?? 2
+    const shapeVariants = new Map<string, ShapeRasterization>()
+    if (shapeCache !== undefined) {
+      for (const size of sizes) {
+        const shape = shapeCache.get({
+          crop,
+          size,
+          occupancyMode: 'subject-shape',
+          refinementIterations: shapeRefinementIterations,
+        })
+        if (shape !== undefined) shapeVariants.set(`${size.width}x${size.height}`, shape)
+      }
+    }
     const occupancyVariants = occupancyModes.map((occupancyMode) => {
-      const sourceShape = occupancyMode === 'subject-shape' && (analysisShape?.foregroundArea ?? 0) > 0
-        ? analysisShape
-        : undefined
+      const usesSubjectShape = occupancyMode === 'subject-shape'
+        && (analysisShape?.foregroundArea ?? 0) > 0
+      const planningAnalysis = shapeVariants.size === 0
+        ? withoutSubjectMask(request.analysis)
+        : request.analysis
       const canvasPlanningInput = {
         image: { width: request.image.width, height: request.image.height },
-        ...(request.analysis === undefined ? {} : { analysis: request.analysis }),
+        ...(planningAnalysis === undefined ? {} : { analysis: planningAnalysis }),
         crop,
         candidates: sizes,
         occupancyMode,
+        shapeRefinementIterations,
+        identitySeed: generationId,
         ...(request.options.beadDiameterMm === undefined
           ? {}
           : { beadDiameterMm: request.options.beadDiameterMm }),
       } as const
-      const canvasPlans = sourceShape === undefined
+      const canvasPlans = shapeVariants.size === 0
         ? planCanvases(canvasPlanningInput)
-        : planCanvasesWithSourceShape(canvasPlanningInput, sourceShape)
+        : planCanvasesWithShapeVariants(canvasPlanningInput, shapeVariants)
       return {
         occupancyMode,
-        sourceShape,
+        usesSubjectShape,
         canvasPlansBySize: new Map(canvasPlans.map((plan) => [
           `${plan.size.width}x${plan.size.height}`,
           plan,
@@ -1602,7 +1612,6 @@ export class DeterministicPatternAlgorithm {
     })
     const resizeMethod = resolveResizeMethod(request.options, baseline)
     const distanceMethod = resolveDistanceMethod(request.options, baseline)
-    const generationId = await generationFingerprint(request, this.version)
     const candidates: PatternCandidate[] = []
     for (const size of sizes) {
       for (const occupancy of occupancyVariants) {
@@ -1617,7 +1626,9 @@ export class DeterministicPatternAlgorithm {
             distanceMethod,
             preparedPalette,
             sourceGuidance,
-            sourceShape: occupancy.sourceShape,
+            shapeRasterization: occupancy.usesSubjectShape
+              ? shapeVariants.get(`${size.width}x${size.height}`)
+              : undefined,
             occupancyMode: occupancy.occupancyMode,
             canvasPlan: occupancy.canvasPlansBySize.get(`${size.width}x${size.height}`)!,
           }, generationId, this.version, this.#clock))

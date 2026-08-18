@@ -30,23 +30,45 @@ const palette = {
   }),
 }
 
+const subjectValues = maximumLoad ? new Float32Array(size * size) : undefined
+if (subjectValues !== undefined) {
+  const center = (size - 1) / 2
+  const radiusX = size * 0.38
+  const radiusY = size * 0.44
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const ellipse = ((x - center) / radiusX) ** 2 + ((y - center) / radiusY) ** 2
+      if (ellipse <= 1) subjectValues[y * size + x] = 1
+    }
+  }
+}
+
 const beforeRss = process.memoryUsage().rss
 const startedAt = performance.now()
 const result = await createPatternAlgorithm().generate({
   image: { width: size, height: size, data },
   palette,
+  ...(subjectValues === undefined ? {} : {
+    analysis: {
+      confidence: 1,
+      subjectMask: { width: size, height: size, values: subjectValues },
+    },
+  }),
   options: {
     canvas: maximumLoad
       ? {
         mode: 'auto',
-        candidates: [48, 64, 80, 96].map((side) => ({ width: side, height: side })),
+        candidates: [32, 48, 64].map((side) => ({ width: side, height: side })),
       }
       : { mode: 'fixed', size: { width: size, height: size } },
     maxColors: maximumLoad ? 48 : 24,
-    maxCandidates: maximumLoad ? 20 : 1,
+    maxCandidates: maximumLoad ? 18 : 1,
     styles: maximumLoad
-      ? ['faithful', 'cute', 'simple', 'high-contrast', 'soft']
+      ? ['faithful', 'simple', 'high-contrast']
       : ['faithful'],
+    ...(maximumLoad ? {
+      structure: { occupancyMode: 'auto', shapeRefinementIterations: 2 },
+    } : {}),
     optimization: { localSearchIterations: maximumLoad ? 2 : 1 },
   },
 })
