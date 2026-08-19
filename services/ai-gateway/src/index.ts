@@ -6,3 +6,4 @@ export {
   type SegmentationRequest,
   type SegmentationResult,
 } from './segmentation.js'
+export { fuseImageAnalyses } from './analysis-fusion.js'

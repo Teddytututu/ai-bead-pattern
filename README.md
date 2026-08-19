@@ -15,7 +15,7 @@ tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
 ```
 
-当前阶段已完成 v0.3.2 Shape Planning Hardening。`pattern-core` 将视觉模型提供的主体 mask 投影到目标豆格，使用连续 signed distance、覆盖率、拓扑与毛刺成本优化边界；CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization，多个颜色风格共享同一结构事实。全画面铺豆模式仍使用主体形状评价构图与边界，执行占位保持全画面。内部五官继续进入特征保护，只有轮廓锚点允许改变主体占位。自动模式同时生成全图和主体形状候选，再按构图、特征格数、轮廓质量和制作成本排序。`ai-gateway` 通过 rembg 调用 `birefnet-general-lite`，将主体掩码、边界重要度、建议裁剪和模型版本转换为 `ImageAnalysis`。A0/A1 继续提供全画面对照，结构版负责主体形状、画布规划、颜色设计和网格整理。
+当前阶段进入 v0.3.3 Analysis Evidence。`pattern-core` 将视觉模型提供的主体 mask 投影到目标豆格，使用连续 signed distance、覆盖率、拓扑与毛刺成本优化边界；CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization，多个颜色风格共享同一结构事实。全画面铺豆模式仍使用主体形状评价构图与边界，执行占位保持全画面。自动模式同时生成全图和主体形状候选，再按构图、特征格数、轮廓质量和制作成本排序。`ImageAnalysis` 现在支持带来源、revision、用户确认状态和 provenance 的主体证据；主体 mask、landmark、语义区域和自动裁剪分别使用自己的置信度。用户确认状态提升系统对 mask 的信任度，同时保留原始 confidence。AI、透明通道、本地启发式和人工修正都有正式来源类型，融合结果经过固定优先级与 canonical 排序，输入顺序不会改变结果身份。
 
 ## 文档
 
@@ -64,10 +64,12 @@ docs/                  架构、隐私与路线说明
 - 结构版、面积缩放、最近邻三路浏览器对照
 - rembg + BiRefNet 主体分割适配器
 - 主体边界重要度、自动裁剪与分析版本追踪
+- 多来源视觉证据、独立置信度与 provenance 追踪
+- 用户确认的修正 mask 优先融合合同
 - 线性轮廓追踪、面积覆盖栅格化与 Signed Distance Field
 - 全图与主体形状占位候选搜索
 
-下一批工作安排为人物与宠物语义分析、FeatureConstraint 模板搜索和 PIA-lite 空间重组。
+下一批工作安排为原图空间的人工 mask 修正工具，随后接入人物语义分析和 FeatureConstraint 模板搜索。
 
 浏览器体验页：`apps/demo/index.html`
 

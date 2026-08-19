@@ -6,6 +6,7 @@ import {
   type PreparedColor,
 } from './color.js'
 import { adaptPattern } from './adaptation.js'
+import { resolvedSubjectMask, subjectMaskConfidence, subjectMaskTrust } from './analysis-evidence.js'
 import {
   countIsolatedCells,
   countThinStripes,
@@ -43,6 +44,7 @@ import type {
   CandidateScore,
   ColorDistanceMethod,
   CropRect,
+  EvidenceProvenance,
   GridSize,
   GenerationTiming,
   ImageAnalysis,
@@ -157,8 +159,10 @@ async function generationFingerprint(
     label: region.label,
     confidence: region.confidence,
     importance: region.importance,
+    provenance: region.provenance,
     mask: await arrayFingerprint(region.mask.values),
   })))
+  const subjectMaskEvidence = analysis?.subjectMaskEvidence
   const identity = {
     engine: 'baseline',
     version,
@@ -175,10 +179,21 @@ async function generationFingerprint(
       suggestedCrop: analysis.suggestedCrop,
       suggestedCropConfidence: analysis.suggestedCropConfidence,
       suggestedCropSource: analysis.suggestedCropSource,
-      subjectMask: await arrayFingerprint(analysis.subjectMask?.values),
+      subjectMask: subjectMaskEvidence === undefined
+        ? await arrayFingerprint(analysis.subjectMask?.values)
+        : undefined,
+      subjectMaskEvidence: subjectMaskEvidence === undefined ? undefined : {
+        confidence: subjectMaskEvidence.confidence,
+        source: subjectMaskEvidence.source,
+        revision: subjectMaskEvidence.revision,
+        userConfirmed: subjectMaskEvidence.userConfirmed,
+        provenance: subjectMaskEvidence.provenance,
+        mask: await arrayFingerprint(subjectMaskEvidence.mask.values),
+      },
       importanceMap: await arrayFingerprint(analysis.importanceMap?.weights),
       semanticRegions,
       landmarks: analysis.landmarks,
+      provenance: analysis.provenance,
     },
     options: request.options,
   }
@@ -206,6 +221,27 @@ function validateEnum(value: string | undefined, allowed: ReadonlySet<string>, l
 function validateUnitInterval(value: number | undefined, label: string): void {
   if (value !== undefined && (Number.isFinite(value) === false || value < 0 || value > 1)) {
     throw new RangeError(`${label} must stay within 0..1`)
+  }
+}
+
+function validateProvenance(
+  provenance: readonly EvidenceProvenance[] | undefined,
+  label: string,
+): void {
+  for (const entry of provenance ?? []) {
+    if (entry.origin !== 'model' && entry.origin !== 'source' && entry.origin !== 'heuristic'
+      && entry.origin !== 'manual' && entry.origin !== 'fused') {
+      throw new RangeError(`${label} origin has an unsupported value`)
+    }
+    if (entry.provider.trim().length === 0) {
+      throw new RangeError(`${label} provider is required`)
+    }
+    if (entry.model !== undefined && entry.model.trim().length === 0) {
+      throw new RangeError(`${label} model must be non-empty when provided`)
+    }
+    if (entry.version !== undefined && entry.version.trim().length === 0) {
+      throw new RangeError(`${label} version must be non-empty when provided`)
+    }
   }
 }
 
@@ -291,19 +327,35 @@ function validateRequest(request: PatternGenerationRequest): void {
     validateRgb(request.options.backgroundRgb, 'Background')
   }
   const analysis = request.analysis
-  if (analysis?.subjectMask !== undefined) {
+  const subjectMask = resolvedSubjectMask(analysis)
+  if (subjectMask !== undefined) {
     validateMask(
-      analysis.subjectMask.width,
-      analysis.subjectMask.height,
-      analysis.subjectMask.values,
+      subjectMask.width,
+      subjectMask.height,
+      subjectMask.values,
       request.image.width,
       request.image.height,
       'Subject mask',
     )
   }
+  if (analysis?.subjectMaskEvidence !== undefined) {
+    validateUnitInterval(analysis.subjectMaskEvidence.confidence, 'Subject mask evidence confidence')
+    if (analysis.subjectMaskEvidence.revision.trim().length === 0) {
+      throw new RangeError('Subject mask evidence revision is required')
+    }
+    if (['ai', 'alpha', 'heuristic', 'manual', 'ai+manual', 'fused', 'legacy']
+      .includes(analysis.subjectMaskEvidence.source) === false) {
+      throw new RangeError('Subject mask evidence source has an unsupported value')
+    }
+    if (analysis.subjectMaskEvidence.userConfirmed !== undefined
+      && typeof analysis.subjectMaskEvidence.userConfirmed !== 'boolean') {
+      throw new RangeError('Subject mask evidence userConfirmed must be boolean')
+    }
+    validateProvenance(analysis.subjectMaskEvidence.provenance, 'Subject mask evidence provenance')
+  }
   if (request.options.structure?.occupancyMode === 'subject-shape'
-    && (analysis?.subjectMask === undefined
-      || analysis.subjectMask.values.some(
+    && (subjectMask === undefined
+      || subjectMask.values.some(
         (value) => value >= shapeRasterizationThreshold,
       ) === false)) {
     throw new RangeError('subject-shape occupancy requires a non-empty subject mask')
@@ -326,6 +378,7 @@ function validateRequest(request: PatternGenerationRequest): void {
     semanticRegionIds.add(region.id)
     validateUnitInterval(region.confidence, `Semantic region ${region.id} confidence`)
     validateUnitInterval(region.importance, `Semantic region ${region.id} importance`)
+    validateProvenance(region.provenance, `Semantic region ${region.id} provenance`)
     validateMask(
       region.mask.width,
       region.mask.height,
@@ -366,6 +419,7 @@ function validateRequest(request: PatternGenerationRequest): void {
       || (landmark.gridRadiusCells ?? 0) < 0) {
       throw new RangeError(`Landmark ${landmark.id} confidence and radii are outside their valid range`)
     }
+    validateProvenance(landmark.provenance, `Landmark ${landmark.id} provenance`)
     const maximumSourceRadius = Math.max(request.image.width, request.image.height)
     if ((landmark.sourceRadiusPx ?? 0) > maximumSourceRadius
       || (landmark.gridRadiusCells ?? 0) > maxCanvasSide
@@ -374,6 +428,7 @@ function validateRequest(request: PatternGenerationRequest): void {
     }
   }
   validateUnitInterval(analysis?.confidence, 'Analysis confidence')
+  validateProvenance(analysis?.provenance, 'Analysis provenance')
   for (const [name, modelVersion] of Object.entries(analysis?.modelVersions ?? {})) {
     if (name.trim().length === 0 || typeof modelVersion !== 'string' || modelVersion.trim().length === 0) {
       throw new RangeError('Analysis model versions require non-empty names and versions')
@@ -452,10 +507,8 @@ function resolvedCrop(request: PatternGenerationRequest): CropRect | undefined {
   if (analysis.suggestedCropSource === 'manual') return crop
   const hasAutomaticMetadata = analysis.suggestedCropSource === 'automatic'
     || analysis.suggestedCropConfidence !== undefined
-    || analysis.confidence !== undefined
   if (hasAutomaticMetadata === false) return crop
-  const confidence = (analysis.suggestedCropConfidence ?? 0) * (analysis.confidence ?? 1)
-  return confidence >= 0.5 ? crop : undefined
+  return (analysis.suggestedCropConfidence ?? 0) >= 0.5 ? crop : undefined
 }
 
 function resolveSizes(options: PatternOptions): readonly GridSize[] {
@@ -504,7 +557,7 @@ function resolveOccupancyModes(
   request: PatternGenerationRequest,
   baseline: BaselineMode,
 ): readonly ResolvedOccupancyMode[] {
-  if (baseline !== 'mvp' || request.analysis?.subjectMask === undefined) return ['full-frame']
+  if (baseline !== 'mvp' || resolvedSubjectMask(request.analysis) === undefined) return ['full-frame']
   const mode = request.options.structure?.occupancyMode ?? 'auto'
   if (mode === 'full-frame') return ['full-frame']
   if (mode === 'subject-shape') return ['subject-shape']
@@ -514,15 +567,17 @@ function resolveOccupancyModes(
 }
 
 function hasConfidentSubjectMask(analysis: ImageAnalysis | undefined): boolean {
-  return analysis?.subjectMask !== undefined
-    && (analysis.confidence ?? 1) >= 0.5
-    && analysis.subjectMask.values.some((value) => value >= shapeRasterizationThreshold)
+  const mask = resolvedSubjectMask(analysis)
+  return mask !== undefined
+    && subjectMaskTrust(analysis) >= 0.5
+    && mask.values.some((value) => value >= shapeRasterizationThreshold)
 }
 
 function withoutSubjectMask(analysis: ImageAnalysis | undefined): ImageAnalysis | undefined {
-  if (analysis === undefined || analysis.subjectMask === undefined) return analysis
+  if (analysis === undefined || resolvedSubjectMask(analysis) === undefined) return analysis
   const copy: ImageAnalysis = { ...analysis }
   delete copy.subjectMask
+  delete copy.subjectMaskEvidence
   return copy
 }
 
@@ -564,7 +619,7 @@ function buildImportanceWeights(
   for (const landmark of analysis?.landmarks ?? []) {
     if (landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) continue
-    const confidence = landmarkEffectiveConfidence(landmark, analysis?.confidence ?? 1)
+    const confidence = landmarkEffectiveConfidence(landmark)
     if (confidence <= 0) continue
     const [gridX, gridY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
     const radius = landmarkGridRadiusCells(landmark, crop, fit)
@@ -608,7 +663,6 @@ function gridRegionIds(
       for (const region of regions) {
         const score = (region.mask.values[sourceY * region.mask.width + sourceX] ?? 0)
           * region.confidence
-          * (analysis?.confidence ?? 1)
         if (score > bestScore) {
           bestScore = score
           ids[index] = region.id
@@ -628,10 +682,9 @@ function protectedCells(
   activeMask: Uint8Array,
 ): ReadonlySet<number> {
   const cells = new Set<number>()
-  const analysisConfidence = analysis?.confidence ?? 1
   for (const landmark of analysis?.landmarks ?? []) {
     if (landmark.priority !== 'hard'
-      || landmarkEffectiveConfidence(landmark, analysisConfidence) < 0.5) continue
+      || landmarkEffectiveConfidence(landmark) < 0.5) continue
     if (landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) continue
     const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
@@ -947,9 +1000,8 @@ function featureVisibility(
   activeMask: Uint8Array,
   regionIds: readonly (string | undefined)[],
 ): FeatureVisibilityResult {
-  const analysisConfidence = analysis?.confidence ?? 1
   const landmarks = (analysis?.landmarks ?? []).filter((landmark) =>
-    landmarkEffectiveConfidence(landmark, analysisConfidence) > 0
+    landmarkEffectiveConfidence(landmark) > 0
       && landmark.x >= crop.x && landmark.y >= crop.y
       && landmark.x < crop.x + crop.width && landmark.y < crop.y + crop.height,
   )
@@ -968,7 +1020,7 @@ function featureVisibility(
   const colorsById = new Map(palette.map((color) => [color.id, color]))
   const evaluated = landmarks.map((landmark) => {
     const profile = featureProfiles[landmark.kind]
-    const effectiveConfidence = landmarkEffectiveConfidence(landmark, analysisConfidence)
+    const effectiveConfidence = landmarkEffectiveConfidence(landmark)
     const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
     const center = centerY * width + centerX
     const colorId = colorIds[center]
@@ -1547,7 +1599,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.3.2-shape-planning'
+    this.version = config.version ?? '0.3.3-analysis-evidence'
     this.#clock = config.clock ?? Date.now
   }
 
@@ -1576,8 +1628,8 @@ export class DeterministicPatternAlgorithm {
     const analysisShape = shouldBuildPlanningShape === false
       ? undefined
       : buildSourceShapeModel(
-        request.analysis!.subjectMask!,
-        request.analysis?.confidence ?? 1,
+        resolvedSubjectMask(request.analysis)!,
+        subjectMaskTrust(request.analysis),
         request.analysis?.landmarks ?? [],
       )
     shapeModelMs = Math.max(0, performance.now() - shapeModelStartedAt)

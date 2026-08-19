@@ -2,15 +2,15 @@
 
 ## Phase 1: Baseline
 
-状态：v0.3.2 Shape Planning Hardening 已完成，主体形状、SDF 边界优化、CanvasPlan 与 FeatureBudget 已进入执行链路。
+状态：v0.3.3 Analysis Evidence 已完成，主体形状、SDF 边界优化、CanvasPlan、FeatureBudget 与多来源视觉证据合同已进入执行链路。
 
 已交付 RGBA 输入、固定/自动画布、A0/A1/MVP 对照、Lab 配色、网格整理、多候选排序、材料统计、最终网格特征可见度、硬特征整区锁定和分项评分。
 
 ## Phase 2: Structure Planning
 
-状态：Structure Planning 前半段完成。ShapeVariantCache 已统一规划与执行使用的目标形状，人物与宠物语义视觉和 FeatureConstraint 模板搜索进入下一批开发。
+状态：Structure Planning 前半段完成。ShapeVariantCache 已统一规划与执行使用的目标形状；主体 mask、landmark、语义区域和裁剪置信度已经解耦，Gateway 支持模型与人工证据融合。
 
-下一批内容包括人物与宠物视觉分析、FeatureConstraint、五官模板、StructurePlan 和 PIA-lite 空间映射。
+下一批内容依次为人工 Mask Correction、人物视觉分析、FeatureConstraint、五官模板、StructurePlan 和 PIA-lite 空间映射。
 
 ## Phase 3: Value And Palette Planning
 
