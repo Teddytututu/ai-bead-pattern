@@ -4,7 +4,7 @@ import type {
   PixelImage,
   RGB,
 } from './types.js'
-import { resolvedSubjectMask, subjectMaskConfidence } from './analysis-evidence.js'
+import { resolvedSubjectMask, subjectMaskTrust } from './analysis-evidence.js'
 import { landmarkEffectiveConfidence, landmarkSourceRadiusPx } from './landmarks.js'
 
 export interface SourceGuidance {
@@ -44,7 +44,7 @@ export function buildSourceGuidance(
   const edge = new Float32Array(total)
   const importance = new Float32Array(total)
   const subjectMask = resolvedSubjectMask(analysis)
-  const maskConfidence = subjectMaskConfidence(analysis)
+  const maskTrust = subjectMaskTrust(analysis)
   for (let index = 0; index < total; index += 1) {
     lightness[index] = luminance(sourceRgb(image, index, background))
   }
@@ -62,7 +62,7 @@ export function buildSourceGuidance(
     importance[index] = Math.max(
       importance[index]!,
       clamp(analysis?.importanceMap?.weights[index] ?? 0, 0, 1),
-      maskValue(subjectMask, index) * 0.55 * maskConfidence,
+      maskValue(subjectMask, index) * 0.55 * maskTrust,
     )
   }
   for (const region of analysis?.semanticRegions ?? []) {

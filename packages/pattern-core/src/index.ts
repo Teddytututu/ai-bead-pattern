@@ -15,6 +15,7 @@ export {
   normalizeEvidenceProvenance,
   resolvedSubjectMask,
   subjectMaskConfidence,
+  subjectMaskTrust,
 } from './analysis-evidence.js'
 export type {
   AlgorithmEngine,

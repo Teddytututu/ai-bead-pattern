@@ -1,63 +1,141 @@
 import {
   normalizeEvidenceProvenance,
+  type EvidenceOrigin,
   type EvidenceProvenance,
   type ImageAnalysis,
   type ImageLandmark,
   type SemanticRegion,
   type SubjectMaskEvidence,
+  type SubjectMaskSource,
 } from '@ai-bead-pattern/pattern-core'
 
-function maskPriority(evidence: SubjectMaskEvidence): readonly [number, number, number] {
+const subjectSourcePriority: Readonly<Record<SubjectMaskSource, number>> = {
+  manual: 6,
+  'ai+manual': 5,
+  ai: 4,
+  alpha: 3,
+  heuristic: 2,
+  fused: 1,
+  legacy: 0,
+}
+
+const evidenceOriginPriority: Readonly<Record<EvidenceOrigin, number>> = {
+  manual: 5,
+  fused: 4,
+  model: 3,
+  source: 2,
+  heuristic: 1,
+}
+
+const imageTypePriority = {
+  portrait: 5,
+  pet: 4,
+  illustration: 3,
+  landscape: 2,
+  general: 1,
+} as const
+
+function canonicalKey(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'undefined'
+  if (ArrayBuffer.isView(value)) {
+    return canonicalKey(Array.from(value as unknown as ArrayLike<number>))
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalKey).join(',')}]`
+  const entries = Object.entries(value as Readonly<Record<string, unknown>>)
+    .filter(([, entry]) => entry !== undefined)
+    .sort(([first], [second]) => first.localeCompare(second))
+  return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${canonicalKey(entry)}`).join(',')}}`
+}
+
+function stableHash(value: unknown): string {
+  const input = canonicalKey(value)
+  let hash = 0x811c9dc5
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(36).padStart(7, '0')
+}
+
+function normalizeSubjectEvidence(evidence: SubjectMaskEvidence): SubjectMaskEvidence {
+  const provenance = normalizeEvidenceProvenance(evidence.provenance)
+  return {
+    ...evidence,
+    ...(provenance.length === 0 ? {} : { provenance }),
+  }
+}
+
+function subjectPriority(evidence: SubjectMaskEvidence): readonly [number, number, number] {
   return [
     evidence.userConfirmed === true ? 1 : 0,
     evidence.confidence,
-    evidence.source === 'manual' || evidence.source === 'ai+manual' ? 1 : 0,
+    subjectSourcePriority[evidence.source],
   ]
 }
 
-function comparePriority(first: SubjectMaskEvidence, second: SubjectMaskEvidence): number {
-  const left = maskPriority(first)
-  const right = maskPriority(second)
-  for (let index = 0; index < left.length; index += 1) {
-    if (left[index] !== right[index]) return left[index]! - right[index]!
+function subjectIsPreferred(candidate: SubjectMaskEvidence, current: SubjectMaskEvidence): boolean {
+  const candidatePriority = subjectPriority(candidate)
+  const currentPriority = subjectPriority(current)
+  for (let index = 0; index < candidatePriority.length; index += 1) {
+    if (candidatePriority[index] !== currentPriority[index]) {
+      return candidatePriority[index]! > currentPriority[index]!
+    }
   }
-  return 0
+  return canonicalKey(candidate) < canonicalKey(current)
 }
 
 function selectedSubjectMask(analyses: readonly ImageAnalysis[]): SubjectMaskEvidence | undefined {
   const evidence: SubjectMaskEvidence[] = []
-  analyses.forEach((analysis, index) => {
+  for (const analysis of analyses) {
     if (analysis.subjectMaskEvidence !== undefined) {
-      evidence.push(analysis.subjectMaskEvidence)
-      return
+      evidence.push(normalizeSubjectEvidence(analysis.subjectMaskEvidence))
+      continue
     }
-    if (analysis.subjectMask === undefined) return
-    evidence.push({
+    if (analysis.subjectMask === undefined) continue
+    evidence.push(normalizeSubjectEvidence({
       mask: analysis.subjectMask,
       confidence: analysis.confidence ?? 1,
-      source: 'ai',
-      revision: `legacy-analysis-${index}`,
-      ...(analysis.provenance === undefined ? {} : { provenance: analysis.provenance }),
-    })
-  })
+      source: 'legacy',
+      revision: `legacy:${stableHash(analysis.subjectMask)}`,
+      provenance: [
+        ...(analysis.provenance ?? []),
+        { origin: 'source', provider: 'legacy-subject-mask', version: 'compat-v1' },
+      ],
+    }))
+  }
   return evidence.reduce<SubjectMaskEvidence | undefined>((selected, candidate) =>
-    selected === undefined || comparePriority(candidate, selected) > 0 ? candidate : selected,
+    selected === undefined || subjectIsPreferred(candidate, selected) ? candidate : selected,
   undefined)
 }
 
-function mergeById<T extends { id: string; confidence: number }>(
-  groups: readonly (readonly T[] | undefined)[],
-): readonly T[] {
+function provenancePriority(provenance: readonly EvidenceProvenance[] | undefined): number {
+  return Math.max(0, ...(provenance ?? []).map((entry) => evidenceOriginPriority[entry.origin]))
+}
+
+function mergeById<T extends {
+  id: string
+  confidence: number
+  provenance?: readonly EvidenceProvenance[]
+}>(groups: readonly (readonly T[] | undefined)[]): readonly T[] {
   const selected = new Map<string, T>()
   for (const group of groups) {
-    for (const candidate of group ?? []) {
-      const current = selected.get(candidate.id)
-      if (current === undefined || candidate.confidence > current.confidence) {
-        selected.set(candidate.id, candidate)
+    for (const rawCandidate of group ?? []) {
+      const provenance = normalizeEvidenceProvenance(rawCandidate.provenance)
+      const candidate = {
+        ...rawCandidate,
+        ...(provenance.length === 0 ? {} : { provenance }),
       }
+      const current = selected.get(candidate.id)
+      const preferred = current === undefined
+        || candidate.confidence > current.confidence
+        || (candidate.confidence === current.confidence
+          && (provenancePriority(candidate.provenance) > provenancePriority(current.provenance)
+            || (provenancePriority(candidate.provenance) === provenancePriority(current.provenance)
+              && canonicalKey(candidate) < canonicalKey(current))))
+      if (preferred) selected.set(candidate.id, candidate)
     }
   }
-  return [...selected.values()]
+  return [...selected.values()].sort((first, second) => first.id.localeCompare(second.id))
 }
 
 function evidenceConfidence(
@@ -94,25 +172,57 @@ function collectedProvenance(
   ])
 }
 
+function selectedCrop(
+  analyses: readonly ImageAnalysis[],
+  source: 'manual' | 'automatic',
+): ImageAnalysis | undefined {
+  return analyses
+    .filter((analysis) => analysis.suggestedCrop !== undefined
+      && analysis.suggestedCropSource === source)
+    .sort((first, second) =>
+      (second.suggestedCropConfidence ?? 0) - (first.suggestedCropConfidence ?? 0)
+        || canonicalKey(first.suggestedCrop).localeCompare(canonicalKey(second.suggestedCrop)),
+    )[0]
+}
+
+function selectedImportance(analyses: readonly ImageAnalysis[]): ImageAnalysis | undefined {
+  return analyses
+    .filter((analysis) => analysis.importanceMap !== undefined)
+    .sort((first, second) =>
+      canonicalKey(first.importanceMap).localeCompare(canonicalKey(second.importanceMap)),
+    )[0]
+}
+
+function selectedImageType(analyses: readonly ImageAnalysis[]): ImageAnalysis | undefined {
+  return analyses
+    .filter((analysis) => analysis.imageType !== undefined)
+    .sort((first, second) =>
+      imageTypePriority[second.imageType!] - imageTypePriority[first.imageType!],
+    )[0]
+}
+
+function mergedModelVersions(analyses: readonly ImageAnalysis[]): Readonly<Record<string, string>> {
+  const values = new Map<string, Set<string>>()
+  for (const analysis of analyses) {
+    for (const [name, version] of Object.entries(analysis.modelVersions ?? {})) {
+      const versions = values.get(name) ?? new Set<string>()
+      versions.add(version)
+      values.set(name, versions)
+    }
+  }
+  return Object.fromEntries([...values.entries()]
+    .sort(([first], [second]) => first.localeCompare(second))
+    .map(([name, versions]) => [name, [...versions].sort().join(' + ')]))
+}
+
 export function fuseImageAnalyses(analyses: readonly ImageAnalysis[]): ImageAnalysis {
   const subject = selectedSubjectMask(analyses)
   const landmarks = mergeById(analyses.map((analysis) => analysis.landmarks))
   const semanticRegions = mergeById(analyses.map((analysis) => analysis.semanticRegions))
-  const manualCrop = [...analyses].reverse().find((analysis) =>
-    analysis.suggestedCrop !== undefined && analysis.suggestedCropSource === 'manual',
-  )
-  const automaticCrop = analyses.reduce<ImageAnalysis | undefined>((selected, analysis) => {
-    if (analysis.suggestedCrop === undefined) return selected
-    if (selected === undefined
-      || (analysis.suggestedCropConfidence ?? 0) > (selected.suggestedCropConfidence ?? 0)) {
-      return analysis
-    }
-    return selected
-  }, undefined)
-  const cropSource = manualCrop ?? automaticCrop
-  const importanceSource = [...analyses].reverse().find((analysis) => analysis.importanceMap !== undefined)
-  const imageTypeSource = [...analyses].reverse().find((analysis) => analysis.imageType !== undefined)
-  const modelVersions = Object.assign({}, ...analyses.map((analysis) => analysis.modelVersions ?? {}))
+  const cropSource = selectedCrop(analyses, 'manual') ?? selectedCrop(analyses, 'automatic')
+  const importanceSource = selectedImportance(analyses)
+  const imageTypeSource = selectedImageType(analyses)
+  const modelVersions = mergedModelVersions(analyses)
   const provenance = collectedProvenance(analyses, subject, landmarks, semanticRegions)
   const confidence = evidenceConfidence(subject, landmarks, semanticRegions, analyses)
 

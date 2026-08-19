@@ -110,4 +110,54 @@ describe('analysis fusion', () => {
 
     assert.equal(fused.subjectMaskEvidence?.revision, 'ai-1')
   })
+
+  it('produces the same fused analysis when evidence order changes', () => {
+    const mask = { width: 1, height: 1, values: new Float32Array([1]) }
+    const first = {
+      subjectMaskEvidence: {
+        mask,
+        confidence: 0.8,
+        source: 'ai' as const,
+        revision: 'subject-1',
+        provenance: [{ origin: 'model' as const, provider: 'z-provider', version: '1' }],
+      },
+      landmarks: [{
+        id: 'eye',
+        kind: 'eye' as const,
+        x: 1,
+        y: 0,
+        confidence: 0.9,
+        priority: 'hard' as const,
+        provenance: [{ origin: 'model' as const, provider: 'z-provider', version: '1' }],
+      }],
+      modelVersions: { vision: 'z-version' },
+    }
+    const second = {
+      landmarks: [{
+        id: 'eye',
+        kind: 'eye' as const,
+        x: 0,
+        y: 0,
+        confidence: 0.9,
+        priority: 'hard' as const,
+        provenance: [{ origin: 'model' as const, provider: 'a-provider', version: '1' }],
+      }],
+      semanticRegions: [{
+        id: 'face',
+        label: 'face',
+        mask,
+        confidence: 0.7,
+        provenance: [{ origin: 'model' as const, provider: 'a-provider', version: '1' }],
+      }],
+      modelVersions: { vision: 'a-version' },
+    }
+
+    const forward = fuseImageAnalyses([first, second])
+    const reversed = fuseImageAnalyses([second, first])
+
+    assert.deepEqual(forward, reversed)
+    assert.equal(forward.landmarks?.[0]?.x, 0)
+    assert.deepEqual(forward.modelVersions, { vision: 'a-version + z-version' })
+    assert.deepEqual(forward.provenance?.map((entry) => entry.provider), ['a-provider', 'z-provider'])
+  })
 })

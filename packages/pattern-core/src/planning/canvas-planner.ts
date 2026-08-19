@@ -1,5 +1,5 @@
 import { validateCanvasPlan, type CanvasPlan, type FeatureBudget, type OccupancyMode } from '../contracts.js'
-import { resolvedSubjectMask, subjectMaskConfidence } from '../analysis-evidence.js'
+import { resolvedSubjectMask, subjectMaskConfidence, subjectMaskTrust } from '../analysis-evidence.js'
 import { fitCropToCanvas, gridCellForSourcePoint, type CanvasFit } from '../image.js'
 import { landmarkEffectiveConfidence, landmarkGridRadiusCells } from '../landmarks.js'
 import {
@@ -358,7 +358,7 @@ function buildCanvasPlans(
     ? undefined
     : buildSourceShapeModel(
       subjectMask,
-      subjectMaskConfidence(input.analysis),
+      subjectMaskTrust(input.analysis),
       input.analysis?.landmarks ?? [],
     )
   const shapeCache = preparedVariants === undefined && shapeModel !== undefined

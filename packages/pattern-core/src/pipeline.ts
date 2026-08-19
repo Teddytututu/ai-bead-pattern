@@ -6,7 +6,7 @@ import {
   type PreparedColor,
 } from './color.js'
 import { adaptPattern } from './adaptation.js'
-import { resolvedSubjectMask, subjectMaskConfidence } from './analysis-evidence.js'
+import { resolvedSubjectMask, subjectMaskConfidence, subjectMaskTrust } from './analysis-evidence.js'
 import {
   countIsolatedCells,
   countThinStripes,
@@ -229,7 +229,8 @@ function validateProvenance(
   label: string,
 ): void {
   for (const entry of provenance ?? []) {
-    if (entry.origin !== 'model' && entry.origin !== 'manual' && entry.origin !== 'fused') {
+    if (entry.origin !== 'model' && entry.origin !== 'source' && entry.origin !== 'heuristic'
+      && entry.origin !== 'manual' && entry.origin !== 'fused') {
       throw new RangeError(`${label} origin has an unsupported value`)
     }
     if (entry.provider.trim().length === 0) {
@@ -342,7 +343,8 @@ function validateRequest(request: PatternGenerationRequest): void {
     if (analysis.subjectMaskEvidence.revision.trim().length === 0) {
       throw new RangeError('Subject mask evidence revision is required')
     }
-    if (['ai', 'manual', 'ai+manual', 'fused'].includes(analysis.subjectMaskEvidence.source) === false) {
+    if (['ai', 'alpha', 'heuristic', 'manual', 'ai+manual', 'fused', 'legacy']
+      .includes(analysis.subjectMaskEvidence.source) === false) {
       throw new RangeError('Subject mask evidence source has an unsupported value')
     }
     if (analysis.subjectMaskEvidence.userConfirmed !== undefined
@@ -567,7 +569,7 @@ function resolveOccupancyModes(
 function hasConfidentSubjectMask(analysis: ImageAnalysis | undefined): boolean {
   const mask = resolvedSubjectMask(analysis)
   return mask !== undefined
-    && subjectMaskConfidence(analysis) >= 0.5
+    && subjectMaskTrust(analysis) >= 0.5
     && mask.values.some((value) => value >= shapeRasterizationThreshold)
 }
 
@@ -1627,7 +1629,7 @@ export class DeterministicPatternAlgorithm {
       ? undefined
       : buildSourceShapeModel(
         resolvedSubjectMask(request.analysis)!,
-        subjectMaskConfidence(request.analysis),
+        subjectMaskTrust(request.analysis),
         request.analysis?.landmarks ?? [],
       )
     shapeModelMs = Math.max(0, performance.now() - shapeModelStartedAt)

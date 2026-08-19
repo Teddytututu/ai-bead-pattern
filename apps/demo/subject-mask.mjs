@@ -14,8 +14,16 @@ function alphaAnalysis(image) {
     values[index] = alpha
     hasTransparency ||= alpha < 0.98
   }
+  const subjectMask = { width: image.width, height: image.height, values }
   return hasTransparency ? {
-    subjectMask: { width: image.width, height: image.height, values },
+    subjectMask,
+    subjectMaskEvidence: {
+      mask: subjectMask,
+      confidence: 1,
+      source: 'alpha',
+      revision: 'demo:alpha-channel:alpha-v1',
+      provenance: [{ origin: 'source', provider: 'alpha-channel', version: 'alpha-v1' }],
+    },
     confidence: 1,
     source: 'alpha',
     modelVersions: { 'demo-subject-mask': 'alpha-v1' },
@@ -76,9 +84,18 @@ function borderFloodAnalysis(image) {
     : border.reduce((sum, index) => sum + background[index], 0) / border.length
   const foregroundRatio = values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)
   const usableRatio = foregroundRatio > 0.01 && foregroundRatio < 0.95 ? 1 : 0.35
+  const subjectMask = { width, height, values }
+  const confidence = Math.min(0.92, borderAgreement * usableRatio)
   return {
-    subjectMask: { width, height, values },
-    confidence: Math.min(0.92, borderAgreement * usableRatio),
+    subjectMask,
+    subjectMaskEvidence: {
+      mask: subjectMask,
+      confidence,
+      source: 'heuristic',
+      revision: 'demo:border-flood:border-flood-v1',
+      provenance: [{ origin: 'heuristic', provider: 'demo-border-flood', version: 'border-flood-v1' }],
+    },
+    confidence,
     source: 'border-flood',
     modelVersions: { 'demo-subject-mask': 'border-flood-v1' },
   }

@@ -14,6 +14,11 @@ export function subjectMaskConfidence(analysis: ImageAnalysis | undefined): numb
   return Math.min(1, Math.max(0, confidence))
 }
 
+export function subjectMaskTrust(analysis: ImageAnalysis | undefined): number {
+  if (analysis?.subjectMaskEvidence?.userConfirmed === true) return 1
+  return subjectMaskConfidence(analysis)
+}
+
 export function normalizeEvidenceProvenance(
   provenance: readonly EvidenceProvenance[] | undefined,
 ): readonly EvidenceProvenance[] {
@@ -28,5 +33,7 @@ export function normalizeEvidenceProvenance(
     const key = `${value.origin}\u0000${value.provider}\u0000${value.model ?? ''}\u0000${value.version ?? ''}`
     normalized.set(key, value)
   }
-  return [...normalized.values()]
+  return [...normalized.entries()]
+    .sort(([first], [second]) => first.localeCompare(second))
+    .map(([, value]) => value)
 }

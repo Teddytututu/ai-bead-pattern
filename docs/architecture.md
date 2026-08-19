@@ -12,7 +12,7 @@ AI Gateway
 Pattern Core <---- Material Palettes
 ```
 
-`pattern-core` 保持平台无关，微信小程序负责界面和平台适配，AI Gateway 负责外部视觉能力接入。当前 gateway 通过 rembg HTTP 服务调用 BiRefNet，并把主体掩码、边界重要度、建议裁剪和模型版本写入 `ImageAnalysis`。主体 mask 使用独立的 `subjectMaskEvidence`，记录 confidence、source、revision、用户确认状态与 provenance；landmark、语义区域和自动裁剪各自保留局部置信度。Gateway 的融合接口将多模型和人工修正整理成同一份分析结果。
+`pattern-core` 保持平台无关，微信小程序负责界面和平台适配，AI Gateway 负责外部视觉能力接入。当前 gateway 通过 rembg HTTP 服务调用 BiRefNet，并把主体掩码、边界重要度、建议裁剪和模型版本写入 `ImageAnalysis`。主体 mask 使用独立的 `subjectMaskEvidence`，记录 confidence、source、revision、用户确认状态与 provenance；landmark、语义区域和自动裁剪各自保留局部置信度。用户确认生成独立 trust，规划使用 trust，原始 confidence 继续用于记录。Gateway 的融合接口覆盖 AI、透明通道、本地启发式和人工修正，并用固定优先级与 canonical 排序生成稳定结果。
 
 ## Pattern Core 0.2
 

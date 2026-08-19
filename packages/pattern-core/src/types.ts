@@ -92,7 +92,7 @@ export interface BinaryMask {
   values: Float32Array
 }
 
-export type EvidenceOrigin = 'model' | 'manual' | 'fused'
+export type EvidenceOrigin = 'model' | 'source' | 'heuristic' | 'manual' | 'fused'
 
 export interface EvidenceProvenance {
   origin: EvidenceOrigin
@@ -101,7 +101,14 @@ export interface EvidenceProvenance {
   version?: string
 }
 
-export type SubjectMaskSource = 'ai' | 'manual' | 'ai+manual' | 'fused'
+export type SubjectMaskSource =
+  | 'ai'
+  | 'alpha'
+  | 'heuristic'
+  | 'manual'
+  | 'ai+manual'
+  | 'fused'
+  | 'legacy'
 
 export interface SubjectMaskEvidence {
   mask: BinaryMask

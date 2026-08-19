@@ -121,7 +121,7 @@ async function decodeMask(data: Uint8Array): Promise<DecodedMask> {
   return { width: decoded.info.width, height: decoded.info.height, values }
 }
 
-function maskConfidence(values: Float32Array): number {
+function maskCertaintyHeuristic(values: Float32Array): number {
   if (values.length === 0) return 0
   let total = 0
   let foreground = 0
@@ -191,13 +191,13 @@ function analysisFromMask(
     height: mask.height,
     values: mask.values,
   }
-  const confidence = maskConfidence(mask.values)
+  const confidence = maskCertaintyHeuristic(mask.values)
   const crop = subjectCrop(mask, cropThreshold, cropPaddingRatio)
   const provenance = [{
     origin: 'model' as const,
     provider: 'rembg-http',
     model,
-    version: 'mask-v1',
+    version: 'mask-v1-certainty-v1',
   }]
   const analysis: ImageAnalysis = {
     confidence,
@@ -206,7 +206,7 @@ function analysisFromMask(
       mask: subjectMask,
       confidence,
       source: 'ai',
-      revision: `rembg-http:${model}:mask-v1`,
+      revision: `rembg-http:${model}:mask-v1-certainty-v1`,
       provenance,
     },
     importanceMap: {

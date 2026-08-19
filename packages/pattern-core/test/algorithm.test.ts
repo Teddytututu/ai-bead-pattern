@@ -1071,6 +1071,59 @@ describe('deterministic pattern algorithm', () => {
     )
   })
 
+  it('trusts a user-confirmed subject mask in automatic occupancy', async () => {
+    const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: source,
+      palette,
+      analysis: {
+        subjectMaskEvidence: {
+          mask: { width: 2, height: 2, values: new Float32Array([1, 0, 0, 0]) },
+          confidence: 0.2,
+          source: 'ai+manual',
+          revision: 'confirmed-1',
+          userConfirmed: true,
+        },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 2, height: 2 } },
+        maxColors: 2,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'auto' },
+      },
+    })
+    const candidates = [result.recommended ?? result.bestEffort, ...result.alternatives]
+      .filter((entry) => entry !== undefined)
+
+    assert.deepEqual(
+      new Set(candidates.map((entry) => entry!.canvasPlan?.occupancyMode)),
+      new Set(['full-frame', 'subject-shape']),
+    )
+  })
+
+  it('accepts alpha and heuristic subject mask evidence sources', async () => {
+    const source = image(1, 1, [[255, 0, 0]])
+    for (const [maskSource, origin] of [
+      ['alpha', 'source'],
+      ['heuristic', 'heuristic'],
+    ] as const) {
+      const request = fixedRequest(source)
+      request.analysis = {
+        subjectMaskEvidence: {
+          mask: { width: 1, height: 1, values: new Float32Array([1]) },
+          confidence: 1,
+          source: maskSource,
+          revision: `${maskSource}-1`,
+          provenance: [{ origin, provider: `${maskSource}-provider` }],
+        },
+      }
+
+      const result = await createPatternAlgorithm().generate(request)
+      assert.ok(result.recommended ?? result.bestEffort)
+    }
+  })
+
   it('includes subject evidence revision and provenance in generation identity', async () => {
     const source = image(1, 1, [[255, 0, 0]])
     const request = (revision: string, legacyMaskValue?: number): PatternGenerationRequest => ({

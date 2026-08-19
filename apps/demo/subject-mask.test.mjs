@@ -21,6 +21,8 @@ describe('demo subject mask inference', () => {
     assert.equal(analysis.source, 'alpha')
     assert.equal(analysis.confidence, 1)
     assert.deepEqual([...analysis.subjectMask.values], [0, 1, 0, 1])
+    assert.equal(analysis.subjectMaskEvidence.source, 'alpha')
+    assert.equal(analysis.subjectMaskEvidence.provenance[0].origin, 'source')
   })
 
   it('flood-fills a flat border while retaining the enclosed subject', () => {
@@ -35,5 +37,7 @@ describe('demo subject mask inference', () => {
     assert.equal(analysis.source, 'border-flood')
     assert.ok(analysis.confidence >= 0.5)
     assert.deepEqual([...analysis.subjectMask.values], [0, 0, 0, 0, 1, 0, 0, 0, 0])
+    assert.equal(analysis.subjectMaskEvidence.source, 'heuristic')
+    assert.equal(analysis.subjectMaskEvidence.provenance[0].origin, 'heuristic')
   })
 })
