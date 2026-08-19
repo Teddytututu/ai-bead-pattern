@@ -19,6 +19,8 @@
 - 小连通域、孤立豆和细条纹整理
 - 五种风格参数与规则候选排序
 - 自动占位模式同时比较全图与主体形状候选
+- 原图归一化坐标的 mask 添加/擦除软笔刷与连续路径插值
+- mask 修正草稿、人工确认、确定性 revision 和 provenance 追踪
 - 材料数量、颜色误差和工艺指标
 - 旧版 `width`、`height` 与结果字段兼容
 
@@ -72,6 +74,25 @@ console.log(result.alternatives)
 生成结果的 `timing` 提供核心总耗时与 shape model、shape planning、canvas planning、candidate generation 分段耗时；候选 `metrics.processingTimeMs` 表示共享规划完成后的单候选处理耗时。
 
 V2 规划能力从 `@ai-bead-pattern/pattern-core/experimental` 导出。`planCanvases()` 可独立比较多个画布尺寸；每个生成候选也会携带经过校验的 `canvasPlan`，供服务端记录和界面解释自动选型。
+
+Mask Correction 使用原图归一化坐标保存笔迹。编辑阶段维护草稿，用户确认后再生成权威主体证据：
+
+```ts
+import {
+  applyMaskStroke,
+  confirmMaskCorrection,
+  createMaskCorrectionDraft,
+} from '@ai-bead-pattern/pattern-core'
+
+const draft = createMaskCorrectionDraft(aiSubjectMaskEvidence)
+const edited = applyMaskStroke(draft, {
+  id: 'stroke-1',
+  mode: 'add',
+  points: [{ x: 0.2, y: 0.3 }, { x: 0.28, y: 0.35 }],
+  radiusNormalized: 0.02,
+})
+const confirmedEvidence = confirmMaskCorrection(edited)
+```
 
 ## 验证
 

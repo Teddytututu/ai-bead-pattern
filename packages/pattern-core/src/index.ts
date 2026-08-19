@@ -18,6 +18,18 @@ export {
   subjectMaskConfidence,
   subjectMaskTrust,
 } from './analysis-evidence.js'
+export {
+  applyMaskStroke,
+  applyMaskStrokes,
+  confirmMaskCorrection,
+  createMaskCorrectionDraft,
+} from './mask-correction.js'
+export type {
+  MaskCorrectionDraft,
+  MaskPoint,
+  MaskStroke,
+  MaskStrokeMode,
+} from './mask-correction.js'
 export type {
   AlgorithmEngine,
   BaselineMode,

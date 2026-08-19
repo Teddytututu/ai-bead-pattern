@@ -19,6 +19,8 @@ docs/                  架构、隐私与路线说明
 
 v0.3.3.1 Evidence Performance Hardening 使用流式数值指纹处理大型 mask 和 importance map，并在 `pattern-core` 内规范化 landmark、semantic region 与 provenance 顺序，语义相同的分析输入会生成相同 identity。
 
+Mask Correction Engine 已加入原图归一化坐标笔迹、添加/擦除软笔刷、连续路径插值、草稿与确认分离，以及稳定 revision。确认后的证据保留模型置信度和 provenance，并追加 `mask-editor` 人工来源。
+
 ## 文档
 
 - [从绘画过程到拼豆图纸：生成方法论](docs/drawing-to-bead-method.md)
@@ -68,10 +70,11 @@ v0.3.3.1 Evidence Performance Hardening 使用流式数值指纹处理大型 mas
 - 主体边界重要度、自动裁剪与分析版本追踪
 - 多来源视觉证据、独立置信度与 provenance 追踪
 - 用户确认的修正 mask 优先融合合同
+- 原图坐标 Mask Correction Engine 与确定性人工确认 revision
 - 线性轮廓追踪、面积覆盖栅格化与 Signed Distance Field
 - 全图与主体形状占位候选搜索
 
-下一批工作安排为原图空间的人工 mask 修正工具，随后接入人物语义分析和 FeatureConstraint 模板搜索。
+下一批工作安排为 Mask Editor 界面与失败样本 Gate，随后接入人物语义分析和 FeatureConstraint 模板搜索。
 
 浏览器体验页：`apps/demo/index.html`
 
