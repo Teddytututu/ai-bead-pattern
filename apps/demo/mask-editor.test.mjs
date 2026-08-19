@@ -4,9 +4,40 @@ import { describe, it } from 'node:test'
 
 import {
   composeMaskOverlay,
+  createLiveStrokePreview,
   fitContainRect,
+  maskEditSessionIsDirty,
   normalizePointerPoint,
 } from './mask-editor.mjs'
+
+function createRecordingCanvas(width = 2048, height = 2048) {
+  const calls = []
+  const context = {
+    beginPath: () => calls.push(['beginPath']),
+    arc: (...args) => calls.push(['arc', ...args]),
+    fill: () => calls.push(['fill']),
+    lineTo: (...args) => calls.push(['lineTo', ...args]),
+    moveTo: (...args) => calls.push(['moveTo', ...args]),
+    stroke: () => calls.push(['stroke']),
+  }
+  return {
+    calls,
+    canvas: {
+      width,
+      height,
+      getContext: () => context,
+    },
+  }
+}
+
+function stroke(id, x = 0.5) {
+  return {
+    id,
+    mode: 'add',
+    points: [{ x, y: 0.5 }],
+    radiusNormalized: 0.02,
+  }
+}
 
 describe('demo mask editor helpers', () => {
   it('fits a rectangular source without stretching it', () => {
@@ -42,6 +73,45 @@ describe('demo mask editor helpers', () => {
       new Float32Array([1]),
       new Float32Array([1, 0]),
     ), /length/i)
+  })
+
+  it('draws only new live-preview segments within the pointer-move budget', () => {
+    const { calls, canvas } = createRecordingCanvas()
+    const preview = createLiveStrokePreview(canvas)
+    const points = []
+    const durations = []
+
+    for (let index = 0; index < 100; index += 1) {
+      points.push({ x: index / 100, y: index / 100 })
+      const startedAt = performance.now()
+      preview.draw(points, 'add', 0.02)
+      durations.push(performance.now() - startedAt)
+    }
+
+    const lineSegments = calls.filter(([name]) => name === 'lineTo')
+    const p95 = durations.toSorted((first, second) => first - second)[94]
+    assert.equal(lineSegments.length, 99)
+    assert.ok(p95 < 16, `Expected preview P95 below 16 ms, received ${p95.toFixed(3)} ms`)
+  })
+
+  it('marks session changes as pending until they match the confirmed session again', () => {
+    const confirmed = {
+      baseRevision: 'base-1',
+      strokes: [stroke('one')],
+      cursor: 1,
+    }
+    const undone = { ...confirmed, cursor: 0 }
+    const redone = { ...confirmed, cursor: 1 }
+    const appended = {
+      ...confirmed,
+      strokes: [...confirmed.strokes, stroke('two', 0.7)],
+      cursor: 2,
+    }
+
+    assert.equal(maskEditSessionIsDirty(confirmed, confirmed), false)
+    assert.equal(maskEditSessionIsDirty(undone, confirmed), true)
+    assert.equal(maskEditSessionIsDirty(redone, confirmed), false)
+    assert.equal(maskEditSessionIsDirty(appended, confirmed), true)
   })
 
   it('keeps portrait sources proportional inside a landscape workspace', () => {

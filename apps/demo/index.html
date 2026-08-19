@@ -623,7 +623,7 @@
           <h2 class="mask-editor-title" id="maskEditorTitle">修正主体</h2>
           <span class="mask-editor-detail" id="maskEditorDetail">0 笔</span>
         </div>
-        <button class="icon-button" id="maskEditorCloseButton" type="button" aria-label="关闭主体编辑器" title="关闭">×</button>
+        <button class="text-button" id="maskEditorCloseButton" type="button" aria-label="取消并关闭主体编辑器" title="取消本次修改">取消</button>
       </header>
       <div class="mask-editor-tools" aria-label="主体编辑工具">
         <div class="mask-tool-group">
@@ -666,7 +666,6 @@
   <script type="module">
     import {
       appendMaskEditStroke,
-      applyMaskStrokes,
       confirmMaskEditSession,
       createMaskCorrectionDraftFromSession,
       createMaskEditSession,
@@ -760,7 +759,6 @@
       },
       core: {
         appendMaskEditStroke,
-        applyMaskStrokes,
         confirmMaskEditSession,
         createMaskCorrectionDraftFromSession,
         createMaskEditSession,

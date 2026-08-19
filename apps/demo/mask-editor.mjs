@@ -60,10 +60,81 @@ export function composeMaskOverlay(baseValues, currentValues) {
   return overlay
 }
 
+function samePoint(first, second) {
+  return first.x === second.x && first.y === second.y
+}
+
+function sameStroke(first, second) {
+  return first.id === second.id
+    && first.mode === second.mode
+    && first.radiusNormalized === second.radiusNormalized
+    && first.points.length === second.points.length
+    && first.points.every((point, index) => samePoint(point, second.points[index]))
+}
+
+export function maskEditSessionIsDirty(session, confirmedSession) {
+  if (session === undefined || confirmedSession === undefined) return false
+  return session.baseRevision !== confirmedSession.baseRevision
+    || session.cursor !== confirmedSession.cursor
+    || session.strokes.length !== confirmedSession.strokes.length
+    || session.strokes.some((stroke, index) => sameStroke(stroke, confirmedSession.strokes[index]) === false)
+}
+
+export function createLiveStrokePreview(canvas) {
+  let renderedPointCount = 0
+
+  return {
+    reset() {
+      renderedPointCount = 0
+    },
+    draw(points, mode, radiusNormalized) {
+      if (points.length === 0) return
+      const context = canvas.getContext('2d')
+      const shortEdge = Math.min(canvas.width, canvas.height)
+      const radius = Math.max(0.5, radiusNormalized * shortEdge)
+      const color = mode === 'erase'
+        ? 'rgba(214, 83, 77, 0.66)'
+        : 'rgba(36, 112, 185, 0.66)'
+      const pointAt = (index) => ({
+        x: points[index].x * canvas.width,
+        y: points[index].y * canvas.height,
+      })
+
+      if (renderedPointCount === 0) {
+        const point = pointAt(0)
+        context.beginPath()
+        context.fillStyle = color
+        context.arc(point.x, point.y, radius, 0, Math.PI * 2)
+        context.fill()
+      }
+
+      const startIndex = renderedPointCount === 0
+        ? 0
+        : Math.max(0, renderedPointCount - 1)
+      if (points.length > startIndex + 1) {
+        const start = pointAt(startIndex)
+        context.beginPath()
+        context.lineCap = 'round'
+        context.lineJoin = 'round'
+        context.lineWidth = radius * 2
+        context.strokeStyle = color
+        context.moveTo(start.x, start.y)
+        for (let index = startIndex + 1; index < points.length; index += 1) {
+          const point = pointAt(index)
+          context.lineTo(point.x, point.y)
+        }
+        context.stroke()
+      }
+      renderedPointCount = points.length
+    },
+  }
+}
+
 export function createMaskEditorController({ elements, core, onConfirm }) {
   let sourceImage
   let baseEvidence
   let session
+  let confirmedSession
   let draft
   let mode = 'add'
   let radiusNormalized = 0.02
@@ -73,6 +144,7 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
   let previewFrame
   const sourceBuffer = document.createElement('canvas')
   const overlayBuffer = document.createElement('canvas')
+  const livePreview = createLiveStrokePreview(elements.canvas)
 
   function resizeCanvasDisplay() {
     if (sourceImage === undefined || elements.dialog.open === false) return
@@ -110,11 +182,13 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
   }
 
   function syncControls() {
+    const dirty = maskEditSessionIsDirty(session, confirmedSession)
     elements.undoButton.disabled = session?.cursor === 0
     elements.redoButton.disabled = session === undefined || session.cursor === session.strokes.length
     elements.detail.textContent = session === undefined
       ? '0 笔'
-      : `${session.cursor} / ${session.strokes.length} 笔`
+      : `${session.cursor} / ${session.strokes.length} 笔 · ${dirty ? '待确认，取消将放弃' : '已确认'}`
+    elements.detail.dataset.dirty = String(dirty)
     setPressed(elements.modeControl, 'data-mask-mode', mode)
     setPressed(elements.radiusControl, 'data-mask-radius', radiusNormalized)
   }
@@ -162,7 +236,7 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
     if (previewFrame !== undefined || pointerPoints.length === 0) return
     previewFrame = requestAnimationFrame(() => {
       previewFrame = undefined
-      drawMask(core.applyMaskStrokes(draft.mask, [currentPointerStroke()]))
+      livePreview.draw(pointerPoints, mode, radiusNormalized)
     })
   }
 
@@ -185,6 +259,7 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
       previewFrame = undefined
     }
     if (elements.canvas.hasPointerCapture(pointerId)) elements.canvas.releasePointerCapture(pointerId)
+    livePreview.reset()
     if (commit) {
       appendPoint(event)
       session = core.appendMaskEditStroke(session, {
@@ -209,12 +284,14 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
     }
     pointerId = undefined
     pointerPoints = []
+    livePreview.reset()
   }
 
   elements.canvas.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || session === undefined) return
     pointerId = event.pointerId
     pointerPoints = []
+    livePreview.reset()
     elements.canvas.setPointerCapture(pointerId)
     appendPoint(event)
     schedulePreview()
@@ -256,6 +333,7 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
     elements.confirmButton.disabled = true
     try {
       const evidence = core.confirmMaskEditSession(baseEvidence, session)
+      confirmedSession = session
       const regeneration = onConfirm({ evidence, session })
       elements.dialog.close()
       await regeneration
@@ -273,7 +351,8 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
     open({ image, evidence, editSession }) {
       sourceImage = image
       baseEvidence = evidence
-      session = editSession ?? core.createMaskEditSession(evidence.revision)
+      confirmedSession = editSession ?? core.createMaskEditSession(evidence.revision)
+      session = confirmedSession
       strokeSequence = session.strokes.length + 1
       prepareImageBuffers()
       elements.dialog.showModal()

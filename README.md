@@ -21,7 +21,7 @@ v0.3.3.1 Evidence Performance Hardening 使用流式数值指纹处理大型 mas
 
 Mask Correction Engine 已加入原图归一化坐标笔迹、添加/擦除软笔刷、连续路径插值、草稿与确认分离，以及稳定 revision。`MaskEditSession` 使用完整笔迹历史和 cursor 支持撤销、重做与分支编辑。确认后的证据保留模型置信度和 provenance，并追加 `mask-editor` 人工来源。修正作用域限定为 subject occupancy，语义区域继续由独立视觉证据管理。
 
-Demo 已加入主体修正编辑器，支持添加、擦除、三档笔刷、撤销、重做、重置和确认生成。原始主体、用户添加与用户擦除使用独立覆盖色显示；画布按原图比例 contain 显示，横图与竖图在桌面和手机宽度下保持比例。完整生成只在确认后触发一次，已确认笔迹在再次打开时继续保留。
+Demo 已加入主体修正编辑器，支持添加、擦除、三档笔刷、撤销、重做、重置和确认生成。原始主体、用户添加与用户擦除使用独立覆盖色显示；画布按原图比例 contain 显示，横图与竖图在桌面和手机宽度下保持比例。拖动阶段使用增量 Canvas 2D 预览，松手后由 Core 精确重建一次；待确认状态会提示取消操作将放弃本次修改。完整生成只在确认后触发一次，已确认笔迹在再次打开时继续保留。
 
 ## 文档
 
@@ -85,6 +85,7 @@ Demo 已加入主体修正编辑器，支持添加、擦除、三档笔刷、撤
 ```bash
 pnpm install
 pnpm test
+pnpm test:e2e
 pnpm typecheck
 pnpm build
 pnpm --filter @ai-bead-pattern/pattern-core example

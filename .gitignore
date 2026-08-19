@@ -22,6 +22,8 @@ Thumbs.db
 *.log
 output/
 .playwright-cli/
+playwright-report/
+test-results/
 
 # Local planning workspace
 .planning/
