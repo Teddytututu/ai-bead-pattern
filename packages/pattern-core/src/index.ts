@@ -13,6 +13,7 @@ export { optimizeGrid } from './grid.js'
 export { adaptPattern } from './adaptation.js'
 export {
   normalizeEvidenceProvenance,
+  numericArrayFingerprintSync,
   resolvedSubjectMask,
   subjectMaskConfidence,
   subjectMaskTrust,

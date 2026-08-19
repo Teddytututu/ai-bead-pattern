@@ -1,5 +1,6 @@
 import {
   normalizeEvidenceProvenance,
+  numericArrayFingerprintSync,
   type EvidenceOrigin,
   type EvidenceProvenance,
   type ImageAnalysis,
@@ -38,7 +39,8 @@ const imageTypePriority = {
 function canonicalKey(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'undefined'
   if (ArrayBuffer.isView(value)) {
-    return canonicalKey(Array.from(value as unknown as ArrayLike<number>))
+    const values = value as unknown as ArrayLike<number>
+    return `numeric:${values.length}:${numericArrayFingerprintSync(values)}`
   }
   if (Array.isArray(value)) return `[${value.map(canonicalKey).join(',')}]`
   const entries = Object.entries(value as Readonly<Record<string, unknown>>)

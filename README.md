@@ -15,7 +15,9 @@ tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
 ```
 
-当前阶段进入 v0.3.3 Analysis Evidence。`pattern-core` 将视觉模型提供的主体 mask 投影到目标豆格，使用连续 signed distance、覆盖率、拓扑与毛刺成本优化边界；CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization，多个颜色风格共享同一结构事实。全画面铺豆模式仍使用主体形状评价构图与边界，执行占位保持全画面。自动模式同时生成全图和主体形状候选，再按构图、特征格数、轮廓质量和制作成本排序。`ImageAnalysis` 现在支持带来源、revision、用户确认状态和 provenance 的主体证据；主体 mask、landmark、语义区域和自动裁剪分别使用自己的置信度。用户确认状态提升系统对 mask 的信任度，同时保留原始 confidence。AI、透明通道、本地启发式和人工修正都有正式来源类型，融合结果经过固定优先级与 canonical 排序，输入顺序不会改变结果身份。
+当前阶段进入 v0.3.3 Analysis Evidence。`pattern-core` 将视觉模型提供的主体 mask 投影到目标豆格，使用连续 signed distance、覆盖率、拓扑与毛刺成本优化边界；CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization，多个颜色风格共享同一结构事实。全画面铺豆模式仍使用主体形状评价构图与边界，执行占位保持全画面。自动模式同时生成全图和主体形状候选，再按构图、特征格数、轮廓质量和制作成本排序。`ImageAnalysis` 现在支持带来源、revision、用户确认状态和 provenance 的主体证据；主体 mask、landmark、语义区域和自动裁剪分别使用自己的置信度。用户确认状态提升系统对 mask 的信任度，同时保留原始 confidence。AI、透明通道、本地启发式和人工修正都有正式来源类型，融合结果经过固定优先级与 canonical 排序，输入顺序变化仍保持同一结果身份。
+
+v0.3.3.1 Evidence Performance Hardening 使用流式数值指纹处理大型 mask 和 importance map，并在 `pattern-core` 内规范化 landmark、semantic region 与 provenance 顺序，语义相同的分析输入会生成相同 identity。
 
 ## 文档
 
