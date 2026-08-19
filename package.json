@@ -9,9 +9,11 @@
     "benchmark:max": "pnpm --filter @ai-bead-pattern/pattern-core benchmark:max",
     "demo": "pnpm build && node scripts/serve-demo.mjs",
     "test": "pnpm --filter @ai-bead-pattern/pattern-core test && pnpm --filter @ai-bead-pattern/ai-gateway test && node --test apps/demo/*.test.mjs",
+    "test:e2e": "pnpm build && playwright test",
     "typecheck": "pnpm --filter @ai-bead-pattern/pattern-core typecheck && pnpm --filter @ai-bead-pattern/pattern-core build && pnpm --filter @ai-bead-pattern/ai-gateway typecheck"
   },
   "devDependencies": {
+    "@playwright/test": "1.62.1",
     "@types/node": "^24.3.0",
     "typescript": "^5.9.2"
   }

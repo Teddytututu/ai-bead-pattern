@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
@@ -22,4 +23,6 @@ jobs:
       - run: pnpm test
       - run: pnpm typecheck
       - run: pnpm build
+      - run: pnpm exec playwright install chromium
+      - run: pnpm test:e2e
       - run: pnpm --filter @ai-bead-pattern/pattern-core example
