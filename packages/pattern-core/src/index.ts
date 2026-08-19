@@ -19,13 +19,21 @@ export {
   subjectMaskTrust,
 } from './analysis-evidence.js'
 export {
+  activeMaskStrokes,
+  appendMaskEditStroke,
   applyMaskStroke,
   applyMaskStrokes,
   confirmMaskCorrection,
+  confirmMaskEditSession,
   createMaskCorrectionDraft,
+  createMaskCorrectionDraftFromSession,
+  createMaskEditSession,
+  redoMaskEdit,
+  undoMaskEdit,
 } from './mask-correction.js'
 export type {
   MaskCorrectionDraft,
+  MaskEditSession,
   MaskPoint,
   MaskStroke,
   MaskStrokeMode,

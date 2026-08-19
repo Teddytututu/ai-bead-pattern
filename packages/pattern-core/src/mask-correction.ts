@@ -40,6 +40,14 @@ export interface MaskCorrectionDraft {
   mask: BinaryMask
 }
 
+export interface MaskEditSession {
+  baseRevision: string
+  /** Complete stroke history, including entries after the current cursor for redo. */
+  strokes: readonly MaskStroke[]
+  /** Number of strokes currently applied from the start of the history. */
+  cursor: number
+}
+
 function assertFiniteRange(value: number, name: string, minimum: number, maximum: number): void {
   if (!Number.isFinite(value) || value < minimum || value > maximum) {
     throw new RangeError(`${name} must be within ${minimum}..${maximum}`)
@@ -160,6 +168,70 @@ function cloneStroke(stroke: MaskStroke): MaskStroke {
   }
 }
 
+function validateEditSession(session: MaskEditSession): void {
+  if (session === null || typeof session !== 'object') {
+    throw new RangeError('Mask edit session must be an object')
+  }
+  if (typeof session.baseRevision !== 'string' || session.baseRevision.trim().length === 0) {
+    throw new RangeError('Mask edit session base revision must be non-empty')
+  }
+  validateStrokeLog(session.strokes)
+  if (!Number.isInteger(session.cursor)
+    || session.cursor < 0
+    || session.cursor > session.strokes.length) {
+    throw new RangeError('Mask edit session cursor must address the stroke history')
+  }
+}
+
+export function createMaskEditSession(
+  baseRevision: string,
+  strokes: readonly MaskStroke[] = [],
+  cursor: number = strokes.length,
+): MaskEditSession {
+  const input = {
+    baseRevision,
+    strokes,
+    cursor,
+  }
+  validateEditSession(input)
+  return {
+    ...input,
+    strokes: strokes.map(cloneStroke),
+  }
+}
+
+export function activeMaskStrokes(session: MaskEditSession): readonly MaskStroke[] {
+  validateEditSession(session)
+  return session.strokes.slice(0, session.cursor)
+}
+
+export function appendMaskEditStroke(
+  session: MaskEditSession,
+  stroke: MaskStroke,
+): MaskEditSession {
+  validateEditSession(session)
+  const input = [...session.strokes.slice(0, session.cursor), stroke]
+  validateStrokeLog(input)
+  const strokes = [...session.strokes.slice(0, session.cursor), cloneStroke(stroke)]
+  return {
+    baseRevision: session.baseRevision,
+    strokes,
+    cursor: strokes.length,
+  }
+}
+
+export function undoMaskEdit(session: MaskEditSession): MaskEditSession {
+  validateEditSession(session)
+  if (session.cursor === 0) return session
+  return { ...session, cursor: session.cursor - 1 }
+}
+
+export function redoMaskEdit(session: MaskEditSession): MaskEditSession {
+  validateEditSession(session)
+  if (session.cursor === session.strokes.length) return session
+  return { ...session, cursor: session.cursor + 1 }
+}
+
 function paintBrush(
   values: Float32Array,
   width: number,
@@ -268,6 +340,18 @@ export function createMaskCorrectionDraft(
   }
 }
 
+export function createMaskCorrectionDraftFromSession(
+  baseEvidence: SubjectMaskEvidence,
+  session: MaskEditSession,
+): MaskCorrectionDraft {
+  validateEvidence(baseEvidence)
+  validateEditSession(session)
+  if (baseEvidence.revision !== session.baseRevision) {
+    throw new RangeError('Mask edit session base revision must match the subject evidence')
+  }
+  return createMaskCorrectionDraft(baseEvidence, activeMaskStrokes(session))
+}
+
 export function applyMaskStroke(draft: MaskCorrectionDraft, stroke: MaskStroke): MaskCorrectionDraft {
   if (draft === null || typeof draft !== 'object') {
     throw new RangeError('Mask correction draft must be an object')
@@ -325,26 +409,45 @@ function correctionProvenance(base: SubjectMaskEvidence): readonly EvidenceProve
   ])
 }
 
+function confirmEvidenceWithStrokes(
+  baseEvidence: SubjectMaskEvidence,
+  strokes: readonly MaskStroke[],
+): SubjectMaskEvidence {
+  validateEvidence(baseEvidence)
+  validateStrokeLog(strokes)
+  const mask = applyValidatedMaskStrokes(baseEvidence.mask, strokes)
+  const baseIdentity = [
+    baseEvidence.revision,
+    baseEvidence.mask.width.toString(),
+    baseEvidence.mask.height.toString(),
+    numericArrayFingerprintSync(baseEvidence.mask.values),
+  ].join(':')
+  const revision = `mask-editor:v1:${textFingerprint(`${baseIdentity}\u0000${canonicalStrokeLog(strokes)}`)}`
+  return {
+    mask,
+    confidence: baseEvidence.confidence,
+    source: correctedSource(baseEvidence),
+    revision,
+    userConfirmed: true,
+    provenance: correctionProvenance(baseEvidence),
+  }
+}
+
 export function confirmMaskCorrection(draft: MaskCorrectionDraft): SubjectMaskEvidence {
   if (draft === null || typeof draft !== 'object') {
     throw new RangeError('Mask correction draft must be an object')
   }
-  validateEvidence(draft.baseEvidence)
-  validateStrokeLog(draft.strokes)
-  const mask = applyValidatedMaskStrokes(draft.baseEvidence.mask, draft.strokes)
-  const baseIdentity = [
-    draft.baseEvidence.revision,
-    draft.baseEvidence.mask.width.toString(),
-    draft.baseEvidence.mask.height.toString(),
-    numericArrayFingerprintSync(draft.baseEvidence.mask.values),
-  ].join(':')
-  const revision = `mask-editor:v1:${textFingerprint(`${baseIdentity}\u0000${canonicalStrokeLog(draft.strokes)}`)}`
-  return {
-    mask,
-    confidence: draft.baseEvidence.confidence,
-    source: correctedSource(draft.baseEvidence),
-    revision,
-    userConfirmed: true,
-    provenance: correctionProvenance(draft.baseEvidence),
+  return confirmEvidenceWithStrokes(draft.baseEvidence, draft.strokes)
+}
+
+export function confirmMaskEditSession(
+  baseEvidence: SubjectMaskEvidence,
+  session: MaskEditSession,
+): SubjectMaskEvidence {
+  validateEvidence(baseEvidence)
+  validateEditSession(session)
+  if (baseEvidence.revision !== session.baseRevision) {
+    throw new RangeError('Mask edit session base revision must match the subject evidence')
   }
+  return confirmEvidenceWithStrokes(baseEvidence, activeMaskStrokes(session))
 }

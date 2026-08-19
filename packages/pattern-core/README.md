@@ -20,7 +20,7 @@
 - 五种风格参数与规则候选排序
 - 自动占位模式同时比较全图与主体形状候选
 - 原图归一化坐标的 mask 添加/擦除软笔刷与连续路径插值
-- mask 修正草稿、人工确认、确定性 revision 和 provenance 追踪
+- mask 修正 Session、撤销重做、草稿确认、确定性 revision 和 provenance 追踪
 - 材料数量、颜色误差和工艺指标
 - 旧版 `width`、`height` 与结果字段兼容
 
@@ -79,20 +79,24 @@ Mask Correction 使用原图归一化坐标保存笔迹。编辑阶段维护草�
 
 ```ts
 import {
-  applyMaskStroke,
-  confirmMaskCorrection,
-  createMaskCorrectionDraft,
+  appendMaskEditStroke,
+  confirmMaskEditSession,
+  createMaskEditSession,
+  undoMaskEdit,
 } from '@ai-bead-pattern/pattern-core'
 
-const draft = createMaskCorrectionDraft(aiSubjectMaskEvidence)
-const edited = applyMaskStroke(draft, {
+let session = createMaskEditSession(aiSubjectMaskEvidence.revision)
+session = appendMaskEditStroke(session, {
   id: 'stroke-1',
   mode: 'add',
   points: [{ x: 0.2, y: 0.3 }, { x: 0.28, y: 0.35 }],
   radiusNormalized: 0.02,
 })
-const confirmedEvidence = confirmMaskCorrection(edited)
+session = undoMaskEdit(session)
+const confirmedEvidence = confirmMaskEditSession(aiSubjectMaskEvidence, session)
 ```
+
+Session 保留完整 stroke log，`cursor` 决定当前生效范围；撤销后新增笔迹会形成新的历史分支。Mask Correction 只生成新的 `SubjectMaskEvidence`，semantic regions 与 landmarks 保持独立证据。
 
 ## 验证
 
