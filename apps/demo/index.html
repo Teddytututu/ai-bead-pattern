@@ -154,6 +154,8 @@
 
     .file-button:hover { background: var(--surface-alt); }
     .file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .file-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    button.file-button { color: var(--text); }
 
     .control-group { display: grid; gap: 8px; margin-top: 15px; }
     .control-group:first-child { margin-top: 0; }
@@ -257,6 +259,115 @@
     .icon-button:hover { background: var(--surface-alt); }
     .icon-button:disabled { opacity: 0.4; cursor: default; }
 
+    .mask-editor-dialog {
+      width: min(1080px, calc(100vw - 32px));
+      height: min(820px, calc(100dvh - 32px));
+      padding: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 24px 72px rgba(24, 30, 29, 0.24);
+    }
+
+    .mask-editor-dialog::backdrop { background: rgba(23, 29, 28, 0.58); }
+
+    .mask-editor-layout {
+      height: 100%;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+    }
+
+    .mask-editor-header,
+    .mask-editor-footer {
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface);
+    }
+
+    .mask-editor-header { border-bottom: 1px solid var(--border); }
+    .mask-editor-footer { border-top: 1px solid var(--border); }
+    .mask-editor-title { margin: 0; font-size: 16px; }
+    .mask-editor-detail { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+    .mask-editor-tools {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      min-height: 54px;
+      padding: 8px 14px;
+      background: var(--surface-alt);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mask-tool-group { display: flex; align-items: center; gap: 6px; }
+    .mask-tool-label { color: var(--muted); font-size: 11px; font-weight: 700; }
+    .mask-segmented { display: grid; grid-auto-flow: column; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
+    .mask-segmented button { min-width: 58px; height: 32px; padding: 0 10px; border: 0; border-right: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
+    .mask-segmented button:last-child { border-right: 0; }
+    .mask-segmented button[aria-pressed="true"] { background: var(--text); color: #fff; font-weight: 700; }
+
+    .mask-editor-workspace {
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      padding: 16px;
+      background: #d9ddda;
+    }
+
+    .mask-editor-canvas-frame {
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    #maskEditorCanvas {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+      background: var(--surface-alt);
+      border: 0;
+      outline: 1px solid var(--border-strong);
+      box-shadow: var(--shadow);
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .mask-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 11px; }
+    .mask-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+    .mask-legend-swatch { width: 12px; height: 12px; border-radius: 2px; }
+    .mask-legend-swatch.base { background: rgba(40, 125, 115, 0.72); }
+    .mask-legend-swatch.add { background: rgba(36, 112, 185, 0.86); }
+    .mask-legend-swatch.erase { background: rgba(214, 83, 77, 0.86); }
+
+    .text-button {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .text-button:hover { background: var(--surface-alt); }
+    .text-button.primary { border-color: var(--teal); background: var(--teal); color: #fff; }
+    .text-button.primary:hover { background: #216b63; }
+    .text-button:disabled { opacity: 0.45; cursor: default; }
+
     .canvas-shell {
       min-height: 0;
       display: grid;
@@ -331,6 +442,11 @@
       .inspector .section:first-child { grid-column: auto; }
       .inspector .section { border-right: 0; border-bottom: 1px solid var(--border); }
       .candidate-list { grid-template-columns: repeat(4, minmax(72px, 1fr)); overflow-x: auto; }
+      .mask-editor-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border: 0; border-radius: 0; }
+      .mask-editor-tools { align-items: flex-start; }
+      .mask-editor-workspace { padding: 8px; }
+      .mask-editor-footer { align-items: stretch; flex-direction: column; }
+      .mask-editor-footer .primary { width: 100%; }
     }
 
     @media (max-width: 420px) {
@@ -368,11 +484,17 @@
           <div class="file-meta">
             <p class="file-name" id="fileName">示例猫咪</p>
             <p class="analysis-source" id="analysisSource" aria-live="polite">透明通道</p>
-            <label class="file-button">
-              <span aria-hidden="true">＋</span>
-              选择图片
-              <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp">
-            </label>
+            <div class="file-actions">
+              <label class="file-button">
+                <span aria-hidden="true">＋</span>
+                选择图片
+                <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp">
+              </label>
+              <button class="file-button" id="openMaskEditorButton" type="button">
+                <span aria-hidden="true">◉</span>
+                修正主体
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -494,8 +616,65 @@
     </aside>
   </main>
 
+  <dialog class="mask-editor-dialog" id="maskEditorDialog" aria-labelledby="maskEditorTitle">
+    <div class="mask-editor-layout">
+      <header class="mask-editor-header">
+        <div>
+          <h2 class="mask-editor-title" id="maskEditorTitle">修正主体</h2>
+          <span class="mask-editor-detail" id="maskEditorDetail">0 笔</span>
+        </div>
+        <button class="icon-button" id="maskEditorCloseButton" type="button" aria-label="关闭主体编辑器" title="关闭">×</button>
+      </header>
+      <div class="mask-editor-tools" aria-label="主体编辑工具">
+        <div class="mask-tool-group">
+          <span class="mask-tool-label">模式</span>
+          <div class="mask-segmented" id="maskModeControl">
+            <button type="button" data-mask-mode="add" aria-pressed="true">添加</button>
+            <button type="button" data-mask-mode="erase" aria-pressed="false">擦除</button>
+          </div>
+        </div>
+        <div class="mask-tool-group">
+          <span class="mask-tool-label">笔刷</span>
+          <div class="mask-segmented" id="maskRadiusControl">
+            <button type="button" data-mask-radius="0.01" aria-pressed="false">小</button>
+            <button type="button" data-mask-radius="0.02" aria-pressed="true">中</button>
+            <button type="button" data-mask-radius="0.04" aria-pressed="false">大</button>
+          </div>
+        </div>
+        <div class="mask-tool-group">
+          <button class="icon-button" id="maskUndoButton" type="button" aria-label="撤销" title="撤销">↶</button>
+          <button class="icon-button" id="maskRedoButton" type="button" aria-label="重做" title="重做">↷</button>
+          <button class="text-button" id="maskResetButton" type="button">重置</button>
+        </div>
+      </div>
+      <div class="mask-editor-workspace">
+        <div class="mask-editor-canvas-frame">
+          <canvas id="maskEditorCanvas" width="512" height="512" tabindex="0" aria-label="主体修正画布"></canvas>
+        </div>
+      </div>
+      <footer class="mask-editor-footer">
+        <div class="mask-legend" aria-label="主体修正颜色图例">
+          <span class="mask-legend-item"><span class="mask-legend-swatch base"></span>原始主体</span>
+          <span class="mask-legend-item"><span class="mask-legend-swatch add"></span>本次添加</span>
+          <span class="mask-legend-item"><span class="mask-legend-swatch erase"></span>本次擦除</span>
+        </div>
+        <button class="text-button primary" id="maskConfirmButton" type="button">确认主体并重新生成</button>
+      </footer>
+    </div>
+  </dialog>
+
   <script type="module">
-    import { createPatternAlgorithm } from '/packages/pattern-core/dist/index.js'
+    import {
+      appendMaskEditStroke,
+      applyMaskStrokes,
+      confirmMaskEditSession,
+      createMaskCorrectionDraftFromSession,
+      createMaskEditSession,
+      createPatternAlgorithm,
+      redoMaskEdit,
+      undoMaskEdit,
+    } from '/packages/pattern-core/dist/index.js'
+    import { createMaskEditorController } from './mask-editor.mjs'
     import { inferSubjectAnalysis } from './subject-mask.mjs'
 
     const palette = await fetch('/assets/palettes/generic-24.json').then((response) => {
@@ -511,6 +690,7 @@
       fileName: document.querySelector('#fileName'),
       analysisSource: document.querySelector('#analysisSource'),
       sourcePreview: document.querySelector('#sourcePreview'),
+      openMaskEditorButton: document.querySelector('#openMaskEditorButton'),
       sizeControl: document.querySelector('#sizeControl'),
       sizeValue: document.querySelector('#sizeValue'),
       maxColors: document.querySelector('#maxColors'),
@@ -541,10 +721,22 @@
       shapeCoverage: document.querySelector('#shapeCoverage'),
       shapeComponents: document.querySelector('#shapeComponents'),
       shapeHoles: document.querySelector('#shapeHoles'),
+      maskEditorDialog: document.querySelector('#maskEditorDialog'),
+      maskEditorCanvas: document.querySelector('#maskEditorCanvas'),
+      maskEditorDetail: document.querySelector('#maskEditorDetail'),
+      maskEditorCloseButton: document.querySelector('#maskEditorCloseButton'),
+      maskModeControl: document.querySelector('#maskModeControl'),
+      maskRadiusControl: document.querySelector('#maskRadiusControl'),
+      maskUndoButton: document.querySelector('#maskUndoButton'),
+      maskRedoButton: document.querySelector('#maskRedoButton'),
+      maskResetButton: document.querySelector('#maskResetButton'),
+      maskConfirmButton: document.querySelector('#maskConfirmButton'),
     }
 
     let sourceImage = createSampleImage()
     let sourceAnalysis = inferSubjectAnalysis(sourceImage)
+    let originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
+    let savedMaskEditSession
     let candidates = []
     let selectedCandidate = null
     let selectedSize = 'auto'
@@ -553,6 +745,41 @@
     let selectedValueLevels = 3
     let showGrid = true
 
+    const maskEditor = createMaskEditorController({
+      elements: {
+        dialog: elements.maskEditorDialog,
+        canvas: elements.maskEditorCanvas,
+        detail: elements.maskEditorDetail,
+        closeButton: elements.maskEditorCloseButton,
+        modeControl: elements.maskModeControl,
+        radiusControl: elements.maskRadiusControl,
+        undoButton: elements.maskUndoButton,
+        redoButton: elements.maskRedoButton,
+        resetButton: elements.maskResetButton,
+        confirmButton: elements.maskConfirmButton,
+      },
+      core: {
+        appendMaskEditStroke,
+        applyMaskStrokes,
+        confirmMaskEditSession,
+        createMaskCorrectionDraftFromSession,
+        createMaskEditSession,
+        redoMaskEdit,
+        undoMaskEdit,
+      },
+      onConfirm: async ({ evidence, session }) => {
+        savedMaskEditSession = session
+        sourceAnalysis = {
+          ...sourceAnalysis,
+          subjectMask: evidence.mask,
+          subjectMaskEvidence: evidence,
+        }
+        renderAnalysisSource()
+        setStatus('主体已确认', 'ready')
+        await generate()
+      },
+    })
+
     function setStatus(text, state = 'ready') {
       elements.status.dataset.state = state
       elements.statusText.textContent = text
@@ -560,13 +787,16 @@
 
     function setBusy(busy) {
       elements.generateButton.disabled = busy
+      elements.openMaskEditorButton.disabled = busy
       elements.stage.dataset.busy = String(busy)
       if (busy) setStatus('生成中', 'busy')
     }
 
     function renderAnalysisSource() {
       const segmentationVersion = sourceAnalysis.modelVersions?.segmentation
-      elements.analysisSource.textContent = sourceAnalysis.source === 'alpha'
+      elements.analysisSource.textContent = sourceAnalysis.subjectMaskEvidence?.userConfirmed === true
+        ? '人工确认主体'
+        : sourceAnalysis.source === 'alpha'
         ? '透明通道'
         : segmentationVersion?.startsWith('rembg/')
           ? 'AI 分割'
@@ -892,6 +1122,9 @@
       bitmap.close()
       sourceImage = canvasToPixelImage(canvas)
       sourceAnalysis = inferSubjectAnalysis(sourceImage)
+      originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
+      savedMaskEditSession = undefined
+      maskEditor.close()
       elements.fileName.textContent = file.name
       renderAnalysisSource()
       renderSourcePreview()
@@ -969,6 +1202,13 @@
       }
     })
     elements.generateButton.addEventListener('click', generate)
+    elements.openMaskEditorButton.addEventListener('click', () => {
+      maskEditor.open({
+        image: sourceImage,
+        evidence: originalSubjectEvidence,
+        editSession: savedMaskEditSession,
+      })
+    })
     elements.toggleGridButton.addEventListener('click', () => {
       showGrid = showGrid === false
       elements.toggleGridButton.setAttribute('aria-pressed', String(showGrid))

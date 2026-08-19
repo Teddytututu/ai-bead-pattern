@@ -15,11 +15,13 @@ tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
 ```
 
-当前阶段进入 v0.3.3 Analysis Evidence。`pattern-core` 将视觉模型提供的主体 mask 投影到目标豆格，使用连续 signed distance、覆盖率、拓扑与毛刺成本优化边界；CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization，多个颜色风格共享同一结构事实。全画面铺豆模式仍使用主体形状评价构图与边界，执行占位保持全画面。自动模式同时生成全图和主体形状候选，再按构图、特征格数、轮廓质量和制作成本排序。`ImageAnalysis` 现在支持带来源、revision、用户确认状态和 provenance 的主体证据；主体 mask、landmark、语义区域和自动裁剪分别使用自己的置信度。用户确认状态提升系统对 mask 的信任度，同时保留原始 confidence。AI、透明通道、本地启发式和人工修正都有正式来源类型，融合结果经过固定优先级与 canonical 排序，输入顺序变化仍保持同一结果身份。
+当前阶段进入 v0.3.4 Mask Correction。`pattern-core` 将视觉模型提供的主体 mask 投影到目标豆格，使用连续 signed distance、覆盖率、拓扑与毛刺成本优化边界；CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization，多个颜色风格共享同一结构事实。全画面铺豆模式仍使用主体形状评价构图与边界，执行占位保持全画面。自动模式同时生成全图和主体形状候选，再按构图、特征格数、轮廓质量和制作成本排序。`ImageAnalysis` 现在支持带来源、revision、用户确认状态和 provenance 的主体证据；主体 mask、landmark、语义区域和自动裁剪分别使用自己的置信度。用户确认状态提升系统对 mask 的信任度，同时保留原始 confidence。AI、透明通道、本地启发式和人工修正都有正式来源类型，融合结果经过固定优先级与 canonical 排序，输入顺序变化仍保持同一结果身份。
 
 v0.3.3.1 Evidence Performance Hardening 使用流式数值指纹处理大型 mask 和 importance map，并在 `pattern-core` 内规范化 landmark、semantic region 与 provenance 顺序，语义相同的分析输入会生成相同 identity。
 
 Mask Correction Engine 已加入原图归一化坐标笔迹、添加/擦除软笔刷、连续路径插值、草稿与确认分离，以及稳定 revision。`MaskEditSession` 使用完整笔迹历史和 cursor 支持撤销、重做与分支编辑。确认后的证据保留模型置信度和 provenance，并追加 `mask-editor` 人工来源。修正作用域限定为 subject occupancy，语义区域继续由独立视觉证据管理。
+
+Demo 已加入主体修正编辑器，支持添加、擦除、三档笔刷、撤销、重做、重置和确认生成。原始主体、用户添加与用户擦除使用独立覆盖色显示；画布按原图比例 contain 显示，横图与竖图在桌面和手机宽度下保持比例。完整生成只在确认后触发一次，已确认笔迹在再次打开时继续保留。
 
 ## 文档
 
@@ -74,7 +76,7 @@ Mask Correction Engine 已加入原图归一化坐标笔迹、添加/擦除软�
 - 线性轮廓追踪、面积覆盖栅格化与 Signed Distance Field
 - 全图与主体形状占位候选搜索
 
-下一批工作安排为 Mask Editor 界面与失败样本 Gate，随后接入人物语义分析和 FeatureConstraint 模板搜索。
+下一批工作安排为 Mask Failure Gate，随后接入人物语义分析和 FeatureConstraint 模板搜索。
 
 浏览器体验页：`apps/demo/index.html`
 

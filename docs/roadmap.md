@@ -8,9 +8,9 @@
 
 ## Phase 2: Structure Planning
 
-状态：Structure Planning 前半段完成。ShapeVariantCache 已统一规划与执行使用的目标形状；主体 mask、landmark、语义区域和裁剪置信度已经解耦，Gateway 支持模型与人工证据融合。v0.3.4 Mask Correction Core 已完成，包含归一化笔迹、连续软笔刷、Session 撤销重做、草稿确认分离与稳定 revision。
+状态：Structure Planning 前半段完成。ShapeVariantCache 已统一规划与执行使用的目标形状；主体 mask、landmark、语义区域和裁剪置信度已经解耦，Gateway 支持模型与人工证据融合。v0.3.4 Mask Correction Core 与 Demo 编辑器已完成，包含归一化笔迹、连续软笔刷、Session 撤销重做、草稿确认分离、稳定 revision、三色覆盖层和确认后单次生成。
 
-下一批内容依次为 Mask Editor UI 与失败样本 Gate、人物视觉分析、FeatureConstraint、五官模板、StructurePlan 和 PIA-lite 空间映射。
+下一批内容依次为 Mask Failure Gate、人物视觉分析、FeatureConstraint、五官模板、StructurePlan 和 PIA-lite 空间映射。
 
 ## Phase 3: Value And Palette Planning
 
