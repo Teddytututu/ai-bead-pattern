@@ -6,7 +6,12 @@ import {
   type PreparedColor,
 } from './color.js'
 import { adaptPattern } from './adaptation.js'
-import { resolvedSubjectMask, subjectMaskConfidence, subjectMaskTrust } from './analysis-evidence.js'
+import {
+  normalizeEvidenceProvenance,
+  resolvedSubjectMask,
+  subjectMaskConfidence,
+  subjectMaskTrust,
+} from './analysis-evidence.js'
 import {
   countIsolatedCells,
   countThinStripes,
@@ -154,14 +159,24 @@ async function generationFingerprint(
     request.image.data.byteLength,
   )
   const analysis = request.analysis
-  const semanticRegions = await Promise.all((analysis?.semanticRegions ?? []).map(async (region) => ({
-    id: region.id,
-    label: region.label,
-    confidence: region.confidence,
-    importance: region.importance,
-    provenance: region.provenance,
-    mask: await arrayFingerprint(region.mask.values),
-  })))
+  const semanticRegions = await Promise.all(
+    [...(analysis?.semanticRegions ?? [])]
+      .sort((first, second) => first.id.localeCompare(second.id))
+      .map(async (region) => ({
+        id: region.id,
+        label: region.label,
+        confidence: region.confidence,
+        importance: region.importance,
+        provenance: normalizeEvidenceProvenance(region.provenance),
+        mask: await arrayFingerprint(region.mask.values),
+      })),
+  )
+  const landmarks = [...(analysis?.landmarks ?? [])]
+    .sort((first, second) => first.id.localeCompare(second.id))
+    .map((landmark) => ({
+      ...landmark,
+      provenance: normalizeEvidenceProvenance(landmark.provenance),
+    }))
   const subjectMaskEvidence = analysis?.subjectMaskEvidence
   const identity = {
     engine: 'baseline',
@@ -187,13 +202,13 @@ async function generationFingerprint(
         source: subjectMaskEvidence.source,
         revision: subjectMaskEvidence.revision,
         userConfirmed: subjectMaskEvidence.userConfirmed,
-        provenance: subjectMaskEvidence.provenance,
+        provenance: normalizeEvidenceProvenance(subjectMaskEvidence.provenance),
         mask: await arrayFingerprint(subjectMaskEvidence.mask.values),
       },
       importanceMap: await arrayFingerprint(analysis.importanceMap?.weights),
       semanticRegions,
-      landmarks: analysis.landmarks,
-      provenance: analysis.provenance,
+      landmarks,
+      provenance: normalizeEvidenceProvenance(analysis.provenance),
     },
     options: request.options,
   }

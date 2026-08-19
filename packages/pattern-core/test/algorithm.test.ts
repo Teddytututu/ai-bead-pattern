@@ -1161,6 +1161,49 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(first.generationId, sameEvidenceWithLegacyDrift.generationId)
   })
 
+  it('canonicalizes analysis collection order in generation identity', async () => {
+    const source = image(2, 1, [[255, 0, 0], [0, 0, 255]])
+    const leftMask = { width: 2, height: 1, values: new Float32Array([1, 0]) }
+    const rightMask = { width: 2, height: 1, values: new Float32Array([0, 1]) }
+    const provenance = [
+      { origin: 'model' as const, provider: 'z-provider', version: '1' },
+      { origin: 'model' as const, provider: 'a-provider', version: '1' },
+    ]
+    const analysis = {
+      provenance,
+      semanticRegions: [
+        { id: 'left', label: 'left', mask: leftMask, confidence: 0.9, provenance },
+        { id: 'right', label: 'right', mask: rightMask, confidence: 0.8, provenance },
+      ],
+      landmarks: [
+        { id: 'left-eye', kind: 'eye' as const, x: 0, y: 0, confidence: 0.9, priority: 'hard' as const, provenance },
+        { id: 'right-eye', kind: 'eye' as const, x: 1, y: 0, confidence: 0.8, priority: 'hard' as const, provenance },
+      ],
+    }
+    const request = (reverse: boolean): PatternGenerationRequest => ({
+      ...fixedRequest(source, {
+        canvas: { mode: 'fixed', size: { width: 2, height: 1 } },
+      }),
+      analysis: reverse ? {
+        ...analysis,
+        provenance: [...analysis.provenance].reverse(),
+        semanticRegions: [...analysis.semanticRegions].reverse().map((region) => ({
+          ...region,
+          provenance: [...region.provenance].reverse(),
+        })),
+        landmarks: [...analysis.landmarks].reverse().map((landmark) => ({
+          ...landmark,
+          provenance: [...landmark.provenance].reverse(),
+        })),
+      } : analysis,
+    })
+
+    const first = await createPatternAlgorithm().generate(request(false))
+    const second = await createPatternAlgorithm().generate(request(true))
+
+    assert.equal(first.generationId, second.generationId)
+  })
+
   it('reduces a semantic gradient to a controlled three-level value design', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const grayscalePalette: MaterialPalette = {
