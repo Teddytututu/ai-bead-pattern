@@ -25,5 +25,8 @@ output/
 playwright-report/
 test-results/
 
+# Private Mask Failure Gate inputs and derived evidence
+work/mask-gate/
+
 # Local planning workspace
 .planning/

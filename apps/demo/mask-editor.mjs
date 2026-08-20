@@ -130,7 +130,7 @@ export function createLiveStrokePreview(canvas) {
   }
 }
 
-export function createMaskEditorController({ elements, core, onConfirm }) {
+export function createMaskEditorController({ elements, core, onConfirm, onClose }) {
   let sourceImage
   let baseEvidence
   let session
@@ -142,6 +142,7 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
   let pointerPoints = []
   let strokeSequence = 1
   let previewFrame
+  let closeOutcome
   const sourceBuffer = document.createElement('canvas')
   const overlayBuffer = document.createElement('canvas')
   const livePreview = createLiveStrokePreview(elements.canvas)
@@ -328,13 +329,18 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
     rebuildDraft()
   })
   elements.closeButton.addEventListener('click', () => elements.dialog.close())
-  elements.dialog.addEventListener('close', cancelActivePointer)
+  elements.dialog.addEventListener('close', () => {
+    cancelActivePointer()
+    onClose?.({ session, outcome: closeOutcome ?? 'cancelled' })
+    closeOutcome = undefined
+  })
   elements.confirmButton.addEventListener('click', async () => {
     elements.confirmButton.disabled = true
     try {
       const evidence = core.confirmMaskEditSession(baseEvidence, session)
       confirmedSession = session
       const regeneration = onConfirm({ evidence, session })
+      closeOutcome = 'confirmed'
       elements.dialog.close()
       await regeneration
     } finally {
@@ -353,6 +359,7 @@ export function createMaskEditorController({ elements, core, onConfirm }) {
       baseEvidence = evidence
       confirmedSession = editSession ?? core.createMaskEditSession(evidence.revision)
       session = confirmedSession
+      closeOutcome = 'cancelled'
       strokeSequence = session.strokes.length + 1
       prepareImageBuffers()
       elements.dialog.showModal()

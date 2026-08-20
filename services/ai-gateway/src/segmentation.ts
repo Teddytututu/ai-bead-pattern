@@ -6,6 +6,7 @@ import type {
   ImageAnalysis,
   PixelImage,
 } from '@ai-bead-pattern/pattern-core'
+import { numericArrayFingerprintSync } from '@ai-bead-pattern/pattern-core'
 
 export type SegmentationModel =
   | 'birefnet-general-lite'
@@ -199,6 +200,7 @@ function analysisFromMask(
     model,
     version: 'mask-v1-certainty-v1',
   }]
+  const maskFingerprint = numericArrayFingerprintSync(mask.values)
   const analysis: ImageAnalysis = {
     confidence,
     subjectMask,
@@ -206,7 +208,7 @@ function analysisFromMask(
       mask: subjectMask,
       confidence,
       source: 'ai',
-      revision: `rembg-http:${model}:mask-v1-certainty-v1`,
+      revision: `rembg-http:${model}:mask-v2-certainty-v1:${maskFingerprint}`,
       provenance,
     },
     importanceMap: {

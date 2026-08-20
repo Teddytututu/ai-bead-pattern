@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "mask-failure-pilot",
+  "samples": [
+    {
+      "imageId": "portrait-01",
+      "imagePath": "../../work/mask-gate/private/portrait-01.jpg",
+      "category": "portrait",
+      "cohort": "failure",
+      "failureType": "fine-hair",
+      "source": {
+        "permission": "owned",
+        "reference": "owner-photo-portrait-01"
+      }
+    },
+    {
+      "imageId": "pet-01",
+      "imagePath": "../../work/mask-gate/private/pet-01.jpg",
+      "category": "pet",
+      "cohort": "failure",
+      "failureType": "fur-edge",
+      "source": {
+        "permission": "research-consent",
+        "reference": "consent-batch-a"
+      }
+    },
+    {
+      "imageId": "object-01",
+      "imagePath": "../../work/mask-gate/private/object-01.png",
+      "category": "illustration-object",
+      "cohort": "failure",
+      "failureType": "thin-structure",
+      "source": {
+        "permission": "licensed",
+        "reference": "licensed-fixture-pack-a"
+      }
+    },
+    {
+      "imageId": "control-01",
+      "imagePath": "../../work/mask-gate/private/control-01.jpg",
+      "category": "control-extreme",
+      "cohort": "control",
+      "failureType": "clean-mask",
+      "source": {
+        "permission": "public-domain",
+        "reference": "public-domain-control-a"
+      }
+    }
+  ]
+}
