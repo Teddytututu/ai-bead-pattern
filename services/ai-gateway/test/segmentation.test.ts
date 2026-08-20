@@ -51,7 +51,10 @@ describe('rembg HTTP segmentation provider', () => {
     assert.equal(result.analysis.modelVersions?.segmentation, 'rembg/birefnet-general-lite')
     assert.equal(result.analysis.subjectMaskEvidence?.confidence, result.analysis.confidence)
     assert.equal(result.analysis.subjectMaskEvidence?.source, 'ai')
-    assert.equal(result.analysis.subjectMaskEvidence?.revision, 'rembg-http:birefnet-general-lite:mask-v1-certainty-v1')
+    assert.match(
+      result.analysis.subjectMaskEvidence?.revision ?? '',
+      /^rembg-http:birefnet-general-lite:mask-v2-certainty-v1:[a-f0-9]{16}$/,
+    )
     assert.deepEqual(result.analysis.subjectMaskEvidence?.provenance, [{
       origin: 'model',
       provider: 'rembg-http',
@@ -75,6 +78,32 @@ describe('rembg HTTP segmentation provider', () => {
     const provider = new RembgHttpSegmentationProvider({ fetch })
 
     await assert.rejects(() => provider.segment(request()), /dimensions/)
+  })
+
+  it('binds the evidence revision to the actual mask values', async () => {
+    const outputs = [
+      await maskPng(2, 2, [0, 0, 255, 255]),
+      await maskPng(2, 2, [0, 255, 255, 255]),
+    ]
+    let requestIndex = 0
+    const provider = new RembgHttpSegmentationProvider({
+      fetch: async () => new Response(Uint8Array.from(outputs[requestIndex++]!), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      }),
+    })
+
+    const first = await provider.segment(request())
+    const second = await provider.segment(request())
+
+    assert.notEqual(
+      first.analysis.subjectMaskEvidence?.revision,
+      second.analysis.subjectMaskEvidence?.revision,
+    )
+    assert.match(
+      first.analysis.subjectMaskEvidence?.revision ?? '',
+      /^rembg-http:birefnet-general-lite:mask-v2-certainty-v1:[a-f0-9]{16}$/,
+    )
   })
 
   it('surfaces rembg failures with a bounded response message', async () => {
