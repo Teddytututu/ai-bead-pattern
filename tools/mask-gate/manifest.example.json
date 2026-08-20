@@ -1,13 +1,23 @@
 {
-  "schemaVersion": 1,
-  "datasetId": "mask-failure-pilot",
+  "schemaVersion": 2,
+  "protocolVersion": "mask-gate-v2",
+  "datasetId": "mask-failure-pilot-v2",
+  "sampleOrderSeed": "mask-failure-pilot-v2-order-a",
+  "modelConfigurationId": "birefnet-general-lite-postprocess-v1",
+  "commits": {
+    "core": "replace-with-core-commit",
+    "demo": "replace-with-demo-commit",
+    "gateway": "replace-with-gateway-commit"
+  },
   "samples": [
     {
       "imageId": "portrait-01",
       "imagePath": "../../work/mask-gate/private/portrait-01.jpg",
       "category": "portrait",
-      "cohort": "failure",
-      "failureType": "fine-hair",
+      "cohort": "targeted-failure",
+      "failureTags": ["fine-hair", "same-color-background"],
+      "subjectCount": 1,
+      "targetMobile": true,
       "source": {
         "permission": "owned",
         "reference": "owner-photo-portrait-01"
@@ -17,30 +27,36 @@
       "imageId": "pet-01",
       "imagePath": "../../work/mask-gate/private/pet-01.jpg",
       "category": "pet",
-      "cohort": "failure",
-      "failureType": "fur-edge",
+      "cohort": "targeted-failure",
+      "failureTags": ["fur-edge", "ear-tip"],
+      "subjectCount": 1,
+      "targetMobile": true,
       "source": {
         "permission": "research-consent",
         "reference": "consent-batch-a"
       }
     },
     {
-      "imageId": "object-01",
-      "imagePath": "../../work/mask-gate/private/object-01.png",
-      "category": "illustration-object",
-      "cohort": "failure",
-      "failureType": "thin-structure",
+      "imageId": "illustration-01",
+      "imagePath": "../../work/mask-gate/private/illustration-01.png",
+      "category": "illustration",
+      "cohort": "extreme",
+      "failureTags": ["transparent-edge", "small-component"],
+      "subjectCount": 1,
+      "targetMobile": false,
       "source": {
         "permission": "licensed",
         "reference": "licensed-fixture-pack-a"
       }
     },
     {
-      "imageId": "control-01",
-      "imagePath": "../../work/mask-gate/private/control-01.jpg",
-      "category": "control-extreme",
-      "cohort": "control",
-      "failureType": "clean-mask",
+      "imageId": "object-01",
+      "imagePath": "../../work/mask-gate/private/object-01.jpg",
+      "category": "object",
+      "cohort": "clean-control",
+      "failureTags": ["hard-corner"],
+      "subjectCount": 1,
+      "targetMobile": false,
       "source": {
         "permission": "public-domain",
         "reference": "public-domain-control-a"

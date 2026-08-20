@@ -5,7 +5,11 @@ import { dirname, isAbsolute, resolve, sep } from 'node:path'
 import { numericArrayFingerprintSync } from '@ai-bead-pattern/pattern-core'
 import sharp from 'sharp'
 
-import { loadMaskGateManifest } from './manifest.mjs'
+import {
+  createMaskGateSampleOrder,
+  fingerprintMaskGateManifest,
+  loadMaskGateManifest,
+} from './manifest.mjs'
 
 const maximumImageSide = 2_048
 const maximumImagePixels = 4_000_000
@@ -105,9 +109,13 @@ export async function generateMaskGateSidecars({
   provider,
   model = 'birefnet-general-lite',
   postProcessMask = true,
-  gatewayCommit = 'unknown',
+  workspaceCommit = 'unknown',
 }) {
   const manifest = await loadMaskGateManifest(manifestPath)
+  const manifestFingerprint = fingerprintMaskGateManifest(manifest)
+  const sampleOrders = new Map(
+    createMaskGateSampleOrder(manifest).map((entry) => [entry.imageId, entry.sampleOrder]),
+  )
   const targetDirectory = resolve(outputDirectory)
   try {
     await stat(targetDirectory)
@@ -146,9 +154,22 @@ export async function generateMaskGateSidecars({
         raw: { width: evidence.mask.width, height: evidence.mask.height, channels: 1 },
       }).png().toBuffer()
       const metadata = {
-        schemaVersion: 1,
+        schemaVersion: 2,
+        protocolVersion: manifest.protocolVersion,
         imageId: sample.imageId,
         datasetId: manifest.datasetId,
+        manifestFingerprint,
+        sampleOrder: sampleOrders.get(sample.imageId),
+        sampleOrderSeed: manifest.sampleOrderSeed,
+        modelConfigurationId: manifest.modelConfigurationId,
+        commits: manifest.commits,
+        sample: {
+          category: sample.category,
+          cohort: sample.cohort,
+          failureTags: sample.failureTags,
+          subjectCount: sample.subjectCount,
+          targetMobile: sample.targetMobile,
+        },
         source: {
           path: sourceName,
           sha256: sha256(source.png),
@@ -173,7 +194,7 @@ export async function generateMaskGateSidecars({
         },
         modelVersions: segmentation.analysis.modelVersions ?? {},
         generator: {
-          gatewayCommit,
+          workspaceCommit,
           provider: segmentation.provider,
           model: segmentation.model,
           postProcessMask,
@@ -193,7 +214,10 @@ export async function generateMaskGateSidecars({
         imageId: sample.imageId,
         category: sample.category,
         cohort: sample.cohort,
-        failureType: sample.failureType,
+        failureTags: sample.failureTags,
+        subjectCount: sample.subjectCount,
+        targetMobile: sample.targetMobile,
+        sampleOrder: sampleOrders.get(sample.imageId),
         sourceMetadata: sample.source,
         source: sourceName,
         mask: maskName,
@@ -202,8 +226,13 @@ export async function generateMaskGateSidecars({
     }
 
     const index = {
-      schemaVersion: 1,
+      schemaVersion: 2,
+      protocolVersion: manifest.protocolVersion,
       datasetId: manifest.datasetId,
+      manifestFingerprint,
+      sampleOrderSeed: manifest.sampleOrderSeed,
+      modelConfigurationId: manifest.modelConfigurationId,
+      commits: manifest.commits,
       samples: artifacts,
     }
     await writeFile(
@@ -219,12 +248,23 @@ export async function generateMaskGateSidecars({
 }
 
 function validateMetadata(metadata) {
-  if (metadata?.schemaVersion !== 1) throw new RangeError('Sidecar schemaVersion must equal 1')
+  if (metadata?.schemaVersion !== 2) throw new RangeError('Sidecar schemaVersion must equal 2')
+  if (metadata.protocolVersion !== 'mask-gate-v2') {
+    throw new RangeError('Sidecar protocolVersion must equal mask-gate-v2')
+  }
   if (typeof metadata.imageId !== 'string' || metadata.imageId.length === 0) {
     throw new TypeError('Sidecar imageId must be present')
   }
   if (typeof metadata.datasetId !== 'string' || metadata.datasetId.length === 0) {
     throw new TypeError('Sidecar datasetId must be present')
+  }
+  if (typeof metadata.manifestFingerprint !== 'string'
+    || typeof metadata.modelConfigurationId !== 'string'
+    || typeof metadata.sampleOrderSeed !== 'string') {
+    throw new TypeError('Sidecar protocol identity must be complete')
+  }
+  if (Number.isInteger(metadata.sampleOrder) === false || metadata.sampleOrder < 1) {
+    throw new RangeError('Sidecar sampleOrder must be a positive integer')
   }
   if (metadata.mask?.encoding !== 'png-u8-gray') {
     throw new RangeError('Sidecar mask encoding has an unsupported value')

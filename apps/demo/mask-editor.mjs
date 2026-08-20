@@ -130,7 +130,7 @@ export function createLiveStrokePreview(canvas) {
   }
 }
 
-export function createMaskEditorController({ elements, core, onConfirm, onClose }) {
+export function createMaskEditorController({ elements, core, onConfirm, onClose, onFirstPointer }) {
   let sourceImage
   let baseEvidence
   let session
@@ -143,6 +143,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose 
   let strokeSequence = 1
   let previewFrame
   let closeOutcome
+  let firstPointerType
   const sourceBuffer = document.createElement('canvas')
   const overlayBuffer = document.createElement('canvas')
   const livePreview = createLiveStrokePreview(elements.canvas)
@@ -290,6 +291,10 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose 
 
   elements.canvas.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || session === undefined) return
+    if (firstPointerType === undefined) {
+      firstPointerType = event.pointerType || 'mouse'
+      onFirstPointer?.(firstPointerType)
+    }
     pointerId = event.pointerId
     pointerPoints = []
     livePreview.reset()
@@ -360,6 +365,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose 
       confirmedSession = editSession ?? core.createMaskEditSession(evidence.revision)
       session = confirmedSession
       closeOutcome = 'cancelled'
+      firstPointerType = undefined
       strokeSequence = session.strokes.length + 1
       prepareImageBuffers()
       elements.dialog.showModal()

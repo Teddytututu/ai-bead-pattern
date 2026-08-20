@@ -240,6 +240,19 @@
     .mask-gate-option input { width: 15px; height: 15px; accent-color: var(--teal); }
     .mask-gate-actions { display: grid; gap: 8px; margin-top: 14px; }
     .mask-gate-status { margin: 0; min-height: 18px; color: var(--muted); font-size: 11px; }
+    .mask-gate-rater { display: grid; gap: 5px; margin: 10px 0 4px; font-size: 11px; color: var(--muted); }
+    .mask-gate-rater input {
+      min-width: 0; height: 34px; padding: 0 9px; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--surface); color: var(--text); font: inherit;
+    }
+    .mask-gate-primary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+    .mask-gate-primary-actions .wide { grid-column: 1 / -1; }
+    .mask-gate-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .mask-gate-variant { display: grid; gap: 5px; margin: 0; text-align: center; font-size: 11px; font-weight: 700; }
+    .mask-gate-variant canvas {
+      display: block; width: 100%; aspect-ratio: 1; object-fit: contain; border: 1px solid var(--border);
+      background: #f5f5f2;
+    }
 
     .stage {
       min-width: 0;
@@ -525,13 +538,22 @@
       <section class="section mask-gate-panel" id="maskGatePanel" hidden>
         <h2 class="section-title">Mask Gate</h2>
         <p class="mask-gate-sample" id="maskGateSample">等待 sidecar</p>
-        <fieldset class="mask-gate-fieldset">
+        <label class="mask-gate-rater">评审者
+          <input id="maskGateRaterId" type="text" value="local-rater" autocomplete="off">
+        </label>
+        <fieldset class="mask-gate-fieldset" id="maskGateInitialFieldset">
           <legend>初始主体</legend>
           <div class="mask-gate-options">
             <label class="mask-gate-option"><input type="radio" name="gateInitialAcceptable" value="false">需修正</label>
             <label class="mask-gate-option"><input type="radio" name="gateInitialAcceptable" value="true">可接受</label>
           </div>
         </fieldset>
+        <div class="mask-gate-primary-actions">
+          <button class="file-button wide" id="maskGateLockInitialButton" type="button" disabled>锁定初始评价</button>
+          <button class="file-button" id="maskGateAcceptButton" type="button" hidden>接受并完成</button>
+          <button class="file-button" id="maskGateEditButton" type="button" hidden>开始修正</button>
+          <button class="file-button" id="maskGateErrorButton" type="button" hidden>记录异常</button>
+        </div>
         <fieldset class="mask-gate-fieldset" id="maskGateAfterFieldset" disabled>
           <legend>确认后主体</legend>
           <div class="mask-gate-options">
@@ -540,10 +562,14 @@
           </div>
         </fieldset>
         <fieldset class="mask-gate-fieldset" id="maskGatePreferenceFieldset" disabled>
-          <legend>图纸偏好</legend>
+          <legend>图纸 A/B</legend>
+          <div class="mask-gate-comparison" id="maskGateComparison" hidden>
+            <figure class="mask-gate-variant"><canvas id="maskGateCanvasA" width="160" height="160"></canvas><figcaption>方案 A</figcaption></figure>
+            <figure class="mask-gate-variant"><canvas id="maskGateCanvasB" width="160" height="160"></canvas><figcaption>方案 B</figcaption></figure>
+          </div>
           <div class="mask-gate-options">
-            <label class="mask-gate-option"><input type="radio" name="gatePreference" value="before">Before</label>
-            <label class="mask-gate-option"><input type="radio" name="gatePreference" value="after">After</label>
+            <label class="mask-gate-option"><input type="radio" name="gatePreference" value="left">A</label>
+            <label class="mask-gate-option"><input type="radio" name="gatePreference" value="right">B</label>
             <label class="mask-gate-option"><input type="radio" name="gatePreference" value="tie">相近</label>
           </div>
         </fieldset>
@@ -729,7 +755,10 @@
     } from '/packages/pattern-core/dist/index.js'
     import { createMaskEditorController } from './mask-editor.mjs'
     import {
+      createBlindComparison,
+      createGatePatternSnapshot,
       createMaskGateAttempt,
+      detectMaskGateDevice,
       downloadMaskGateAttempt,
       loadMaskGateSample,
     } from './mask-gate.mjs'
@@ -791,8 +820,17 @@
       maskConfirmButton: document.querySelector('#maskConfirmButton'),
       maskGatePanel: document.querySelector('#maskGatePanel'),
       maskGateSample: document.querySelector('#maskGateSample'),
+      maskGateRaterId: document.querySelector('#maskGateRaterId'),
+      maskGateInitialFieldset: document.querySelector('#maskGateInitialFieldset'),
+      maskGateLockInitialButton: document.querySelector('#maskGateLockInitialButton'),
+      maskGateAcceptButton: document.querySelector('#maskGateAcceptButton'),
+      maskGateEditButton: document.querySelector('#maskGateEditButton'),
+      maskGateErrorButton: document.querySelector('#maskGateErrorButton'),
       maskGateAfterFieldset: document.querySelector('#maskGateAfterFieldset'),
       maskGatePreferenceFieldset: document.querySelector('#maskGatePreferenceFieldset'),
+      maskGateComparison: document.querySelector('#maskGateComparison'),
+      maskGateCanvasA: document.querySelector('#maskGateCanvasA'),
+      maskGateCanvasB: document.querySelector('#maskGateCanvasB'),
       maskGateExportButton: document.querySelector('#maskGateExportButton'),
       maskGateStatus: document.querySelector('#maskGateStatus'),
     }
@@ -811,6 +849,13 @@
     let currentGenerationId
     let maskGateContext
     let maskGateRun
+    let maskGateInitialRating
+    let maskGateBeforeCandidate
+    let maskGateAfterCandidate
+    let maskGateBeforeSnapshot
+    let maskGateAfterSnapshot
+    let maskGateBlindComparison
+    let maskGatePointerType
 
     const maskEditor = createMaskEditorController({
       elements: {
@@ -845,13 +890,27 @@
         setStatus('主体已确认', 'ready')
         const result = await generate()
         if (maskGateContext !== undefined && maskGateRun !== undefined) {
+          maskGateAfterCandidate = result?.recommended ?? result?.bestEffort
+          if (result === undefined || maskGateAfterCandidate === undefined) {
+            recordMaskGateError(new Error('修正后图纸生成失败'))
+            return
+          }
+          maskGateAfterSnapshot = maskGateAfterCandidate === undefined
+            ? undefined
+            : await createGatePatternSnapshot({
+              generationId: result.generationId,
+              candidate: maskGateAfterCandidate,
+              options: generationOptions(),
+            })
+          maskGateBlindComparison = await createBlindComparison(maskGateIdentity())
           maskGateRun = {
             ...maskGateRun,
             outcome: 'confirmed',
             correctionEndedAt,
-            afterGenerationId: result?.generationId,
+            outcomeAt: correctionEndedAt,
             session,
           }
+          renderMaskGateComparison()
           updateMaskGatePanel()
         }
       },
@@ -861,9 +920,13 @@
           ...maskGateRun,
           outcome: 'cancelled',
           correctionEndedAt: Date.now(),
+          outcomeAt: Date.now(),
           session,
         }
         updateMaskGatePanel()
+      },
+      onFirstPointer: (pointerType) => {
+        maskGatePointerType ??= pointerType
       },
     })
 
@@ -874,7 +937,8 @@
 
     function setBusy(busy) {
       elements.generateButton.disabled = busy
-      elements.openMaskEditorButton.disabled = busy
+      elements.openMaskEditorButton.disabled = busy || (maskGateContext !== undefined
+        && (maskGateInitialRating?.acceptable !== false || maskGateRun !== undefined))
       elements.stage.dataset.busy = String(busy)
       if (busy) setStatus('生成中', 'busy')
     }
@@ -894,32 +958,92 @@
       return document.querySelector(`input[name="${name}"]:checked`)?.value
     }
 
-    function maskGateDeviceClass() {
-      if (window.innerWidth <= 600) return 'mobile'
-      if (window.innerWidth <= 900) return 'tablet'
-      return 'desktop'
+    function maskGateIdentity() {
+      return {
+        protocolVersion: maskGateContext.protocolVersion,
+        datasetId: maskGateContext.datasetId,
+        manifestFingerprint: maskGateContext.manifestFingerprint,
+        imageId: maskGateContext.sample.imageId,
+        raterId: elements.maskGateRaterId.value.trim(),
+      }
+    }
+
+    function fullMaskGateIdentity() {
+      return {
+        ...maskGateIdentity(),
+        attemptId: `${maskGateContext.datasetId}:${maskGateContext.sample.imageId}:${elements.maskGateRaterId.value.trim()}`,
+        sampleOrder: maskGateContext.sample.sampleOrder,
+        sampleOrderSeed: maskGateContext.sampleOrderSeed,
+        coreCommit: maskGateContext.commits.core,
+        demoCommit: maskGateContext.commits.demo,
+        gatewayCommit: maskGateContext.commits.gateway,
+        modelConfigurationId: maskGateContext.modelConfigurationId,
+      }
+    }
+
+    function renderMaskGateComparison() {
+      if (maskGateBlindComparison === undefined || maskGateBeforeCandidate === undefined
+        || maskGateAfterCandidate === undefined) {
+        elements.maskGateComparison.hidden = true
+        return
+      }
+      const left = maskGateBlindComparison.leftVariant === 'before'
+        ? maskGateBeforeCandidate
+        : maskGateAfterCandidate
+      const right = maskGateBlindComparison.leftVariant === 'before'
+        ? maskGateAfterCandidate
+        : maskGateBeforeCandidate
+      drawPattern(elements.maskGateCanvasA, left.pattern, { maximum: 320, beads: true })
+      drawPattern(elements.maskGateCanvasB, right.pattern, { maximum: 320, beads: true })
+      elements.maskGateComparison.hidden = false
     }
 
     function updateMaskGatePanel() {
       if (maskGateContext === undefined) return
-      const initial = selectedGateValue('gateInitialAcceptable')
+      const selectedInitial = selectedGateValue('gateInitialAcceptable')
+      const initialLocked = maskGateInitialRating !== undefined
+      const confirmed = maskGateRun?.outcome === 'confirmed'
+      const terminal = ['accepted', 'confirmed', 'cancelled', 'error'].includes(maskGateRun?.outcome)
       const subject = selectedGateValue('gateSubjectAcceptable')
       const preference = selectedGateValue('gatePreference')
-      const confirmed = maskGateRun?.outcome === 'confirmed'
-      const cancelled = maskGateRun?.outcome === 'cancelled'
+      elements.maskGateRaterId.disabled = initialLocked
+      elements.maskGateInitialFieldset.disabled = initialLocked
+      elements.openMaskEditorButton.disabled = initialLocked === false
+        || maskGateInitialRating?.acceptable !== false
+        || maskGateRun !== undefined
+      elements.maskGateLockInitialButton.disabled = initialLocked
+        || selectedInitial === undefined
+        || elements.maskGateRaterId.value.trim().length === 0
+        || maskGateBeforeSnapshot === undefined
+      elements.maskGateLockInitialButton.hidden = initialLocked
+      elements.maskGateAcceptButton.hidden = initialLocked === false
+        || maskGateInitialRating?.acceptable === false
+        || terminal
+      elements.maskGateEditButton.hidden = initialLocked === false
+        || maskGateInitialRating?.acceptable === true
+        || maskGateRun !== undefined
+      elements.maskGateErrorButton.hidden = initialLocked === false || terminal
       elements.maskGateAfterFieldset.disabled = confirmed === false
-      elements.maskGatePreferenceFieldset.disabled = confirmed === false
-      elements.maskGateExportButton.disabled = initial === undefined
+      elements.maskGatePreferenceFieldset.disabled = confirmed === false || subject === undefined
+      elements.maskGateComparison.hidden = confirmed === false || subject === undefined
+      elements.maskGateExportButton.disabled = terminal === false
         || (confirmed && (subject === undefined || preference === undefined
-          || maskGateRun.afterGenerationId === undefined))
-        || (confirmed === false && cancelled === false)
-      elements.maskGateStatus.textContent = confirmed
-        ? '主体已确认，请完成前后判断并导出'
-        : cancelled
-          ? '本次编辑已取消，可导出取消记录'
-          : maskGateRun === undefined
-            ? '打开主体编辑器开始记录'
-            : '正在记录修正时间'
+          || maskGateAfterSnapshot === undefined))
+      elements.maskGateStatus.textContent = initialLocked === false
+        ? '评价初始主体并锁定'
+        : maskGateRun?.outcome === 'accepted'
+          ? '原始主体已接受，可导出'
+          : maskGateRun?.outcome === 'confirmed'
+            ? subject === undefined
+              ? '评价修正后的主体'
+              : '比较方案 A 与方案 B'
+            : maskGateRun?.outcome === 'cancelled'
+              ? '本次编辑已取消，可导出'
+              : maskGateRun?.outcome === 'error'
+                ? '异常已记录，可导出'
+                : maskGateRun === undefined
+                  ? '初始评价已锁定，开始修正'
+                  : '正在记录修正时间'
     }
 
     async function initializeMaskGate() {
@@ -930,7 +1054,12 @@
       setStatus('加载 Mask Gate sidecar', 'busy')
       const loaded = await loadMaskGateSample({ indexUrl, sampleId })
       maskGateContext = {
+        protocolVersion: loaded.protocolVersion,
         datasetId: loaded.datasetId,
+        manifestFingerprint: loaded.manifestFingerprint,
+        sampleOrderSeed: loaded.sampleOrderSeed,
+        modelConfigurationId: loaded.modelConfigurationId,
+        commits: loaded.commits,
         sample: loaded.sample,
       }
       sourceImage = loaded.image
@@ -938,33 +1067,71 @@
       originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
       savedMaskEditSession = undefined
       elements.maskGatePanel.hidden = false
-      elements.maskGateSample.textContent = `${loaded.sample.imageId} · ${loaded.sample.failureType}`
+      const raterId = params.get('rater') ?? localStorage.getItem('maskGateRaterId')
+      if (raterId !== null && raterId.trim().length > 0) elements.maskGateRaterId.value = raterId
+      elements.maskGateSample.textContent = `${loaded.sample.imageId} · ${loaded.sample.failureTags.join(' / ')}`
       elements.fileName.textContent = loaded.sample.imageId
       elements.fileInput.disabled = true
       updateMaskGatePanel()
     }
 
+    function lockMaskGateInitialRating() {
+      if (maskGateContext === undefined || maskGateBeforeSnapshot === undefined) return
+      const value = selectedGateValue('gateInitialAcceptable')
+      if (value === undefined || elements.maskGateRaterId.value.trim().length === 0) return
+      localStorage.setItem('maskGateRaterId', elements.maskGateRaterId.value.trim())
+      maskGateInitialRating = { acceptable: value === 'true', at: Date.now() }
+      updateMaskGatePanel()
+    }
+
+    function acceptMaskGateOriginal() {
+      const now = Date.now()
+      maskGateRun = { outcome: 'accepted', outcomeAt: now }
+      updateMaskGatePanel()
+    }
+
+    function recordMaskGateError(error = new Error('Manual gate error')) {
+      const now = Date.now()
+      maskGateRun = {
+        ...(maskGateRun ?? {}),
+        outcome: 'error',
+        outcomeAt: now,
+        correctionEndedAt: maskGateRun?.correctionStartedAt === undefined ? undefined : now,
+        error: {
+          code: 'manual-gate-error',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      }
+      updateMaskGatePanel()
+    }
+
     function exportMaskGateAttempt() {
       if (maskGateContext === undefined || maskGateRun === undefined) return
-      const initialSubjectAcceptable = selectedGateValue('gateInitialAcceptable') === 'true'
       const confirmed = maskGateRun.outcome === 'confirmed'
       const attempt = createMaskGateAttempt({
-        imageId: maskGateContext.sample.imageId,
+        ...fullMaskGateIdentity(),
         outcome: maskGateRun.outcome,
+        initialRatingAt: maskGateInitialRating.at,
+        initialSubjectAcceptable: maskGateInitialRating.acceptable,
+        outcomeAt: maskGateRun.outcomeAt,
         correctionStartedAt: maskGateRun.correctionStartedAt,
         correctionEndedAt: maskGateRun.correctionEndedAt,
-        beforeGenerationId: maskGateRun.beforeGenerationId,
-        afterGenerationId: maskGateRun.afterGenerationId,
-        initialSubjectAcceptable,
+        beforeSnapshot: maskGateBeforeSnapshot,
+        afterSnapshot: maskGateAfterSnapshot,
         subjectAcceptable: confirmed
           ? selectedGateValue('gateSubjectAcceptable') === 'true'
-          : false,
-        patternPreference: confirmed ? selectedGateValue('gatePreference') : 'unrated',
-        deviceClass: maskGateDeviceClass(),
+          : undefined,
+        blindComparison: confirmed
+          ? { ...maskGateBlindComparison, choice: selectedGateValue('gatePreference') }
+          : undefined,
+        ratedAt: confirmed ? Date.now() : undefined,
+        device: detectMaskGateDevice(window, maskGatePointerType),
         session: maskGateRun.session,
+        error: maskGateRun.error,
       })
       window.__maskGateAttempt = attempt
       downloadMaskGateAttempt(attempt)
+      elements.maskGateExportButton.disabled = true
       elements.maskGateStatus.textContent = 'attempt 已导出'
     }
 
@@ -1075,6 +1242,42 @@
       return { mode: 'fixed', size: { width: size, height: size } }
     }
 
+    function generationOptions() {
+      return {
+        canvas: canvasOptions(),
+        maxColors: Number(elements.maxColors.value),
+        maxCandidates: 10,
+        styles: selectedStyles(),
+        baseline: selectedBaseline,
+        backgroundRgb: [245, 245, 242],
+        structure: {
+          importanceStrength: 0,
+          edgeStrength: 0.35,
+          valueLevels: selectedValueLevels,
+          occupancyMode: selectedOccupancy,
+          shapeRefinementIterations: 2,
+        },
+        optimization: elements.cleanGrid.checked
+          ? {
+            minRegionSize: 2,
+            isolatedPixelPenalty: 1,
+            stripePenalty: 1,
+            aliasPenalty: 1,
+            paletteCoherence: 1.15,
+            localSearchIterations: 2,
+            edgeProtection: 0.8,
+          }
+          : {
+            minRegionSize: 1,
+            isolatedPixelPenalty: 0,
+            stripePenalty: 0,
+            aliasPenalty: 0,
+            paletteCoherence: 0,
+            localSearchIterations: 0,
+          },
+      }
+    }
+
     async function generate() {
       setBusy(true)
       await new Promise((resolve) => requestAnimationFrame(resolve))
@@ -1088,39 +1291,7 @@
             confidence: sourceAnalysis.confidence,
             modelVersions: sourceAnalysis.modelVersions,
           },
-          options: {
-            canvas: canvasOptions(),
-            maxColors: Number(elements.maxColors.value),
-            maxCandidates: 10,
-            styles: selectedStyles(),
-            baseline: selectedBaseline,
-            backgroundRgb: [245, 245, 242],
-            structure: {
-              importanceStrength: 0,
-              edgeStrength: 0.35,
-              valueLevels: selectedValueLevels,
-              occupancyMode: selectedOccupancy,
-              shapeRefinementIterations: 2,
-            },
-            optimization: elements.cleanGrid.checked
-              ? {
-                minRegionSize: 2,
-                isolatedPixelPenalty: 1,
-                stripePenalty: 1,
-                aliasPenalty: 1,
-                paletteCoherence: 1.15,
-                localSearchIterations: 2,
-                edgeProtection: 0.8,
-              }
-              : {
-                minRegionSize: 1,
-                isolatedPixelPenalty: 0,
-                stripePenalty: 0,
-                aliasPenalty: 0,
-                paletteCoherence: 0,
-                localSearchIterations: 0,
-              },
-          },
+          options: generationOptions(),
         })
         const primary = result.recommended ?? result.bestEffort
         if (primary === undefined) throw new Error('当前参数没有生成候选方案')
@@ -1136,6 +1307,15 @@
           setStatus('关键特征表达不足，请扩大画布、缩小主体范围或调整关键点', 'warning')
         }
         currentGenerationId = result.generationId
+        if (maskGateContext !== undefined && maskGateBeforeSnapshot === undefined) {
+          maskGateBeforeCandidate = primary
+          maskGateBeforeSnapshot = await createGatePatternSnapshot({
+            generationId: result.generationId,
+            candidate: primary,
+            options: generationOptions(),
+          })
+          updateMaskGatePanel()
+        }
         return result
       } catch (error) {
         console.error(error)
@@ -1369,14 +1549,15 @@
       }
     })
     elements.generateButton.addEventListener('click', generate)
-    elements.openMaskEditorButton.addEventListener('click', () => {
+    function openMaskEditor() {
       if (maskGateContext !== undefined) {
+        if (maskGateInitialRating?.acceptable !== false || maskGateRun !== undefined) return
         for (const input of document.querySelectorAll(
           'input[name="gateSubjectAcceptable"], input[name="gatePreference"]',
         )) input.checked = false
+        maskGatePointerType = undefined
         maskGateRun = {
           correctionStartedAt: Date.now(),
-          beforeGenerationId: currentGenerationId,
         }
         updateMaskGatePanel()
       }
@@ -1385,8 +1566,14 @@
         evidence: originalSubjectEvidence,
         editSession: savedMaskEditSession,
       })
-    })
+    }
+    elements.openMaskEditorButton.addEventListener('click', openMaskEditor)
     elements.maskGatePanel.addEventListener('change', updateMaskGatePanel)
+    elements.maskGateRaterId.addEventListener('input', updateMaskGatePanel)
+    elements.maskGateLockInitialButton.addEventListener('click', lockMaskGateInitialRating)
+    elements.maskGateAcceptButton.addEventListener('click', acceptMaskGateOriginal)
+    elements.maskGateEditButton.addEventListener('click', openMaskEditor)
+    elements.maskGateErrorButton.addEventListener('click', () => recordMaskGateError())
     elements.maskGateExportButton.addEventListener('click', exportMaskGateAttempt)
     elements.toggleGridButton.addEventListener('click', () => {
       showGrid = showGrid === false

@@ -1,3 +1,5 @@
+const protocolVersion = 'mask-gate-v2'
+
 function text(value, name) {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new TypeError(`${name} must be a non-empty string`)
@@ -10,46 +12,201 @@ function finite(value, name) {
   return value
 }
 
+function integer(value, name, minimum = 0) {
+  if (Number.isInteger(value) === false || value < minimum) {
+    throw new RangeError(`${name} must be an integer greater than or equal to ${minimum}`)
+  }
+  return value
+}
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]),
+    )
+  }
+  return value
+}
+
+async function sha256(value) {
+  const bytes = new TextEncoder().encode(
+    typeof value === 'string' ? value : JSON.stringify(canonicalize(value)),
+  )
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return [...new Uint8Array(digest)]
+    .map((entry) => entry.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+function snapshot(value, name) {
+  if (value === null || typeof value !== 'object') throw new TypeError(`${name} must be an object`)
+  return {
+    generationId: text(value.generationId, `${name}.generationId`),
+    candidateId: text(value.candidateId, `${name}.candidateId`),
+    patternHash: text(value.patternHash, `${name}.patternHash`),
+    optionsHash: text(value.optionsHash, `${name}.optionsHash`),
+    width: integer(value.width, `${name}.width`, 1),
+    height: integer(value.height, `${name}.height`, 1),
+    colorCount: integer(value.colorCount, `${name}.colorCount`),
+    totalBeads: integer(value.totalBeads, `${name}.totalBeads`),
+  }
+}
+
+function device(value) {
+  if (value === null || typeof value !== 'object') throw new TypeError('device must be an object')
+  if (['desktop', 'tablet', 'mobile'].includes(value.class) === false) {
+    throw new RangeError('device.class has an unsupported value')
+  }
+  if (['mouse', 'touch', 'pen'].includes(value.inputModality) === false) {
+    throw new RangeError('device.inputModality has an unsupported value')
+  }
+  return {
+    class: value.class,
+    inputModality: value.inputModality,
+    viewportWidth: integer(value.viewportWidth, 'device.viewportWidth', 1),
+    viewportHeight: integer(value.viewportHeight, 'device.viewportHeight', 1),
+    devicePixelRatio: finite(value.devicePixelRatio, 'device.devicePixelRatio'),
+    maxTouchPoints: integer(value.maxTouchPoints, 'device.maxTouchPoints'),
+    platform: text(value.platform, 'device.platform'),
+  }
+}
+
+function identity(input) {
+  if (input.protocolVersion !== protocolVersion) {
+    throw new RangeError(`protocolVersion must equal ${protocolVersion}`)
+  }
+  return {
+    protocolVersion,
+    attemptId: text(input.attemptId, 'attemptId'),
+    datasetId: text(input.datasetId, 'datasetId'),
+    manifestFingerprint: text(input.manifestFingerprint, 'manifestFingerprint'),
+    imageId: text(input.imageId, 'imageId'),
+    raterId: text(input.raterId, 'raterId'),
+    sampleOrder: integer(input.sampleOrder, 'sampleOrder', 1),
+    sampleOrderSeed: text(input.sampleOrderSeed, 'sampleOrderSeed'),
+    coreCommit: text(input.coreCommit, 'coreCommit'),
+    demoCommit: text(input.demoCommit, 'demoCommit'),
+    gatewayCommit: text(input.gatewayCommit, 'gatewayCommit'),
+    modelConfigurationId: text(input.modelConfigurationId, 'modelConfigurationId'),
+  }
+}
+
 export function resolveMaskGateSample(indexUrl, index, sampleId) {
-  if (index?.schemaVersion !== 1 || Array.isArray(index.samples) === false) {
+  if (index?.schemaVersion !== 2 || index.protocolVersion !== protocolVersion
+    || Array.isArray(index.samples) === false) {
     throw new RangeError('Mask gate index schema is unsupported')
   }
   const datasetId = text(index.datasetId, 'index.datasetId')
   const sample = index.samples.find((entry) => entry.imageId === sampleId)
   if (sample === undefined) throw new RangeError(`Mask gate sample ${sampleId} is missing`)
   return {
+    protocolVersion,
     datasetId,
+    manifestFingerprint: text(index.manifestFingerprint, 'index.manifestFingerprint'),
+    sampleOrderSeed: text(index.sampleOrderSeed, 'index.sampleOrderSeed'),
+    modelConfigurationId: text(index.modelConfigurationId, 'index.modelConfigurationId'),
+    commits: index.commits,
     sample,
     analysisUrl: new URL(text(sample.analysis, 'sample.analysis'), indexUrl).toString(),
   }
 }
 
+export async function createBlindComparison(input) {
+  const seed = await sha256([
+    text(input.datasetId, 'datasetId'),
+    text(input.imageId, 'imageId'),
+    text(input.raterId, 'raterId'),
+    text(input.protocolVersion, 'protocolVersion'),
+  ].join('\0'))
+  return {
+    leftVariant: Number.parseInt(seed.slice(0, 8), 16) % 2 === 0 ? 'before' : 'after',
+    seed,
+  }
+}
+
+export async function createGatePatternSnapshot({ generationId, candidate, options }) {
+  if (candidate?.pattern === undefined) throw new TypeError('candidate.pattern must be present')
+  const pattern = candidate.pattern
+  return {
+    generationId: text(generationId, 'generationId'),
+    candidateId: text(candidate.id, 'candidate.id'),
+    patternHash: await sha256({
+      width: pattern.width,
+      height: pattern.height,
+      cells: pattern.cells,
+      metadata: pattern.metadata,
+    }),
+    optionsHash: await sha256(options),
+    width: integer(pattern.width, 'pattern.width', 1),
+    height: integer(pattern.height, 'pattern.height', 1),
+    colorCount: integer(candidate.materialCounts?.length ?? 0, 'colorCount'),
+    totalBeads: integer(pattern.metadata?.totalBeads ?? pattern.cells?.length ?? 0, 'totalBeads'),
+  }
+}
+
+export function detectMaskGateDevice(scope = globalThis, pointerType) {
+  const width = integer(Math.round(scope.innerWidth), 'innerWidth', 1)
+  const height = integer(Math.round(scope.innerHeight), 'innerHeight', 1)
+  const maxTouchPoints = integer(scope.navigator?.maxTouchPoints ?? 0, 'maxTouchPoints')
+  const inputModality = ['touch', 'pen', 'mouse'].includes(pointerType)
+    ? pointerType
+    : maxTouchPoints > 0 ? 'touch' : 'mouse'
+  return {
+    class: width <= 600 ? 'mobile' : width <= 900 ? 'tablet' : 'desktop',
+    inputModality,
+    viewportWidth: width,
+    viewportHeight: height,
+    devicePixelRatio: Number.isFinite(scope.devicePixelRatio) ? scope.devicePixelRatio : 1,
+    maxTouchPoints,
+    platform: String(scope.navigator?.userAgentData?.platform
+      ?? scope.navigator?.platform
+      ?? 'unknown'),
+  }
+}
+
 export function createMaskGateAttempt(input) {
+  const recordIdentity = identity(input)
   const outcome = text(input.outcome, 'outcome')
-  if (outcome !== 'confirmed' && outcome !== 'cancelled' && outcome !== 'error') {
+  if (['accepted', 'confirmed', 'cancelled', 'error'].includes(outcome) === false) {
     throw new RangeError('outcome has an unsupported value')
   }
-  const correctionStartedAt = finite(input.correctionStartedAt, 'correctionStartedAt')
-  const correctionEndedAt = finite(input.correctionEndedAt, 'correctionEndedAt')
-  if (correctionEndedAt < correctionStartedAt) {
-    throw new RangeError('correctionEndedAt must follow correctionStartedAt')
+  const initialSubjectAcceptable = Boolean(input.initialSubjectAcceptable)
+  if (outcome === 'accepted' && initialSubjectAcceptable === false) {
+    throw new RangeError('accepted outcome requires an acceptable initial rating')
+  }
+  if (outcome !== 'accepted' && initialSubjectAcceptable) {
+    throw new RangeError('edit outcomes require an initial failure rating')
   }
   const attempt = {
-    imageId: text(input.imageId, 'imageId'),
+    ...recordIdentity,
+    initialRatingAt: finite(input.initialRatingAt, 'initialRatingAt'),
+    initialSubjectAcceptable,
     outcome,
-    correctionStartedAt,
-    correctionEndedAt,
-    beforeGenerationId: text(input.beforeGenerationId, 'beforeGenerationId'),
-    initialSubjectAcceptable: Boolean(input.initialSubjectAcceptable),
-    subjectAcceptable: outcome === 'confirmed' ? Boolean(input.subjectAcceptable) : false,
-    patternPreference: outcome === 'confirmed'
-      ? text(input.patternPreference, 'patternPreference')
-      : 'unrated',
-    deviceClass: text(input.deviceClass, 'deviceClass'),
-    session: input.session,
+    outcomeAt: finite(input.outcomeAt, 'outcomeAt'),
+    beforeSnapshot: snapshot(input.beforeSnapshot, 'beforeSnapshot'),
+    device: device(input.device),
+  }
+  if (outcome !== 'accepted' && input.correctionStartedAt !== undefined) {
+    attempt.correctionStartedAt = finite(input.correctionStartedAt, 'correctionStartedAt')
+    attempt.correctionEndedAt = finite(input.correctionEndedAt, 'correctionEndedAt')
+    attempt.session = input.session
   }
   if (outcome === 'confirmed') {
-    attempt.afterGenerationId = text(input.afterGenerationId, 'afterGenerationId')
+    attempt.afterSnapshot = snapshot(input.afterSnapshot, 'afterSnapshot')
+    attempt.subjectAcceptable = Boolean(input.subjectAcceptable)
+    attempt.blindComparison = {
+      leftVariant: input.blindComparison?.leftVariant,
+      choice: input.blindComparison?.choice,
+      seed: text(input.blindComparison?.seed, 'blindComparison.seed'),
+    }
+    attempt.ratedAt = finite(input.ratedAt, 'ratedAt')
+  }
+  if (outcome === 'error') {
+    attempt.error = {
+      code: text(input.error?.code, 'error.code'),
+      message: text(input.error?.message, 'error.message'),
+    }
   }
   return attempt
 }
@@ -92,8 +249,9 @@ export async function loadMaskGateSample({ indexUrl, sampleId, fetch = globalThi
   const index = await (await fetchOk(fetch, absoluteIndexUrl, 'Mask gate index')).json()
   const resolved = resolveMaskGateSample(absoluteIndexUrl, index, sampleId)
   const metadata = await (await fetchOk(fetch, resolved.analysisUrl, 'Mask gate analysis')).json()
-  if (metadata.schemaVersion !== 1 || metadata.imageId !== sampleId
-    || metadata.datasetId !== resolved.datasetId) {
+  if (metadata.schemaVersion !== 2 || metadata.protocolVersion !== protocolVersion
+    || metadata.imageId !== sampleId || metadata.datasetId !== resolved.datasetId
+    || metadata.manifestFingerprint !== resolved.manifestFingerprint) {
     throw new RangeError('Mask gate sidecar identity differs from the index')
   }
   const sourceUrl = new URL(metadata.source.path, resolved.analysisUrl).toString()
@@ -129,7 +287,12 @@ export async function loadMaskGateSample({ indexUrl, sampleId, fetch = globalThi
       : { provenance: metadata.evidence.provenance }),
   }
   return {
+    protocolVersion,
     datasetId: resolved.datasetId,
+    manifestFingerprint: resolved.manifestFingerprint,
+    sampleOrderSeed: resolved.sampleOrderSeed,
+    modelConfigurationId: resolved.modelConfigurationId,
+    commits: resolved.commits,
     sample: resolved.sample,
     image,
     analysis: {

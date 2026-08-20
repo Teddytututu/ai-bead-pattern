@@ -23,6 +23,29 @@ function capturePageErrors(page) {
   return errors
 }
 
+async function openGate(page, rater = 'e2e-rater') {
+  await page.goto(`/apps/demo/?maskGateIndex=${encodeURIComponent(indexUrl)}&sample=wide-01&rater=${rater}`)
+  await expect(page.locator('#maskGatePanel')).toBeVisible()
+  await expect(page.locator('#maskGateLockInitialButton')).toBeDisabled()
+}
+
+async function lockInitial(page, acceptable) {
+  await page.locator(`input[name="gateInitialAcceptable"][value="${acceptable}"]`).check()
+  await expect(page.locator('#maskGateLockInitialButton')).toBeEnabled()
+  await page.locator('#maskGateLockInitialButton').click()
+  await expect(page.locator('#maskGateInitialFieldset')).toHaveAttribute('disabled', '')
+}
+
+async function downloadAttempt(page) {
+  const downloadPromise = page.waitForEvent('download')
+  await page.locator('#maskGateExportButton').click()
+  const download = await downloadPromise
+  const stream = await download.createReadStream()
+  const chunks = []
+  for await (const chunk of stream) chunks.push(chunk)
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+}
+
 test.beforeAll(async () => {
   await mkdir(fixtureDirectory, { recursive: true })
   const sourcePixels = Buffer.alloc(8 * 4 * 4, 255)
@@ -50,10 +73,30 @@ test.beforeAll(async () => {
     Float32Array.from(maskRaw, (value) => value / 255),
   )
   const upstreamRevision = 'rembg-http:birefnet-general-lite:e2e'
-  const metadata = {
-    schemaVersion: 1,
-    imageId: 'wide-01',
+  const commonIdentity = {
+    protocolVersion: 'mask-gate-v2',
     datasetId: 'demo-e2e',
+    manifestFingerprint: 'e2e-manifest-fingerprint',
+    sampleOrderSeed: 'e2e-order-seed',
+    modelConfigurationId: 'birefnet-general-lite-v1',
+    commits: {
+      core: 'core-e2e',
+      demo: 'demo-e2e',
+      gateway: 'gateway-e2e',
+    },
+  }
+  const metadata = {
+    schemaVersion: 2,
+    ...commonIdentity,
+    imageId: 'wide-01',
+    sampleOrder: 1,
+    sample: {
+      category: 'portrait',
+      cohort: 'targeted-failure',
+      failureTags: ['thin-structure'],
+      subjectCount: 1,
+      targetMobile: true,
+    },
     source: {
       path: 'wide-01.source.png',
       sha256: sha256(sourcePng),
@@ -83,13 +126,16 @@ test.beforeAll(async () => {
     modelVersions: { segmentation: 'rembg/birefnet-general-lite' },
   }
   const index = {
-    schemaVersion: 1,
-    datasetId: 'demo-e2e',
+    schemaVersion: 2,
+    ...commonIdentity,
     samples: [{
       imageId: 'wide-01',
       category: 'portrait',
-      cohort: 'failure',
-      failureType: 'thin-edge',
+      cohort: 'targeted-failure',
+      failureTags: ['thin-structure'],
+      subjectCount: 1,
+      targetMobile: true,
+      sampleOrder: 1,
       source: 'wide-01.source.png',
       mask: 'wide-01.mask.png',
       analysis: 'wide-01.analysis.json',
@@ -107,14 +153,27 @@ test.afterAll(async () => {
   await rm(fixtureDirectory, { recursive: true, force: true })
 })
 
-test('loads a real sidecar and exports a confirmed gate attempt', async ({ page }) => {
+test('exports an accepted V2 interaction', async ({ page }) => {
   const pageErrors = capturePageErrors(page)
-  await page.goto(`/apps/demo/?maskGateIndex=${encodeURIComponent(indexUrl)}&sample=wide-01`)
+  await openGate(page, 'accepted-rater')
+  await lockInitial(page, 'true')
+  await page.locator('#maskGateAcceptButton').click()
+  await expect(page.locator('#maskGateExportButton')).toBeEnabled()
 
-  await expect(page.locator('#fileName')).toHaveText('wide-01')
-  await expect(page.locator('#analysisSource')).toHaveText('AI 分割')
-  await expect(page.locator('#maskGatePanel')).toBeVisible()
-  await page.locator('#openMaskEditorButton').click()
+  const attempt = await downloadAttempt(page)
+  expect(attempt.outcome).toBe('accepted')
+  expect(attempt.initialSubjectAcceptable).toBe(true)
+  expect(attempt.protocolVersion).toBe('mask-gate-v2')
+  expect(attempt.beforeSnapshot.patternHash).toMatch(/^[a-f0-9]{64}$/)
+  expect('session' in attempt).toBe(false)
+  expect(pageErrors).toEqual([])
+})
+
+test('exports a confirmed V2 interaction with blind A/B evidence', async ({ page }) => {
+  const pageErrors = capturePageErrors(page)
+  await openGate(page, 'confirmed-rater')
+  await lockInitial(page, 'false')
+  await page.locator('#maskGateEditButton').click()
   await expect(page.locator('#maskEditorDialog')).toBeVisible()
   await expect(page.locator('#maskEditorCanvas')).toHaveJSProperty('width', 8)
   await expect(page.locator('#maskEditorCanvas')).toHaveJSProperty('height', 4)
@@ -128,70 +187,63 @@ test('loads a real sidecar and exports a confirmed gate attempt', async ({ page 
   await page.locator('#maskConfirmButton').click()
   await expect(page.locator('#maskEditorDialog')).toBeHidden()
 
-  await page.locator('input[name="gateInitialAcceptable"][value="false"]').check()
   await page.locator('input[name="gateSubjectAcceptable"][value="true"]').check()
-  await page.locator('input[name="gatePreference"][value="after"]').check()
+  await expect(page.locator('#maskGateComparison')).toBeVisible()
+  await page.locator('input[name="gatePreference"][value="left"]').check()
   await expect(page.locator('#maskGateExportButton')).toBeEnabled()
 
-  const downloadPromise = page.waitForEvent('download')
-  await page.locator('#maskGateExportButton').click()
-  const download = await downloadPromise
-  const stream = await download.createReadStream()
-  const chunks = []
-  for await (const chunk of stream) chunks.push(chunk)
-  const attempt = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-
-  expect(attempt.imageId).toBe('wide-01')
+  const attempt = await downloadAttempt(page)
   expect(attempt.outcome).toBe('confirmed')
   expect(attempt.session.strokes).toHaveLength(1)
-  expect(attempt.beforeGenerationId).toMatch(/^[a-f0-9]{32}$/)
-  expect(attempt.afterGenerationId).toMatch(/^[a-f0-9]{32}$/)
-  expect(attempt.correctionEndedAt).toBeGreaterThanOrEqual(attempt.correctionStartedAt)
-  expect(attempt.patternPreference).toBe('after')
+  expect(attempt.beforeSnapshot.patternHash).toMatch(/^[a-f0-9]{64}$/)
+  expect(attempt.afterSnapshot.patternHash).toMatch(/^[a-f0-9]{64}$/)
+  expect(attempt.blindComparison.choice).toBe('left')
+  expect(attempt.blindComparison.leftVariant).toMatch(/before|after/)
+  expect(attempt.device.inputModality).toBe('mouse')
   expect(pageErrors).toEqual([])
 })
 
-test('exports an unrated attempt when mask editing is cancelled', async ({ page }) => {
+test('exports a cancelled V2 interaction', async ({ page }) => {
   const pageErrors = capturePageErrors(page)
-  await page.goto(`/apps/demo/?maskGateIndex=${encodeURIComponent(indexUrl)}&sample=wide-01`)
-
-  await page.locator('input[name="gateInitialAcceptable"][value="false"]').check()
-  await page.locator('#openMaskEditorButton').click()
-  await expect(page.locator('#maskEditorDialog')).toBeVisible()
-
+  await openGate(page, 'cancelled-rater')
+  await lockInitial(page, 'false')
+  await page.locator('#maskGateEditButton').click()
   const canvas = page.locator('#maskEditorCanvas')
   const box = await canvas.boundingBox()
   await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5)
   await page.locator('#maskEditorCloseButton').click()
-  await expect(page.locator('#maskEditorDialog')).toBeHidden()
   await expect(page.locator('#maskGateExportButton')).toBeEnabled()
 
-  const downloadPromise = page.waitForEvent('download')
-  await page.locator('#maskGateExportButton').click()
-  const download = await downloadPromise
-  const stream = await download.createReadStream()
-  const chunks = []
-  for await (const chunk of stream) chunks.push(chunk)
-  const attempt = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-
-  expect(attempt.imageId).toBe('wide-01')
+  const attempt = await downloadAttempt(page)
   expect(attempt.outcome).toBe('cancelled')
-  expect(attempt.patternPreference).toBe('unrated')
-  expect(attempt.subjectAcceptable).toBe(false)
   expect(attempt.session.strokes).toHaveLength(1)
-  expect(attempt.beforeGenerationId).toMatch(/^[a-f0-9]{32}$/)
-  expect('afterGenerationId' in attempt).toBe(false)
-  expect(attempt.correctionEndedAt).toBeGreaterThanOrEqual(attempt.correctionStartedAt)
+  expect('afterSnapshot' in attempt).toBe(false)
   expect(pageErrors).toEqual([])
 })
 
-test('keeps the gate controls usable at 390 by 844', async ({ page }) => {
+test('exports an explicit V2 error interaction', async ({ page }) => {
+  const pageErrors = capturePageErrors(page)
+  await openGate(page, 'error-rater')
+  await lockInitial(page, 'false')
+  await page.locator('#maskGateErrorButton').click()
+  await expect(page.locator('#maskGateExportButton')).toBeEnabled()
+
+  const attempt = await downloadAttempt(page)
+  expect(attempt.outcome).toBe('error')
+  expect(attempt.error.code).toBe('manual-gate-error')
+  expect(pageErrors).toEqual([])
+})
+
+test('keeps the Gate usable at 390 by 844 and records touch-class metadata', async ({ page }) => {
   const pageErrors = capturePageErrors(page)
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(`/apps/demo/?maskGateIndex=${encodeURIComponent(indexUrl)}&sample=wide-01`)
+  await openGate(page, 'mobile-rater')
+  await lockInitial(page, 'true')
+  await page.locator('#maskGateAcceptButton').click()
+  const attempt = await downloadAttempt(page)
 
-  await expect(page.locator('#maskGatePanel')).toBeVisible()
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(1)
+  expect(attempt.device.class).toBe('mobile')
   expect(pageErrors).toEqual([])
 })

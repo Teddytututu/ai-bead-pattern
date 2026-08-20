@@ -23,13 +23,13 @@ if (values.manifest === undefined || values.output === undefined) {
   throw new Error('Usage: generate-sidecars --manifest <manifest.json> --output <directory>')
 }
 
-let gatewayCommit = 'unknown'
+let workspaceCommit = 'unknown'
 try {
   const [head, status] = await Promise.all([
     execFileAsync('git', ['rev-parse', 'HEAD']),
     execFileAsync('git', ['status', '--porcelain']),
   ])
-  gatewayCommit = `${head.stdout.trim()}${status.stdout.trim().length > 0 ? '-dirty' : ''}`
+  workspaceCommit = `${head.stdout.trim()}${status.stdout.trim().length > 0 ? '-dirty' : ''}`
 } catch {
   // Source identity remains explicit when git metadata is unavailable.
 }
@@ -44,7 +44,7 @@ const index = await generateMaskGateSidecars({
   provider,
   model: values.model,
   postProcessMask: values['raw-mask'] === false,
-  gatewayCommit,
+  workspaceCommit,
 })
 
 console.log(`Generated ${index.samples.length} BiRefNet sidecar set(s) in ${values.output}`)
