@@ -1,0 +1,92 @@
+import assert from 'node:assert/strict'
+import { describe, it } from 'node:test'
+
+import { refineGridClusters } from '../src/experimental.js'
+import type { Lab, MaterialColor } from '../src/index.js'
+
+const colors: readonly MaterialColor[] = [
+  { id: 'red', name: 'Red', hex: '#ff0000', rgb: [255, 0, 0], lab: [55, 75, 55] },
+  { id: 'blue', name: 'Blue', hex: '#0000ff', rgb: [0, 0, 255], lab: [35, 55, -85] },
+]
+
+function labs(size: number, value: Lab = [55, 75, 55]): readonly Lab[] {
+  return Array.from({ length: size }, () => value)
+}
+
+describe('unified grid refinement', () => {
+  it('removes an unsupported color when the unified energy improves', () => {
+    const result = refineGridClusters({
+      colorIds: [
+        'red', 'red', 'red',
+        'red', 'blue', 'red',
+        'red', 'red', 'red',
+      ],
+      width: 3,
+      height: 3,
+      activeMask: new Uint8Array(9).fill(1),
+      protectedCells: new Set(),
+      pixelLabs: labs(9),
+      colors,
+      boundaryStrength: new Float32Array(9),
+      importance: new Array(9).fill(0.5),
+      featurePlacements: [],
+      distanceMethod: 'delta-e-2000',
+      mode: 'fast',
+    })
+
+    assert.equal(result.colorIds[4], 'red')
+    assert.equal(result.changedCells, 1)
+    assert.ok(result.energyAfter < result.energyBefore)
+  })
+
+  it('keeps protected feature cells fixed', () => {
+    const result = refineGridClusters({
+      colorIds: [
+        'red', 'red', 'red',
+        'red', 'blue', 'red',
+        'red', 'red', 'red',
+      ],
+      width: 3,
+      height: 3,
+      activeMask: new Uint8Array(9).fill(1),
+      protectedCells: new Set([4]),
+      pixelLabs: labs(9),
+      colors,
+      boundaryStrength: new Float32Array(9),
+      importance: new Array(9).fill(0.5),
+      featurePlacements: [],
+      distanceMethod: 'delta-e-2000',
+      mode: 'quality',
+    })
+
+    assert.equal(result.colorIds[4], 'blue')
+  })
+
+  it('keeps quality refinement deterministic and at least as low-energy as fast refinement', () => {
+    const input = {
+      colorIds: [
+        'red', 'blue', 'red', 'blue',
+        'blue', 'red', 'blue', 'red',
+        'red', 'blue', 'red', 'blue',
+        'blue', 'red', 'blue', 'red',
+      ],
+      width: 4,
+      height: 4,
+      activeMask: new Uint8Array(16).fill(1),
+      protectedCells: new Set<number>(),
+      pixelLabs: labs(16),
+      colors,
+      boundaryStrength: new Float32Array(16),
+      importance: new Array(16).fill(0.2),
+      featurePlacements: [],
+      distanceMethod: 'delta-e-2000' as const,
+    }
+    const fast = refineGridClusters({ ...input, mode: 'fast' })
+    const first = refineGridClusters({ ...input, mode: 'quality' })
+    const second = refineGridClusters({ ...input, mode: 'quality' })
+
+    assert.ok(first.energyAfter <= fast.energyAfter + 1e-6)
+    assert.deepEqual(first.colorIds, second.colorIds)
+    assert.equal(first.energyAfter, second.energyAfter)
+  })
+})

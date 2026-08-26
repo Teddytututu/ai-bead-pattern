@@ -15,13 +15,15 @@ tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
 ```
 
-当前阶段进入 v0.3.4 Mask Correction。`pattern-core` 将视觉模型提供的主体 mask 投影到目标豆格，使用连续 signed distance、覆盖率、拓扑与毛刺成本优化边界；CanvasPlanner 与候选生成共用缓存后的 ShapeRasterization，多个颜色风格共享同一结构事实。全画面铺豆模式仍使用主体形状评价构图与边界，执行占位保持全画面。自动模式同时生成全图和主体形状候选，再按构图、特征格数、轮廓质量和制作成本排序。`ImageAnalysis` 现在支持带来源、revision、用户确认状态和 provenance 的主体证据；主体 mask、landmark、语义区域和自动裁剪分别使用自己的置信度。用户确认状态提升系统对 mask 的信任度，同时保留原始 confidence。AI、透明通道、本地启发式和人工修正都有正式来源类型，融合结果经过固定优先级与 canonical 排序，输入顺序变化仍保持同一结果身份。
+当前主线已到 `pattern-core v0.7.0`。生成顺序已经落成 CanvasPlan、FeaturePlacement、StructurePlan、ValuePlan、PalettePlan、Unified Grid Refinement 和 Preference Aggregation。人物五官先确定离散格位，语义区域再合并和重映射，区域明暗角色随后映射到真实材料色号，最后通过 Fast / Quality 两档统一能量整理孤立格、细条、棋盘锯齿与双眼对称。A/B/Tie 记录可以直接进入 Bradley–Terry 聚合，输出稳定的候选效用分数和排序。
 
 v0.3.3.1 Evidence Performance Hardening 使用流式数值指纹处理大型 mask 和 importance map，并在 `pattern-core` 内规范化 landmark、semantic region 与 provenance 顺序，语义相同的分析输入会生成相同 identity。
 
 Mask Correction Engine 已加入原图归一化坐标笔迹、添加/擦除软笔刷、连续路径插值、草稿与确认分离，以及稳定 revision。`MaskEditSession` 使用完整笔迹历史和 cursor 支持撤销、重做与分支编辑。确认后的证据保留模型置信度和 provenance，并追加 `mask-editor` 人工来源。修正作用域限定为 subject occupancy，语义区域继续由独立视觉证据管理。
 
 Demo 已加入主体修正编辑器，支持添加、擦除、三档笔刷、撤销、重做、重置和确认生成。原始主体、用户添加与用户擦除使用独立覆盖色显示；画布按原图比例 contain 显示，横图与竖图在桌面和手机宽度下保持比例。拖动阶段使用增量 Canvas 2D 预览，松手后由 Core 精确重建一次；待确认状态会提示取消操作将放弃本次修改。完整生成只在确认后触发一次，已确认笔迹在再次打开时继续保留。
+
+工作台同时展示 Structure / Value / Palette / Grid Refinement 诊断、材料统计和通用候选盲评。偏好记录保存在浏览器本地，可对当前候选运行 Bradley–Terry 排序。
 
 ## 文档
 
@@ -75,8 +77,14 @@ Demo 已加入主体修正编辑器，支持添加、擦除、三档笔刷、撤
 - 原图坐标 Mask Correction Engine、Session 撤销重做与确定性人工确认 revision
 - 线性轮廓追踪、面积覆盖栅格化与 Signed Distance Field
 - 全图与主体形状占位候选搜索
+- 语义区域图、区域合并、边界简化与 PIA-lite sourceMapping
+- 眼睛、嘴和鼻子的模板搜索、联合放置与材料色角色解析
+- 区域级 light / base / shadow / outline 明暗规划
+- 全局真实材料色子集与角色分配
+- Fast / Quality 统一网格精修、能量单调检查与对称质量指标
+- A/B/Tie 本地采集与 Bradley–Terry 偏好聚合
 
-下一批工作安排为 Mask Failure Gate，随后接入人物语义分析和 FeatureConstraint 模板搜索。
+下一阶段使用独立图片和人工标签建立真实偏好集，按来源图片切分训练与评测，并扩展宠物关键点和身份花纹规划。
 
 浏览器体验页：`apps/demo/index.html`
 

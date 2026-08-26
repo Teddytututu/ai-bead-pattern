@@ -4,6 +4,7 @@ import { appendFile, readFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
 
 import { collectMaskGateRecord } from '../src/collect.mjs'
+import { resolveCliPath } from '../src/cli-path.mjs'
 import { loadMaskGateManifest } from '../src/manifest.mjs'
 
 const { values } = parseArgs({
@@ -41,24 +42,26 @@ async function assertUnique(path, key, value) {
 }
 
 const [manifest, attemptSource] = await Promise.all([
-  loadMaskGateManifest(values.manifest),
-  readFile(values.input, 'utf8'),
+  loadMaskGateManifest(resolveCliPath(values.manifest)),
+  readFile(resolveCliPath(values.input), 'utf8'),
 ])
 const attempt = JSON.parse(attemptSource)
 const sample = manifest.samples.find((entry) => entry.imageId === attempt.imageId)
 if (sample === undefined) throw new RangeError(`Manifest sample ${attempt.imageId} is missing`)
 const result = await collectMaskGateRecord({
   sample,
-  sidecarPath: values.sidecar,
+  sidecarPath: resolveCliPath(values.sidecar),
   attempt,
 })
-await assertUnique(values.records, 'imageId', result.interaction.imageId)
+const recordsPath = resolveCliPath(values.records)
+const preferencesPath = resolveCliPath(values.preferences)
+await assertUnique(recordsPath, 'imageId', result.interaction.imageId)
 if (result.preference !== undefined) {
-  await assertUnique(values.preferences, 'preferenceId', result.preference.preferenceId)
+  await assertUnique(preferencesPath, 'preferenceId', result.preference.preferenceId)
 }
-await appendFile(values.records, `${JSON.stringify(result.interaction)}\n`)
+await appendFile(recordsPath, `${JSON.stringify(result.interaction)}\n`)
 if (result.preference !== undefined) {
-  await appendFile(values.preferences, `${JSON.stringify(result.preference)}\n`)
+  await appendFile(preferencesPath, `${JSON.stringify(result.preference)}\n`)
 }
 const duration = result.interaction.correctionDurationMs ?? 0
 console.log(

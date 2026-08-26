@@ -36,7 +36,7 @@ export const defaultGateThresholds = Object.freeze({
   medianStrokeCount: 6,
   afterPreferenceRate: 0.75,
   controlPreservationRate: 0.9,
-  minimumPreferenceRatingsPerConfirmedSample: 1,
+  minimumPreferenceRatingsPerConfirmedSample: 2,
 })
 
 function median(values) {

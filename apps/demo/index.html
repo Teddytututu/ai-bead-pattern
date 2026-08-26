@@ -28,6 +28,7 @@
     }
 
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
 
     html, body { margin: 0; min-height: 100%; }
 
@@ -77,7 +78,7 @@
     .brand-mark span:nth-child(2), .brand-mark span:nth-child(6), .brand-mark span:nth-child(7) { background: var(--teal); }
     .brand-mark span:nth-child(3), .brand-mark span:nth-child(4), .brand-mark span:nth-child(8) { background: var(--yellow); }
 
-    h1 { font-size: 17px; line-height: 1.2; margin: 0; font-weight: 700; }
+    h1 { font-size: 17px; line-height: 1.2; margin: 0; font-weight: 700; white-space: nowrap; }
 
     .status {
       display: inline-flex;
@@ -86,9 +87,11 @@
       color: var(--muted);
       font-size: 12px;
       white-space: nowrap;
+      min-width: 0;
     }
 
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); }
+    .status-dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--teal); }
+    #statusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .status[data-state="busy"] .status-dot { background: var(--yellow); animation: pulse 0.9s ease-in-out infinite alternate; }
     .status[data-state="error"] .status-dot { background: var(--accent); }
     .status[data-state="warning"] .status-dot { background: #c47b18; }
@@ -171,6 +174,7 @@
     }
 
     .segmented.three { grid-template-columns: repeat(3, 1fr); }
+    .segmented.two { grid-template-columns: repeat(2, 1fr); }
 
     .segmented button {
       height: 34px;
@@ -404,6 +408,51 @@
     .text-button.primary:hover { background: #216b63; }
     .text-button:disabled { opacity: 0.45; cursor: default; }
 
+    .analysis-debug-dialog {
+      width: min(1180px, calc(100vw - 32px));
+      height: min(820px, calc(100dvh - 32px));
+      padding: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 24px 72px rgba(24, 30, 29, 0.24);
+    }
+
+    .analysis-debug-dialog::backdrop { background: rgba(23, 29, 28, 0.58); }
+
+    .analysis-debug-layout { height: 100%; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+    .analysis-debug-header {
+      min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+    }
+    .analysis-debug-header h2 { margin: 0; font-size: 16px; }
+    .analysis-debug-body { min-height: 0; display: grid; grid-template-columns: 154px minmax(0, 1fr) 270px; }
+    .analysis-debug-layers { min-width: 0; padding: 12px; border-right: 1px solid var(--border); overflow: auto; }
+    .analysis-debug-layer-list { display: grid; gap: 4px; }
+    .analysis-debug-layer {
+      min-height: 36px; padding: 0 10px; border: 1px solid transparent; border-radius: 4px;
+      background: transparent; color: var(--muted); text-align: left; cursor: pointer;
+    }
+    .analysis-debug-layer:hover { background: var(--surface-alt); color: var(--text); }
+    .analysis-debug-layer[aria-pressed="true"] { border-color: var(--border-strong); background: var(--text); color: #fff; font-weight: 700; }
+    .analysis-debug-layer:disabled { opacity: 0.38; cursor: default; }
+    .analysis-debug-workspace { min-width: 0; min-height: 0; display: grid; place-items: center; padding: 16px; overflow: hidden; background: #d9ddda; }
+    .analysis-debug-canvas-frame { width: 100%; height: 100%; min-width: 0; min-height: 0; display: grid; place-items: center; }
+    #analysisDebugCanvas {
+      display: block; width: auto; height: auto; max-width: 100%; max-height: 100%;
+      background: var(--surface-alt); outline: 1px solid var(--border-strong); box-shadow: var(--shadow);
+    }
+    .analysis-debug-meta { min-width: 0; padding: 14px; border-left: 1px solid var(--border); overflow: auto; }
+    .analysis-debug-meta h3 { margin: 0 0 12px; font-size: 15px; }
+    .analysis-debug-list { margin: 0; display: grid; gap: 10px; }
+    .analysis-debug-list div { min-width: 0; }
+    .analysis-debug-list dt { color: var(--muted); font-size: 11px; font-weight: 700; }
+    .analysis-debug-list dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+    .analysis-debug-landmark { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .analysis-debug-landmark h4 { margin: 0 0 5px; font-size: 13px; }
+    .analysis-debug-landmark p { margin: 3px 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+
     .canvas-shell {
       min-height: 0;
       display: grid;
@@ -447,6 +496,24 @@
     .summary-value { display: block; font-size: 15px; font-weight: 750; font-variant-numeric: tabular-nums; }
     .summary-label { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
 
+    .diagnostic-list { margin: 0; display: grid; gap: 0; border-top: 1px solid var(--border); }
+    .diagnostic-list div {
+      min-width: 0; min-height: 34px; display: grid; grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px; align-items: center; border-bottom: 1px solid var(--border);
+    }
+    .diagnostic-list dt { color: var(--muted); font-size: 11px; }
+    .diagnostic-list dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+
+    .preference-controls { display: grid; gap: 10px; }
+    .preference-comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .preference-variant { min-width: 0; display: grid; gap: 5px; margin: 0; text-align: center; font-size: 11px; font-weight: 700; }
+    .preference-variant canvas {
+      display: block; width: 100%; aspect-ratio: 1; border: 1px solid var(--border);
+      background: var(--surface-alt); image-rendering: pixelated;
+    }
+    .preference-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .preference-status { min-height: 18px; margin: 0; color: var(--muted); font-size: 11px; }
+
     .material-list { display: grid; gap: 1px; max-height: 330px; overflow: auto; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
     .material-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 9px; align-items: center; min-height: 34px; padding: 5px 2px; border-bottom: 1px solid var(--border); }
     .material-row:last-child { border-bottom: 0; }
@@ -466,8 +533,9 @@
     }
 
     @media (max-width: 760px) {
-      .app-header { padding: 0 12px; }
-      .status { font-size: 11px; }
+      .app-header { gap: 12px; padding: 0 12px; }
+      .brand { flex: 0 0 auto; }
+      .status { max-width: 58%; font-size: 11px; }
       .workspace { display: block; }
       .sidebar, .inspector { border: 0; overflow: visible; }
       .sidebar { border-bottom: 1px solid var(--border); }
@@ -483,6 +551,13 @@
       .mask-editor-workspace { padding: 8px; }
       .mask-editor-footer { align-items: stretch; flex-direction: column; }
       .mask-editor-footer .primary { width: 100%; }
+      .analysis-debug-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border: 0; border-radius: 0; }
+      .analysis-debug-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(280px, 1fr) auto; }
+      .analysis-debug-layers { padding: 8px; border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+      .analysis-debug-layer-list { display: flex; width: max-content; gap: 4px; }
+      .analysis-debug-layer { min-width: 76px; text-align: center; }
+      .analysis-debug-workspace { padding: 8px; }
+      .analysis-debug-meta { max-height: 220px; border-left: 0; border-top: 1px solid var(--border); }
     }
 
     @media (max-width: 420px) {
@@ -635,9 +710,16 @@
         <h2 class="section-title">整理</h2>
         <div class="check-list">
           <label class="check-item">
-            <span>网格整理</span>
+            <span>基础去噪</span>
             <span class="switch"><input id="cleanGrid" type="checkbox" checked><span class="switch-track"></span></span>
           </label>
+        </div>
+        <div class="control-group">
+          <div class="control-label"><span>聚类精修</span><span class="control-value" id="refinementModeValue">Quality</span></div>
+          <div class="segmented two" id="refinementModeControl" aria-label="聚类精修模式">
+            <button type="button" data-refinement="fast" aria-pressed="false">Fast</button>
+            <button type="button" data-refinement="quality" aria-pressed="true">Quality</button>
+          </div>
         </div>
       </section>
 
@@ -653,6 +735,7 @@
           <span class="stage-detail" id="patternDetail">32 × 32 · 0 色</span>
         </div>
         <div class="toolbar-actions">
+          <button class="text-button" id="openAnalysisDebugButton" type="button">分析图层</button>
           <button class="icon-button" id="toggleGridButton" type="button" title="切换网格" aria-label="切换网格" aria-pressed="true">#</button>
           <button class="icon-button" id="downloadButton" type="button" title="下载 PNG" aria-label="下载 PNG" disabled>↓</button>
         </div>
@@ -672,6 +755,23 @@
         </div>
       </section>
 
+      <section class="section" id="preferencePanel">
+        <h2 class="section-title">偏好比较</h2>
+        <div class="preference-controls">
+          <button class="text-button" id="preferenceStartButton" type="button" disabled>比较当前与下一方案</button>
+          <div class="preference-comparison" id="preferenceComparison" hidden>
+            <figure class="preference-variant"><canvas id="preferenceCanvasA" width="160" height="160"></canvas><figcaption>方案 A</figcaption></figure>
+            <figure class="preference-variant"><canvas id="preferenceCanvasB" width="160" height="160"></canvas><figcaption>方案 B</figcaption></figure>
+          </div>
+          <div class="preference-actions" id="preferenceActions" hidden>
+            <button class="text-button" type="button" data-preference-choice="left">A</button>
+            <button class="text-button" type="button" data-preference-choice="right">B</button>
+            <button class="text-button" type="button" data-preference-choice="tie">相近</button>
+          </div>
+          <p class="preference-status" id="preferenceStatus" role="status" aria-live="polite">等待两个候选方案</p>
+        </div>
+      </section>
+
       <section class="section">
         <h2 class="section-title">概览</h2>
         <div class="summary-grid">
@@ -680,11 +780,25 @@
           <div class="summary-item"><span class="summary-value" id="qualityScore">0</span><span class="summary-label">评分</span></div>
           <div class="summary-item"><span class="summary-value" id="paletteChanges">0</span><span class="summary-label">配色调整</span></div>
           <div class="summary-item"><span class="summary-value" id="gridEdits">0</span><span class="summary-label">网格整理</span></div>
+          <div class="summary-item"><span class="summary-value" id="gridRefinementChanges">0</span><span class="summary-label">聚类精修</span></div>
+          <div class="summary-item"><span class="summary-value" id="symmetryQuality">--</span><span class="summary-label">对称质量</span></div>
+          <div class="summary-item"><span class="summary-value" id="valueOrderAccuracy">--</span><span class="summary-label">明暗顺序</span></div>
           <div class="summary-item"><span class="summary-value" id="shapeScore">--</span><span class="summary-label">轮廓吻合</span></div>
           <div class="summary-item"><span class="summary-value" id="shapeCoverage">--</span><span class="summary-label">覆盖吻合</span></div>
           <div class="summary-item"><span class="summary-value" id="shapeComponents">--</span><span class="summary-label">连通块</span></div>
           <div class="summary-item"><span class="summary-value" id="shapeHoles">--</span><span class="summary-label">孔洞</span></div>
         </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">算法诊断</h2>
+        <dl class="diagnostic-list">
+          <div><dt>精修能量</dt><dd id="gridRefinementEnergy">--</dd></div>
+          <div><dt>结构区域</dt><dd id="structureRegionCount">--</dd></div>
+          <div><dt>五官格</dt><dd id="featurePlacementCount">--</dd></div>
+          <div><dt>明暗角色</dt><dd id="valueRoleCount">--</dd></div>
+          <div><dt>色板角色</dt><dd id="paletteRoleCount">--</dd></div>
+        </dl>
       </section>
 
       <section class="section">
@@ -743,6 +857,49 @@
     </div>
   </dialog>
 
+  <dialog class="analysis-debug-dialog" id="analysisDebugDialog" aria-labelledby="analysisDebugDialogTitle">
+    <div class="analysis-debug-layout">
+      <header class="analysis-debug-header">
+        <h2 id="analysisDebugDialogTitle">图像理解</h2>
+        <button class="text-button" id="analysisDebugCloseButton" type="button" aria-label="关闭图像理解">关闭</button>
+      </header>
+      <div class="analysis-debug-body">
+        <nav class="analysis-debug-layers" aria-label="分析图层">
+          <div class="analysis-debug-layer-list" id="analysisDebugLayerControl">
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="original" aria-pressed="false">原图</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="ai-subject" aria-pressed="false">AI 主体</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="corrected-subject" aria-pressed="false">修正主体</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="face" aria-pressed="false">脸部</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="hair" aria-pressed="false">头发</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="skin" aria-pressed="false">皮肤</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="clothes" aria-pressed="false">衣服</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="landmarks" aria-pressed="false">关键点</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="features" aria-pressed="false">五官落格</button>
+          </div>
+        </nav>
+        <div class="analysis-debug-workspace">
+          <div class="analysis-debug-canvas-frame">
+            <canvas id="analysisDebugCanvas" width="512" height="512" tabindex="0" aria-label="图像理解图层画布"></canvas>
+          </div>
+        </div>
+        <aside class="analysis-debug-meta" aria-live="polite">
+          <h3 id="analysisDebugTitle">原图</h3>
+          <dl class="analysis-debug-list">
+            <div><dt>状态</dt><dd id="analysisDebugStatus">图层已加载</dd></div>
+            <div><dt>置信度</dt><dd id="analysisDebugConfidence">--</dd></div>
+            <div><dt>模型</dt><dd id="analysisDebugModel">--</dd></div>
+            <div><dt>来源</dt><dd id="analysisDebugProvenance">--</dd></div>
+          </dl>
+          <section class="analysis-debug-landmark" id="analysisDebugLandmarkDetail" hidden>
+            <h4 id="analysisDebugLandmarkName">landmark</h4>
+            <p id="analysisDebugLandmarkMeta"></p>
+            <p id="analysisDebugLandmarkProvenance"></p>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </dialog>
+
   <script type="module">
     import {
       appendMaskEditStroke,
@@ -750,10 +907,15 @@
       createMaskCorrectionDraftFromSession,
       createMaskEditSession,
       createPatternAlgorithm,
+      fitBradleyTerry,
       redoMaskEdit,
       undoMaskEdit,
     } from '/packages/pattern-core/dist/index.js'
     import { createMaskEditorController } from './mask-editor.mjs'
+    import {
+      applyCorrectedSubjectEvidence,
+      createAnalysisDebugViewer,
+    } from './analysis-debug-viewer.mjs'
     import {
       createBlindComparison,
       createGatePatternSnapshot,
@@ -763,6 +925,12 @@
       loadMaskGateSample,
     } from './mask-gate.mjs'
     import { inferSubjectAnalysis } from './subject-mask.mjs'
+    import {
+      createBlindCandidatePair,
+      loadPreferenceRecords,
+      resolveCandidatePreference,
+      savePreferenceRecords,
+    } from './preference-lab.mjs'
 
     const palette = await fetch('/assets/palettes/generic-24.json').then((response) => {
       if (response.ok === false) throw new Error('色板读取失败')
@@ -790,11 +958,14 @@
       valueLevelsValue: document.querySelector('#valueLevelsValue'),
       styleControl: document.querySelector('#styleControl'),
       cleanGrid: document.querySelector('#cleanGrid'),
+      refinementModeControl: document.querySelector('#refinementModeControl'),
+      refinementModeValue: document.querySelector('#refinementModeValue'),
       generateButton: document.querySelector('#generateButton'),
       stage: document.querySelector('#stage'),
       patternCanvas: document.querySelector('#patternCanvas'),
       patternTitle: document.querySelector('#patternTitle'),
       patternDetail: document.querySelector('#patternDetail'),
+      openAnalysisDebugButton: document.querySelector('#openAnalysisDebugButton'),
       toggleGridButton: document.querySelector('#toggleGridButton'),
       downloadButton: document.querySelector('#downloadButton'),
       candidateList: document.querySelector('#candidateList'),
@@ -804,10 +975,24 @@
       qualityScore: document.querySelector('#qualityScore'),
       paletteChanges: document.querySelector('#paletteChanges'),
       gridEdits: document.querySelector('#gridEdits'),
+      gridRefinementChanges: document.querySelector('#gridRefinementChanges'),
+      symmetryQuality: document.querySelector('#symmetryQuality'),
+      valueOrderAccuracy: document.querySelector('#valueOrderAccuracy'),
       shapeScore: document.querySelector('#shapeScore'),
       shapeCoverage: document.querySelector('#shapeCoverage'),
       shapeComponents: document.querySelector('#shapeComponents'),
       shapeHoles: document.querySelector('#shapeHoles'),
+      gridRefinementEnergy: document.querySelector('#gridRefinementEnergy'),
+      structureRegionCount: document.querySelector('#structureRegionCount'),
+      featurePlacementCount: document.querySelector('#featurePlacementCount'),
+      valueRoleCount: document.querySelector('#valueRoleCount'),
+      paletteRoleCount: document.querySelector('#paletteRoleCount'),
+      preferenceStartButton: document.querySelector('#preferenceStartButton'),
+      preferenceComparison: document.querySelector('#preferenceComparison'),
+      preferenceCanvasA: document.querySelector('#preferenceCanvasA'),
+      preferenceCanvasB: document.querySelector('#preferenceCanvasB'),
+      preferenceActions: document.querySelector('#preferenceActions'),
+      preferenceStatus: document.querySelector('#preferenceStatus'),
       maskEditorDialog: document.querySelector('#maskEditorDialog'),
       maskEditorCanvas: document.querySelector('#maskEditorCanvas'),
       maskEditorDetail: document.querySelector('#maskEditorDetail'),
@@ -833,10 +1018,23 @@
       maskGateCanvasB: document.querySelector('#maskGateCanvasB'),
       maskGateExportButton: document.querySelector('#maskGateExportButton'),
       maskGateStatus: document.querySelector('#maskGateStatus'),
+      analysisDebugDialog: document.querySelector('#analysisDebugDialog'),
+      analysisDebugCloseButton: document.querySelector('#analysisDebugCloseButton'),
+      analysisDebugCanvas: document.querySelector('#analysisDebugCanvas'),
+      analysisDebugLayerControl: document.querySelector('#analysisDebugLayerControl'),
+      analysisDebugTitle: document.querySelector('#analysisDebugTitle'),
+      analysisDebugStatus: document.querySelector('#analysisDebugStatus'),
+      analysisDebugConfidence: document.querySelector('#analysisDebugConfidence'),
+      analysisDebugModel: document.querySelector('#analysisDebugModel'),
+      analysisDebugProvenance: document.querySelector('#analysisDebugProvenance'),
+      analysisDebugLandmarkDetail: document.querySelector('#analysisDebugLandmarkDetail'),
+      analysisDebugLandmarkName: document.querySelector('#analysisDebugLandmarkName'),
+      analysisDebugLandmarkMeta: document.querySelector('#analysisDebugLandmarkMeta'),
+      analysisDebugLandmarkProvenance: document.querySelector('#analysisDebugLandmarkProvenance'),
     }
 
     let sourceImage = createSampleImage()
-    let sourceAnalysis = inferSubjectAnalysis(sourceImage)
+    let sourceAnalysis = createSampleAnalysis(sourceImage)
     let originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
     let savedMaskEditSession
     let candidates = []
@@ -845,8 +1043,12 @@
     let selectedBaseline = 'mvp'
     let selectedOccupancy = 'auto'
     let selectedValueLevels = 3
+    let selectedRefinementMode = 'quality'
     let showGrid = true
     let currentGenerationId
+    let activePreferencePair
+    let preferenceRecords = loadPreferenceRecords()
+    let preferenceRanking
     let maskGateContext
     let maskGateRun
     let maskGateInitialRating
@@ -856,6 +1058,24 @@
     let maskGateAfterSnapshot
     let maskGateBlindComparison
     let maskGatePointerType
+
+    const analysisDebugViewer = createAnalysisDebugViewer({
+      elements: {
+        dialog: elements.analysisDebugDialog,
+        closeButton: elements.analysisDebugCloseButton,
+        canvas: elements.analysisDebugCanvas,
+        layerControl: elements.analysisDebugLayerControl,
+        title: elements.analysisDebugTitle,
+        status: elements.analysisDebugStatus,
+        confidence: elements.analysisDebugConfidence,
+        model: elements.analysisDebugModel,
+        provenance: elements.analysisDebugProvenance,
+        landmarkDetail: elements.analysisDebugLandmarkDetail,
+        landmarkName: elements.analysisDebugLandmarkName,
+        landmarkMeta: elements.analysisDebugLandmarkMeta,
+        landmarkProvenance: elements.analysisDebugLandmarkProvenance,
+      },
+    })
 
     const maskEditor = createMaskEditorController({
       elements: {
@@ -881,11 +1101,13 @@
       onConfirm: async ({ evidence, session }) => {
         const correctionEndedAt = Date.now()
         savedMaskEditSession = session
-        sourceAnalysis = {
-          ...sourceAnalysis,
-          subjectMask: evidence.mask,
-          subjectMaskEvidence: evidence,
-        }
+        sourceAnalysis = applyCorrectedSubjectEvidence(sourceAnalysis, evidence)
+        analysisDebugViewer.update({
+          image: sourceImage,
+          analysis: sourceAnalysis,
+          originalSubjectEvidence,
+          candidate: selectedCandidate,
+        })
         renderAnalysisSource()
         setStatus('主体已确认', 'ready')
         const result = await generate()
@@ -937,6 +1159,7 @@
 
     function setBusy(busy) {
       elements.generateButton.disabled = busy
+      elements.preferenceStartButton.disabled = busy || candidates.length < 2
       elements.openMaskEditorButton.disabled = busy || (maskGateContext !== undefined
         && (maskGateInitialRating?.acceptable !== false || maskGateRun !== undefined))
       elements.stage.dataset.busy = String(busy)
@@ -1195,6 +1418,39 @@
       return canvasToPixelImage(canvas)
     }
 
+    function createSampleAnalysis(image) {
+      const base = inferSubjectAnalysis(image)
+      const faceMask = base.subjectMaskEvidence.mask
+      const provenance = [{
+        origin: 'heuristic',
+        provider: 'demo-sample',
+        model: 'known-sample-portrait',
+        version: '1',
+      }]
+      return {
+        ...base,
+        landmarks: [
+          { id: 'left-eye-center', kind: 'eye', x: 166, y: 217, confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
+          { id: 'right-eye-center', kind: 'eye', x: 254, y: 217, confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
+          { id: 'nose-tip', kind: 'nose', x: 210, y: 253, confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
+          { id: 'mouth-center', kind: 'mouth', x: 210, y: 276, confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
+        ],
+        semanticRegions: [{
+          id: 'face-skin',
+          label: 'face-skin',
+          mask: faceMask,
+          confidence: 1,
+          importance: 1,
+          provenance,
+        }],
+        modelVersions: {
+          ...base.modelVersions,
+          faceLandmarks: 'demo/known-sample-v1',
+          portraitSemantics: 'demo/known-sample-v1',
+        },
+      }
+    }
+
     function canvasToPixelImage(canvas) {
       const context = canvas.getContext('2d', { willReadFrequently: true })
       return {
@@ -1266,6 +1522,7 @@
             paletteCoherence: 1.15,
             localSearchIterations: 2,
             edgeProtection: 0.8,
+            refinementMode: selectedRefinementMode,
           }
           : {
             minRegionSize: 1,
@@ -1274,6 +1531,7 @@
             aliasPenalty: 0,
             paletteCoherence: 0,
             localSearchIterations: 0,
+            refinementMode: selectedRefinementMode,
           },
       }
     }
@@ -1285,19 +1543,18 @@
         const result = await algorithm.generate({
           image: sourceImage,
           palette,
-          analysis: {
-            subjectMask: sourceAnalysis.subjectMask,
-            subjectMaskEvidence: sourceAnalysis.subjectMaskEvidence,
-            confidence: sourceAnalysis.confidence,
-            modelVersions: sourceAnalysis.modelVersions,
-          },
+          analysis: sourceAnalysis,
           options: generationOptions(),
         })
         const primary = result.recommended ?? result.bestEffort
         if (primary === undefined) throw new Error('当前参数没有生成候选方案')
         candidates = [primary, ...result.alternatives]
+        currentGenerationId = result.generationId
+        activePreferencePair = undefined
+        preferenceRanking = undefined
         selectCandidate(primary.id)
         renderCandidates()
+        renderPreferencePanel()
         elements.downloadButton.disabled = result.status !== 'success'
         const modeName = { mvp: '结构版', a1: '面积缩放', a0: '最近邻' }[selectedBaseline]
         if (result.status === 'success') {
@@ -1306,7 +1563,6 @@
         } else {
           setStatus('关键特征表达不足，请扩大画布、缩小主体范围或调整关键点', 'warning')
         }
-        currentGenerationId = result.generationId
         if (maskGateContext !== undefined && maskGateBeforeSnapshot === undefined) {
           maskGateBeforeCandidate = primary
           maskGateBeforeSnapshot = await createGatePatternSnapshot({
@@ -1330,9 +1586,16 @@
       if (selectedCandidate === null) return
       renderPattern(selectedCandidate)
       renderMaterials(selectedCandidate)
+      analysisDebugViewer.update({
+        image: sourceImage,
+        analysis: sourceAnalysis,
+        originalSubjectEvidence,
+        candidate: selectedCandidate,
+      })
       for (const button of elements.candidateList.querySelectorAll('.candidate')) {
         button.setAttribute('aria-pressed', String(button.dataset.id === selectedCandidate.id))
       }
+      if (activePreferencePair === undefined) renderPreferencePanel()
     }
 
     function styleName(style) {
@@ -1355,7 +1618,10 @@
       elements.uniqueColors.textContent = String(candidate.materialCounts.length)
       elements.qualityScore.textContent = String(Math.round(candidate.score.total * 100))
       elements.paletteChanges.textContent = String(candidate.metrics.paletteOptimizationChanges)
-      elements.gridEdits.textContent = String(candidate.edits.length - candidate.metrics.paletteOptimizationChanges)
+      elements.gridEdits.textContent = String(candidate.edits.length)
+      elements.gridRefinementChanges.textContent = String(candidate.metrics.gridRefinementChanges)
+      elements.symmetryQuality.textContent = `${Math.round(candidate.metrics.symmetryQuality * 100)}%`
+      elements.valueOrderAccuracy.textContent = `${Math.round(candidate.metrics.valueOrderAccuracy * 100)}%`
       elements.shapeScore.textContent = candidate.metrics.shapeApplied
         ? `${Math.round(candidate.metrics.silhouetteBoundaryIoU * 100)}%`
         : '--'
@@ -1368,6 +1634,21 @@
       elements.shapeHoles.textContent = candidate.metrics.shapeApplied
         ? `${candidate.metrics.targetShapeHoles}/${candidate.metrics.referenceShapeHoles}`
         : '--'
+      elements.gridRefinementEnergy.textContent = candidate.gridRefinement === undefined
+        ? '--'
+        : `${Math.round(candidate.gridRefinement.energyBefore)} → ${Math.round(candidate.gridRefinement.energyAfter)}`
+      elements.structureRegionCount.textContent = candidate.structurePlan === undefined
+        ? '--'
+        : String(candidate.structurePlan.regions.length)
+      elements.featurePlacementCount.textContent = candidate.featurePlacements === undefined
+        ? '--'
+        : String(new Set(candidate.featurePlacements.flatMap((entry) => entry.occupiedCells)).size)
+      elements.valueRoleCount.textContent = candidate.valuePlan === undefined
+        ? '--'
+        : String(candidate.valuePlan.roles.length)
+      elements.paletteRoleCount.textContent = candidate.palettePlan === undefined
+        ? '--'
+        : String(Object.keys(candidate.palettePlan.assignments).length)
     }
 
     function drawPattern(canvas, pattern, options = {}) {
@@ -1414,7 +1695,91 @@
       }
     }
 
+    function candidateDisplayName(candidate) {
+      return `${occupancyName(candidate)} ${styleName(candidate.style)} ${candidate.pattern.width}`
+    }
+
+    function currentPreferenceRecords() {
+      const candidateIds = new Set(candidates.map((candidate) => candidate.id))
+      return preferenceRecords.filter((record) => record.sourceId === currentGenerationId
+        && candidateIds.has(record.candidateAId)
+        && candidateIds.has(record.candidateBId))
+    }
+
+    function updatePreferenceRanking() {
+      const records = currentPreferenceRecords()
+      preferenceRanking = candidates.length < 2 || records.length === 0
+        ? undefined
+        : fitBradleyTerry(candidates.map((candidate) => candidate.id), records)
+      return records
+    }
+
+    function renderPreferencePanel() {
+      const ready = currentGenerationId !== undefined && selectedCandidate !== null && candidates.length > 1
+      elements.preferenceStartButton.disabled = ready === false
+      elements.preferenceComparison.hidden = activePreferencePair === undefined
+      elements.preferenceActions.hidden = activePreferencePair === undefined
+      if (ready === false) {
+        elements.preferenceStatus.textContent = '等待两个候选方案'
+        return
+      }
+      const records = updatePreferenceRanking()
+      if (activePreferencePair !== undefined) {
+        elements.preferenceStatus.textContent = '比较进行中'
+        return
+      }
+      if (preferenceRanking === undefined) {
+        elements.preferenceStatus.textContent = '0 次比较'
+        return
+      }
+      const preferred = candidates.find((candidate) =>
+        candidate.id === preferenceRanking.rankedCandidateIds[0])
+      elements.preferenceStatus.textContent = preferred === undefined
+        ? `${records.length} 次比较`
+        : `${records.length} 次比较 · 当前首选 ${candidateDisplayName(preferred)}`
+    }
+
+    async function startPreferenceComparison() {
+      if (currentGenerationId === undefined || selectedCandidate === null) return
+      const selectedIndex = candidates.findIndex((candidate) => candidate.id === selectedCandidate.id)
+      const opponent = candidates[(selectedIndex + 1) % candidates.length]
+      if (opponent === undefined) return
+      activePreferencePair = await createBlindCandidatePair({
+        generationId: currentGenerationId,
+        candidateAId: selectedCandidate.id,
+        candidateBId: opponent.id,
+        raterId: elements.maskGateRaterId.value.trim() || 'local-rater',
+      })
+      const left = candidates.find((candidate) => candidate.id === activePreferencePair.leftCandidateId)
+      const right = candidates.find((candidate) => candidate.id === activePreferencePair.rightCandidateId)
+      if (left === undefined || right === undefined) throw new Error('偏好候选已失效')
+      drawPattern(elements.preferenceCanvasA, left.pattern, { maximum: 240 })
+      drawPattern(elements.preferenceCanvasB, right.pattern, { maximum: 240 })
+      renderPreferencePanel()
+    }
+
+    function recordPreference(choice) {
+      if (activePreferencePair === undefined) return
+      const pair = activePreferencePair
+      const record = resolveCandidatePreference(pair, choice)
+      preferenceRecords = savePreferenceRecords(localStorage, [
+        ...preferenceRecords.filter((entry) => entry.id !== record.id),
+        record,
+      ])
+      const selectedId = choice === 'left'
+        ? pair.leftCandidateId
+        : choice === 'right'
+          ? pair.rightCandidateId
+          : selectedCandidate?.id
+      activePreferencePair = undefined
+      if (selectedId !== undefined) selectCandidate(selectedId)
+      updatePreferenceRanking()
+      renderCandidates()
+      renderPreferencePanel()
+    }
+
     function renderCandidates() {
+      updatePreferenceRanking()
       elements.candidateList.replaceChildren()
       for (const candidate of candidates) {
         const button = document.createElement('button')
@@ -1427,7 +1792,8 @@
         drawPattern(canvas, candidate.pattern, { maximum: 160 })
         const label = document.createElement('span')
         label.className = 'candidate-name'
-        label.textContent = `${occupancyName(candidate)} ${styleName(candidate.style)} ${candidate.pattern.width}${candidate.valid ? '' : ' · 需调整'}`
+        const preferenceRank = preferenceRanking?.rankedCandidateIds.indexOf(candidate.id) ?? -1
+        label.textContent = `${candidateDisplayName(candidate)}${preferenceRank < 0 ? '' : ` · 偏好${preferenceRank + 1}`}${candidate.valid ? '' : ' · 需调整'}`
         button.append(canvas, label)
         button.addEventListener('click', () => selectCandidate(candidate.id))
         elements.candidateList.append(button)
@@ -1471,7 +1837,17 @@
       sourceAnalysis = inferSubjectAnalysis(sourceImage)
       originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
       savedMaskEditSession = undefined
+      candidates = []
+      selectedCandidate = null
+      activePreferencePair = undefined
+      preferenceRanking = undefined
       maskEditor.close()
+      analysisDebugViewer.update({
+        image: sourceImage,
+        analysis: sourceAnalysis,
+        originalSubjectEvidence,
+        candidate: selectedCandidate,
+      })
       elements.fileName.textContent = file.name
       renderAnalysisSource()
       renderSourcePreview()
@@ -1500,6 +1876,15 @@
     elements.maxColors.addEventListener('input', () => {
       elements.colorValue.textContent = `${elements.maxColors.value} 色`
     })
+    elements.refinementModeControl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-refinement]')
+      if (button === null) return
+      selectedRefinementMode = button.dataset.refinement
+      elements.refinementModeValue.textContent = selectedRefinementMode === 'quality' ? 'Quality' : 'Fast'
+      for (const item of elements.refinementModeControl.querySelectorAll('button')) {
+        item.setAttribute('aria-pressed', String(item === button))
+      }
+    })
     elements.baselineControl.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-baseline]')
       if (button === null) return
@@ -1512,6 +1897,9 @@
         item.disabled = selectedBaseline !== 'mvp'
       }
       for (const item of elements.occupancyControl.querySelectorAll('button')) {
+        item.disabled = selectedBaseline !== 'mvp'
+      }
+      for (const item of elements.refinementModeControl.querySelectorAll('button')) {
         item.disabled = selectedBaseline !== 'mvp'
       }
     })
@@ -1549,6 +1937,24 @@
       }
     })
     elements.generateButton.addEventListener('click', generate)
+    elements.preferenceStartButton.addEventListener('click', async () => {
+      try {
+        await startPreferenceComparison()
+      } catch (error) {
+        console.error(error)
+        elements.preferenceStatus.textContent = error instanceof Error ? error.message : '偏好比较失败'
+      }
+    })
+    elements.preferenceActions.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-preference-choice]')
+      if (button === null) return
+      try {
+        recordPreference(button.dataset.preferenceChoice)
+      } catch (error) {
+        console.error(error)
+        elements.preferenceStatus.textContent = error instanceof Error ? error.message : '偏好记录失败'
+      }
+    })
     function openMaskEditor() {
       if (maskGateContext !== undefined) {
         if (maskGateInitialRating?.acceptable !== false || maskGateRun !== undefined) return
@@ -1575,6 +1981,7 @@
     elements.maskGateEditButton.addEventListener('click', openMaskEditor)
     elements.maskGateErrorButton.addEventListener('click', () => recordMaskGateError())
     elements.maskGateExportButton.addEventListener('click', exportMaskGateAttempt)
+    elements.openAnalysisDebugButton.addEventListener('click', () => analysisDebugViewer.open())
     elements.toggleGridButton.addEventListener('click', () => {
       showGrid = showGrid === false
       elements.toggleGridButton.setAttribute('aria-pressed', String(showGrid))
@@ -1583,6 +1990,12 @@
     elements.downloadButton.addEventListener('click', downloadPattern)
 
     await initializeMaskGate()
+    analysisDebugViewer.update({
+      image: sourceImage,
+      analysis: sourceAnalysis,
+      originalSubjectEvidence,
+      candidate: selectedCandidate,
+    })
     renderSourcePreview()
     renderAnalysisSource()
     await generate()

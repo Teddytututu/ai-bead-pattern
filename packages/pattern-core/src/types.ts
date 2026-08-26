@@ -1,4 +1,10 @@
-import type { CanvasPlan } from './contracts.js'
+import type {
+  CanvasPlan,
+  PalettePlan,
+  StructurePlan,
+  ValuePlan,
+} from './contracts.js'
+import type { ResolvedFeaturePlacement } from './planning/feature-placement.js'
 
 export type RGB = readonly [red: number, green: number, blue: number]
 
@@ -31,6 +37,7 @@ export type ColorDistanceMethod = 'delta-e-76' | 'delta-e-2000'
 export type PatternStyle = 'faithful' | 'cute' | 'simple' | 'high-contrast' | 'soft'
 export type BaselineMode = 'a0' | 'a1' | 'mvp'
 export type AlgorithmEngine = 'baseline'
+export type GridRefinementMode = 'fast' | 'quality'
 
 export interface GridSize {
   width: number
@@ -49,6 +56,7 @@ export interface OptimizationOptions {
   paletteCoherence?: number
   localSearchIterations?: number
   aliasPenalty?: number
+  refinementMode?: GridRefinementMode
 }
 
 export interface StructureOptions {
@@ -230,6 +238,7 @@ export interface GridEditRecord {
   fromColorId: string
   toColorId: string
   reason: 'small-region' | 'isolated-cell' | 'stripe' | 'topology' | 'palette-coherence'
+    | 'feature-placement' | 'cluster-refinement' | 'symmetry'
 }
 
 export interface GenerationMetrics {
@@ -253,7 +262,11 @@ export interface GenerationMetrics {
   planBoundaryAgreement: number
   referenceMeanColorDistance: number
   referenceBoundaryAgreement: number
+  valueOrderAccuracy: number
+  paletteRoleConsistency: number
   paletteOptimizationChanges: number
+  gridRefinementChanges: number
+  symmetryQuality: number
   topologyEdits: number
   shapeApplied: boolean
   subjectOccupancyRatio: number
@@ -265,6 +278,14 @@ export interface GenerationMetrics {
   referenceShapeHoles: number
   targetShapeHoles: number
   shapeEdits: number
+}
+
+export interface GridRefinementSummary {
+  mode: GridRefinementMode
+  changedCells: number
+  energyBefore: number
+  energyAfter: number
+  iterations: number
 }
 
 export interface GenerationTiming {
@@ -302,6 +323,16 @@ export interface PatternCandidate {
   score: CandidateScore
   /** @experimental Executable V2 planning diagnostics for this candidate. */
   canvasPlan?: CanvasPlan
+  /** @experimental Discrete feature placements resolved before color quantization. */
+  featurePlacements?: readonly ResolvedFeaturePlacement[]
+  /** @experimental Region graph, bounded source mapping, and feature constraints. */
+  structurePlan?: StructurePlan
+  /** @experimental Region-level light, base, shadow, and outline roles. */
+  valuePlan?: ValuePlan
+  /** @experimental Global material-color subset and role assignments. */
+  palettePlan?: PalettePlan
+  /** @experimental Unified cluster cleanup diagnostics. */
+  gridRefinement?: GridRefinementSummary
   edits: readonly GridEditRecord[]
 }
 

@@ -125,12 +125,12 @@ export function designRegionValues(
   activeMask: Uint8Array,
   levels: 2 | 3 | 4,
   importance: readonly number[],
-  regionIds?: readonly (string | undefined)[],
+  regionIds?: ArrayLike<string | number | undefined>,
 ): readonly RGB[] {
   const groups = new Map<string, number[]>()
   for (let index = 0; index < pixels.length; index += 1) {
     if (activeMask[index] !== 1) continue
-    const group = regionIds?.[index] ?? hueBucket(pixels[index]!)
+    const group = String(regionIds?.[index] ?? hueBucket(pixels[index]!))
     const entries = groups.get(group) ?? []
     entries.push(index)
     groups.set(group, entries)

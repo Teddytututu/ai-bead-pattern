@@ -1,4 +1,8 @@
-import { maskGateProtocolVersion, resolveBlindPreference } from './protocol.mjs'
+import {
+  createBlindComparison,
+  maskGateProtocolVersion,
+  resolveBlindPreference,
+} from './protocol.mjs'
 
 const deviceClasses = new Set(['desktop', 'mobile', 'tablet'])
 const inputModalities = new Set(['touch', 'pen', 'mouse'])
@@ -269,6 +273,33 @@ export function createMaskGatePreferenceRecord(input) {
     patternPreference,
     ratedAt: finite(input.ratedAt, 'ratedAt'),
   }
+}
+
+export async function createIndependentMaskGatePreferenceRecord({
+  interaction,
+  raterId,
+  choice,
+  ratedAt,
+}) {
+  const validated = validateMaskGateInteractionRecord(interaction)
+  if (validated.outcome !== 'confirmed') {
+    throw new RangeError('Independent preference requires a confirmed interaction')
+  }
+  const blindComparison = await createBlindComparison({
+    protocolVersion: validated.protocolVersion,
+    datasetId: validated.datasetId,
+    imageId: validated.imageId,
+    raterId,
+  })
+  return createMaskGatePreferenceRecord({
+    ...validated,
+    sample: validated,
+    raterId,
+    beforeSnapshot: validated.beforeSnapshot,
+    afterSnapshot: validated.afterSnapshot,
+    blindComparison: { ...blindComparison, choice },
+    ratedAt,
+  })
 }
 
 export function validateMaskGateInteractionRecord(value) {

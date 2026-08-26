@@ -4,7 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:pool": "node bin/build-wikimedia-pool.mjs",
+    "contact-sheet": "node bin/render-contact-sheet.mjs",
     "collect": "pnpm --filter @ai-bead-pattern/pattern-core build && node bin/collect-session.mjs",
+    "collect:preference": "pnpm --filter @ai-bead-pattern/pattern-core build && node bin/collect-preference.mjs",
+    "freeze": "node bin/freeze-dataset.mjs",
+    "pilot": "pnpm --filter @ai-bead-pattern/pattern-core build && node bin/run-pilot.mjs",
     "report": "node bin/report.mjs",
     "sidecars": "pnpm --filter @ai-bead-pattern/ai-gateway build && node bin/generate-sidecars.mjs",
     "test": "pnpm --filter @ai-bead-pattern/pattern-core build && node --test test/*.test.mjs"

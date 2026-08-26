@@ -139,8 +139,9 @@ describe('demo mask editor helpers', () => {
       html.indexOf('function setStatus'),
     )
 
-    assert.ok(confirmationBlock.indexOf('subjectMaskEvidence: evidence') >= 0)
-    assert.ok(confirmationBlock.indexOf('subjectMaskEvidence: evidence') < confirmationBlock.indexOf('await generate()'))
+    assert.ok(confirmationBlock.indexOf('applyCorrectedSubjectEvidence(sourceAnalysis, evidence)') >= 0)
+    assert.ok(confirmationBlock.indexOf('applyCorrectedSubjectEvidence(sourceAnalysis, evidence)')
+      < confirmationBlock.indexOf('await generate()'))
     assert.equal(confirmationBlock.match(/await generate\(\)/g)?.length, 1)
   })
 })

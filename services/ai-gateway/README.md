@@ -1,7 +1,7 @@
 # AI Gateway
 
-外部视觉模型接入层。当前提供 rembg HTTP 适配器，默认使用
-`birefnet-general-lite` 生成主体掩码，并转换为 `pattern-core` 的 `ImageAnalysis`。
+外部视觉模型接入层。当前提供 rembg HTTP 适配器、MediaPipe 人脸关键点映射、
+人像语义区域映射和融合接口，并统一转换为 `pattern-core` 的 `ImageAnalysis`。
 
 ## 已接入
 
@@ -10,6 +10,14 @@
 - 带置信度的自动裁剪
 - `rembg/模型名` 版本记录
 - 超时、取消、响应大小和图像尺寸校验
+- 主脸选择与相近多脸的 `ambiguous` 状态
+- 9 个稳定人脸锚点及来源记录
+- `subject`、`face-skin`、`hair`、`body-skin`、`clothes` 语义区域
+- 语义区域与权威 corrected subject mask 相交
+
+## Portrait Vision
+
+`MediaPipeFaceLandmarkProvider` 和 `MediaPipePortraitSemanticProvider` 接收可注入的模型函数，部署层可以连接 MediaPipe Tasks、ONNX 或远程推理服务。`analyzePortrait` 负责主脸判定、关键点与语义区域融合；相近多脸返回 `ambiguous`，交给产品界面选择主体。
 
 ## 启动 rembg
 
