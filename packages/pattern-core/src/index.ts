@@ -11,6 +11,14 @@ export {
 } from './color.js'
 export { optimizeGrid } from './grid.js'
 export { adaptPattern } from './adaptation.js'
+export { fitBradleyTerry, predictPairwisePreference } from './preference.js'
+export type {
+  BradleyTerryOptions,
+  BradleyTerryResult,
+  CandidatePreferenceScore,
+  PairwisePreferenceChoice,
+  PairwisePreferenceRecord,
+} from './preference.js'
 export {
   normalizeEvidenceProvenance,
   numericArrayFingerprintSync,

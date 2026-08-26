@@ -71,6 +71,14 @@ export type {
   GridRefinementResult,
 } from './grid-refinement.js'
 export type { GridRefinementMode, GridRefinementSummary } from './types.js'
+export { fitBradleyTerry, predictPairwisePreference } from './preference.js'
+export type {
+  BradleyTerryOptions,
+  BradleyTerryResult,
+  CandidatePreferenceScore,
+  PairwisePreferenceChoice,
+  PairwisePreferenceRecord,
+} from './preference.js'
 export type {
   LandmarkAllocation,
   ShapeAnchor,

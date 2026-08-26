@@ -1990,7 +1990,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.6.0-grid-refinement'
+    this.version = config.version ?? '0.7.0-preference-learning'
     this.#clock = config.clock ?? Date.now
   }
 
