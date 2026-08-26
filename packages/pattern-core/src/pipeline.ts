@@ -22,6 +22,7 @@ import {
   gridCellForSourcePoint,
   normalizeCrop,
   resizePixels,
+  samplePixelsAtSourceMapping,
   sourcePointForGridCell,
   type CanvasFit,
 } from './image.js'
@@ -41,6 +42,7 @@ import {
 } from './planning/feature-placement.js'
 import { searchFeaturePairs } from './planning/feature-pair-search.js'
 import { resolveFeatureColors } from './planning/feature-color-resolver.js'
+import { buildStructurePlan } from './planning/structure-planner.js'
 import type { CanvasPlan, OccupancyMode } from './contracts.js'
 import {
   buildSourceShapeModel,
@@ -816,6 +818,22 @@ function planFeaturePlacements(
   return selected.sort((first, second) => first.featureId.localeCompare(second.featureId))
 }
 
+function plannedFeatureConstraints(
+  analysis: ImageAnalysis | undefined,
+  canvasPlan: CanvasPlan,
+  placements: readonly ResolvedFeaturePlacement[],
+) {
+  const landmarks = new Map((analysis?.landmarks ?? []).map((landmark) => [landmark.id, landmark]))
+  const budgets = new Map(canvasPlan.featureBudgets.map((budget) => [budget.featureId, budget]))
+  return placements.flatMap((placement) => {
+    const landmark = landmarks.get(placement.featureId)
+    const budget = budgets.get(placement.featureId)
+    return landmark === undefined || budget === undefined
+      ? []
+      : [createFeatureConstraint(budget, landmark, canvasPlan)]
+  })
+}
+
 function protectedCells(
   analysis: ImageAnalysis | undefined,
   crop: CropRect,
@@ -1448,7 +1466,6 @@ function generateCandidate(
     activeMask,
   )
   const sourceLabs = rawResized.pixels.map(rgbToLab)
-  const styledPixels = resized.pixels.map((pixel) => applyStyle(pixel, style))
   const valueLevels = structureOptions.valueLevels
     ?? (style === 'simple' ? 2 : 3)
   const regionIds = gridRegionIds(
@@ -1462,6 +1479,37 @@ function generateCandidate(
   const featurePlacements = baseline === 'mvp'
     ? planFeaturePlacements(request.analysis, context.canvasPlan, activeMask, regionIds)
     : []
+  const structurePlan = baseline === 'mvp'
+    ? buildStructurePlan({
+      width: size.width,
+      height: size.height,
+      crop,
+      fit: resized.fit,
+      activeMask,
+      pixelLabs: resized.pixels.map(rgbToLab),
+      semanticRegionIds: regionIds,
+      importance: weights,
+      sourceGuidance: context.sourceGuidance,
+      featurePlacements,
+      featureConstraints: plannedFeatureConstraints(request.analysis, context.canvasPlan, featurePlacements),
+      maximumSourceShiftCells: 0.35,
+    })
+    : undefined
+  const structureMappingActive = (request.analysis?.semanticRegions?.length ?? 0) > 0
+    && structurePlan !== undefined
+  const structuredPixels = structureMappingActive === false
+    ? resized.pixels
+    : samplePixelsAtSourceMapping(
+      resized.pixels,
+      size.width,
+      size.height,
+      structurePlan.sourceMapping,
+      activeMask,
+      crop,
+      resized.fit,
+      request.options.backgroundRgb,
+    )
+  const styledPixels = structuredPixels.map((pixel) => applyStyle(pixel, style))
   const pixels = baseline === 'mvp'
     ? designRegionValues(
       styledPixels,
@@ -1695,6 +1743,12 @@ function generateCandidate(
       carrierRegionId: landmark.carrierRegionId,
     })) ?? [],
     featurePlacements,
+    structureRegions: structurePlan?.regions.map((region) => ({
+      id: region.id,
+      sourceRegionId: region.sourceRegionId,
+      cells: region.cellIndices.length,
+      adjacentRegionIds: region.adjacentRegionIds,
+    })) ?? [],
     structure: request.options.structure ?? {},
     optimization: request.options.optimization ?? {},
   })
@@ -1750,6 +1804,7 @@ function generateCandidate(
     score,
     canvasPlan: context.canvasPlan,
     ...(featurePlacements.length === 0 ? {} : { featurePlacements }),
+    ...(structurePlan === undefined ? {} : { structurePlan }),
     edits: [...featureColors.edits, ...paletteEdits, ...optimization.edits],
   }
 }
@@ -1768,7 +1823,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.3.3-analysis-evidence'
+    this.version = config.version ?? '0.4.0-structure-plan'
     this.#clock = config.clock ?? Date.now
   }
 

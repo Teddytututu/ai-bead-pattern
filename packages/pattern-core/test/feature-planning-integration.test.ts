@@ -6,6 +6,7 @@ import {
   type MaterialPalette,
   type PixelImage,
 } from '../src/index.js'
+import { validateStructurePlan } from '../src/experimental.js'
 
 const palette: MaterialPalette = {
   id: 'feature-test',
@@ -61,6 +62,8 @@ describe('feature planning pipeline integration', () => {
     })
     const candidate = result.recommended ?? result.bestEffort
     assert.ok(candidate !== undefined)
+    assert.ok(candidate.structurePlan !== undefined)
+    assert.doesNotThrow(() => validateStructurePlan(candidate.structurePlan!))
     assert.deepEqual(candidate.featurePlacements?.map((entry) => entry.featureId), [
       'left-eye-center',
       'mouth-center',

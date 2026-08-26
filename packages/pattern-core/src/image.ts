@@ -251,6 +251,67 @@ export function resizePixels(
   return { pixels, activeMask, fit }
 }
 
+export function samplePixelsAtSourceMapping(
+  inputPixels: readonly RGB[],
+  width: number,
+  height: number,
+  sourceMapping: Float32Array,
+  activeMask: Uint8Array,
+  crop: CropRect,
+  fit: CanvasFit,
+  backgroundRgb: RGB = [255, 255, 255],
+): readonly RGB[] {
+  if (inputPixels.length !== width * height || activeMask.length !== width * height
+    || sourceMapping.length !== activeMask.length * 2) {
+    throw new RangeError('Source mapping must contain two coordinates per target cell')
+  }
+  const gridPixel = (x: number, y: number): RGB => {
+    const safeX = clamp(x, 0, width - 1)
+    const safeY = clamp(y, 0, height - 1)
+    const index = safeY * width + safeX
+    return activeMask[index] === 1 ? inputPixels[index]! : backgroundRgb
+  }
+  const sampleGrid = (x: number, y: number): RGB => {
+    const x0 = Math.floor(x)
+    const y0 = Math.floor(y)
+    const tx = x - x0
+    const ty = y - y0
+    const topLeft = gridPixel(x0, y0)
+    const topRight = gridPixel(x0 + 1, y0)
+    const bottomLeft = gridPixel(x0, y0 + 1)
+    const bottomRight = gridPixel(x0 + 1, y0 + 1)
+    return [0, 1, 2].map((channel) => Math.round(
+      topLeft[channel]! * (1 - tx) * (1 - ty)
+        + topRight[channel]! * tx * (1 - ty)
+        + bottomLeft[channel]! * (1 - tx) * ty
+        + bottomRight[channel]! * tx * ty,
+    )) as unknown as RGB
+  }
+  const pixels: RGB[] = []
+  for (let cell = 0; cell < activeMask.length; cell += 1) {
+    if (activeMask[cell] !== 1) {
+      pixels.push(backgroundRgb)
+      continue
+    }
+    const sourceX = sourceMapping[cell * 2]!
+    const sourceY = sourceMapping[cell * 2 + 1]!
+    if (Number.isFinite(sourceX) === false || Number.isFinite(sourceY) === false) {
+      throw new RangeError('Source mapping coordinates must be finite')
+    }
+    const x = cell % width
+    const y = Math.floor(cell / width)
+    const defaultPoint = sourcePointForGridCell(crop, fit, x, y)
+    if (defaultPoint === undefined) {
+      pixels.push(backgroundRgb)
+      continue
+    }
+    const deltaX = (sourceX - defaultPoint[0]) / (crop.width / fit.width)
+    const deltaY = (sourceY - defaultPoint[1]) / (crop.height / fit.height)
+    pixels.push(sampleGrid(x + deltaX, y + deltaY))
+  }
+  return pixels
+}
+
 function transformChannel(value: number, contrast: number, brightness: number): number {
   return clamp(Math.round((value - 128) * contrast + 128 + brightness), 0, 255)
 }

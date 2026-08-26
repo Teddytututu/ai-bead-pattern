@@ -73,6 +73,7 @@ it('stays inside the representative online time and memory budget', async () => 
 it('keeps an eighteen-candidate subject-shape load inside the CI budget', async () => {
   const beforeRss = process.memoryUsage().rss
   const startedAt = performance.now()
+  const subjectMask = benchmarkSubjectMask(1024)
   const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
     image: benchmarkImage(1024),
     palette: benchmarkPalette,
@@ -81,8 +82,14 @@ it('keeps an eighteen-candidate subject-shape load inside the CI budget', async 
       subjectMask: {
         width: 1024,
         height: 1024,
-        values: benchmarkSubjectMask(1024),
+        values: subjectMask,
       },
+      semanticRegions: [{
+        id: 'subject',
+        label: 'subject',
+        mask: { width: 1024, height: 1024, values: subjectMask },
+        confidence: 1,
+      }],
     },
     options: {
       canvas: {
@@ -108,6 +115,7 @@ it('keeps an eighteen-candidate subject-shape load inside the CI budget', async 
   const candidates = [result.recommended, ...result.alternatives]
     .filter((entry) => entry !== undefined)
   assert.equal(candidates.filter((entry) => entry!.metrics.shapeApplied).length, 9)
+  assert.equal(candidates.filter((entry) => entry!.structurePlan !== undefined).length, 18)
   assert.ok(elapsedMs < 30_000, `Shape generation took ${elapsedMs.toFixed(0)} ms`)
   assert.ok(rssGrowth < 512 * 1024 * 1024, `RSS grew by ${Math.round(rssGrowth / 1024 / 1024)} MiB`)
 })

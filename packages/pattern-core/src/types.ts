@@ -1,4 +1,4 @@
-import type { CanvasPlan } from './contracts.js'
+import type { CanvasPlan, StructurePlan } from './contracts.js'
 import type { ResolvedFeaturePlacement } from './planning/feature-placement.js'
 
 export type RGB = readonly [red: number, green: number, blue: number]
@@ -306,6 +306,8 @@ export interface PatternCandidate {
   canvasPlan?: CanvasPlan
   /** @experimental Discrete feature placements resolved before color quantization. */
   featurePlacements?: readonly ResolvedFeaturePlacement[]
+  /** @experimental Region graph, bounded source mapping, and feature constraints. */
+  structurePlan?: StructurePlan
   edits: readonly GridEditRecord[]
 }
 

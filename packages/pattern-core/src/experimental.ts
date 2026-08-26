@@ -59,6 +59,8 @@ export type {
   FeatureColorResolutionInput,
   FeatureColorResolutionResult,
 } from './planning/feature-color-resolver.js'
+export { buildStructurePlan } from './planning/structure-planner.js'
+export type { StructurePlanningInput } from './planning/structure-planner.js'
 export type {
   LandmarkAllocation,
   ShapeAnchor,
