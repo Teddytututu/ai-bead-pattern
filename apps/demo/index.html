@@ -404,6 +404,51 @@
     .text-button.primary:hover { background: #216b63; }
     .text-button:disabled { opacity: 0.45; cursor: default; }
 
+    .analysis-debug-dialog {
+      width: min(1180px, calc(100vw - 32px));
+      height: min(820px, calc(100dvh - 32px));
+      padding: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 24px 72px rgba(24, 30, 29, 0.24);
+    }
+
+    .analysis-debug-dialog::backdrop { background: rgba(23, 29, 28, 0.58); }
+
+    .analysis-debug-layout { height: 100%; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+    .analysis-debug-header {
+      min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+    }
+    .analysis-debug-header h2 { margin: 0; font-size: 16px; }
+    .analysis-debug-body { min-height: 0; display: grid; grid-template-columns: 154px minmax(0, 1fr) 270px; }
+    .analysis-debug-layers { min-width: 0; padding: 12px; border-right: 1px solid var(--border); overflow: auto; }
+    .analysis-debug-layer-list { display: grid; gap: 4px; }
+    .analysis-debug-layer {
+      min-height: 36px; padding: 0 10px; border: 1px solid transparent; border-radius: 4px;
+      background: transparent; color: var(--muted); text-align: left; cursor: pointer;
+    }
+    .analysis-debug-layer:hover { background: var(--surface-alt); color: var(--text); }
+    .analysis-debug-layer[aria-pressed="true"] { border-color: var(--border-strong); background: var(--text); color: #fff; font-weight: 700; }
+    .analysis-debug-layer:disabled { opacity: 0.38; cursor: default; }
+    .analysis-debug-workspace { min-width: 0; min-height: 0; display: grid; place-items: center; padding: 16px; overflow: hidden; background: #d9ddda; }
+    .analysis-debug-canvas-frame { width: 100%; height: 100%; min-width: 0; min-height: 0; display: grid; place-items: center; }
+    #analysisDebugCanvas {
+      display: block; width: auto; height: auto; max-width: 100%; max-height: 100%;
+      background: var(--surface-alt); outline: 1px solid var(--border-strong); box-shadow: var(--shadow);
+    }
+    .analysis-debug-meta { min-width: 0; padding: 14px; border-left: 1px solid var(--border); overflow: auto; }
+    .analysis-debug-meta h3 { margin: 0 0 12px; font-size: 15px; }
+    .analysis-debug-list { margin: 0; display: grid; gap: 10px; }
+    .analysis-debug-list div { min-width: 0; }
+    .analysis-debug-list dt { color: var(--muted); font-size: 11px; font-weight: 700; }
+    .analysis-debug-list dd { margin: 2px 0 0; overflow-wrap: anywhere; }
+    .analysis-debug-landmark { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .analysis-debug-landmark h4 { margin: 0 0 5px; font-size: 13px; }
+    .analysis-debug-landmark p { margin: 3px 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+
     .canvas-shell {
       min-height: 0;
       display: grid;
@@ -483,6 +528,13 @@
       .mask-editor-workspace { padding: 8px; }
       .mask-editor-footer { align-items: stretch; flex-direction: column; }
       .mask-editor-footer .primary { width: 100%; }
+      .analysis-debug-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border: 0; border-radius: 0; }
+      .analysis-debug-body { grid-template-columns: 1fr; grid-template-rows: auto minmax(280px, 1fr) auto; }
+      .analysis-debug-layers { padding: 8px; border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+      .analysis-debug-layer-list { display: flex; width: max-content; gap: 4px; }
+      .analysis-debug-layer { min-width: 76px; text-align: center; }
+      .analysis-debug-workspace { padding: 8px; }
+      .analysis-debug-meta { max-height: 220px; border-left: 0; border-top: 1px solid var(--border); }
     }
 
     @media (max-width: 420px) {
@@ -653,6 +705,7 @@
           <span class="stage-detail" id="patternDetail">32 × 32 · 0 色</span>
         </div>
         <div class="toolbar-actions">
+          <button class="text-button" id="openAnalysisDebugButton" type="button">分析图层</button>
           <button class="icon-button" id="toggleGridButton" type="button" title="切换网格" aria-label="切换网格" aria-pressed="true">#</button>
           <button class="icon-button" id="downloadButton" type="button" title="下载 PNG" aria-label="下载 PNG" disabled>↓</button>
         </div>
@@ -743,6 +796,48 @@
     </div>
   </dialog>
 
+  <dialog class="analysis-debug-dialog" id="analysisDebugDialog" aria-labelledby="analysisDebugDialogTitle">
+    <div class="analysis-debug-layout">
+      <header class="analysis-debug-header">
+        <h2 id="analysisDebugDialogTitle">图像理解</h2>
+        <button class="text-button" id="analysisDebugCloseButton" type="button" aria-label="关闭图像理解">关闭</button>
+      </header>
+      <div class="analysis-debug-body">
+        <nav class="analysis-debug-layers" aria-label="分析图层">
+          <div class="analysis-debug-layer-list" id="analysisDebugLayerControl">
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="original" aria-pressed="false">原图</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="ai-subject" aria-pressed="false">AI 主体</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="corrected-subject" aria-pressed="false">修正主体</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="face" aria-pressed="false">脸部</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="hair" aria-pressed="false">头发</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="skin" aria-pressed="false">皮肤</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="clothes" aria-pressed="false">衣服</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="landmarks" aria-pressed="false">关键点</button>
+          </div>
+        </nav>
+        <div class="analysis-debug-workspace">
+          <div class="analysis-debug-canvas-frame">
+            <canvas id="analysisDebugCanvas" width="512" height="512" tabindex="0" aria-label="图像理解图层画布"></canvas>
+          </div>
+        </div>
+        <aside class="analysis-debug-meta" aria-live="polite">
+          <h3 id="analysisDebugTitle">原图</h3>
+          <dl class="analysis-debug-list">
+            <div><dt>状态</dt><dd id="analysisDebugStatus">图层已加载</dd></div>
+            <div><dt>置信度</dt><dd id="analysisDebugConfidence">--</dd></div>
+            <div><dt>模型</dt><dd id="analysisDebugModel">--</dd></div>
+            <div><dt>来源</dt><dd id="analysisDebugProvenance">--</dd></div>
+          </dl>
+          <section class="analysis-debug-landmark" id="analysisDebugLandmarkDetail" hidden>
+            <h4 id="analysisDebugLandmarkName">landmark</h4>
+            <p id="analysisDebugLandmarkMeta"></p>
+            <p id="analysisDebugLandmarkProvenance"></p>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </dialog>
+
   <script type="module">
     import {
       appendMaskEditStroke,
@@ -754,6 +849,10 @@
       undoMaskEdit,
     } from '/packages/pattern-core/dist/index.js'
     import { createMaskEditorController } from './mask-editor.mjs'
+    import {
+      applyCorrectedSubjectEvidence,
+      createAnalysisDebugViewer,
+    } from './analysis-debug-viewer.mjs'
     import {
       createBlindComparison,
       createGatePatternSnapshot,
@@ -795,6 +894,7 @@
       patternCanvas: document.querySelector('#patternCanvas'),
       patternTitle: document.querySelector('#patternTitle'),
       patternDetail: document.querySelector('#patternDetail'),
+      openAnalysisDebugButton: document.querySelector('#openAnalysisDebugButton'),
       toggleGridButton: document.querySelector('#toggleGridButton'),
       downloadButton: document.querySelector('#downloadButton'),
       candidateList: document.querySelector('#candidateList'),
@@ -833,6 +933,19 @@
       maskGateCanvasB: document.querySelector('#maskGateCanvasB'),
       maskGateExportButton: document.querySelector('#maskGateExportButton'),
       maskGateStatus: document.querySelector('#maskGateStatus'),
+      analysisDebugDialog: document.querySelector('#analysisDebugDialog'),
+      analysisDebugCloseButton: document.querySelector('#analysisDebugCloseButton'),
+      analysisDebugCanvas: document.querySelector('#analysisDebugCanvas'),
+      analysisDebugLayerControl: document.querySelector('#analysisDebugLayerControl'),
+      analysisDebugTitle: document.querySelector('#analysisDebugTitle'),
+      analysisDebugStatus: document.querySelector('#analysisDebugStatus'),
+      analysisDebugConfidence: document.querySelector('#analysisDebugConfidence'),
+      analysisDebugModel: document.querySelector('#analysisDebugModel'),
+      analysisDebugProvenance: document.querySelector('#analysisDebugProvenance'),
+      analysisDebugLandmarkDetail: document.querySelector('#analysisDebugLandmarkDetail'),
+      analysisDebugLandmarkName: document.querySelector('#analysisDebugLandmarkName'),
+      analysisDebugLandmarkMeta: document.querySelector('#analysisDebugLandmarkMeta'),
+      analysisDebugLandmarkProvenance: document.querySelector('#analysisDebugLandmarkProvenance'),
     }
 
     let sourceImage = createSampleImage()
@@ -856,6 +969,24 @@
     let maskGateAfterSnapshot
     let maskGateBlindComparison
     let maskGatePointerType
+
+    const analysisDebugViewer = createAnalysisDebugViewer({
+      elements: {
+        dialog: elements.analysisDebugDialog,
+        closeButton: elements.analysisDebugCloseButton,
+        canvas: elements.analysisDebugCanvas,
+        layerControl: elements.analysisDebugLayerControl,
+        title: elements.analysisDebugTitle,
+        status: elements.analysisDebugStatus,
+        confidence: elements.analysisDebugConfidence,
+        model: elements.analysisDebugModel,
+        provenance: elements.analysisDebugProvenance,
+        landmarkDetail: elements.analysisDebugLandmarkDetail,
+        landmarkName: elements.analysisDebugLandmarkName,
+        landmarkMeta: elements.analysisDebugLandmarkMeta,
+        landmarkProvenance: elements.analysisDebugLandmarkProvenance,
+      },
+    })
 
     const maskEditor = createMaskEditorController({
       elements: {
@@ -881,11 +1012,12 @@
       onConfirm: async ({ evidence, session }) => {
         const correctionEndedAt = Date.now()
         savedMaskEditSession = session
-        sourceAnalysis = {
-          ...sourceAnalysis,
-          subjectMask: evidence.mask,
-          subjectMaskEvidence: evidence,
-        }
+        sourceAnalysis = applyCorrectedSubjectEvidence(sourceAnalysis, evidence)
+        analysisDebugViewer.update({
+          image: sourceImage,
+          analysis: sourceAnalysis,
+          originalSubjectEvidence,
+        })
         renderAnalysisSource()
         setStatus('主体已确认', 'ready')
         const result = await generate()
@@ -1285,12 +1417,7 @@
         const result = await algorithm.generate({
           image: sourceImage,
           palette,
-          analysis: {
-            subjectMask: sourceAnalysis.subjectMask,
-            subjectMaskEvidence: sourceAnalysis.subjectMaskEvidence,
-            confidence: sourceAnalysis.confidence,
-            modelVersions: sourceAnalysis.modelVersions,
-          },
+          analysis: sourceAnalysis,
           options: generationOptions(),
         })
         const primary = result.recommended ?? result.bestEffort
@@ -1472,6 +1599,11 @@
       originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
       savedMaskEditSession = undefined
       maskEditor.close()
+      analysisDebugViewer.update({
+        image: sourceImage,
+        analysis: sourceAnalysis,
+        originalSubjectEvidence,
+      })
       elements.fileName.textContent = file.name
       renderAnalysisSource()
       renderSourcePreview()
@@ -1575,6 +1707,7 @@
     elements.maskGateEditButton.addEventListener('click', openMaskEditor)
     elements.maskGateErrorButton.addEventListener('click', () => recordMaskGateError())
     elements.maskGateExportButton.addEventListener('click', exportMaskGateAttempt)
+    elements.openAnalysisDebugButton.addEventListener('click', () => analysisDebugViewer.open())
     elements.toggleGridButton.addEventListener('click', () => {
       showGrid = showGrid === false
       elements.toggleGridButton.setAttribute('aria-pressed', String(showGrid))
@@ -1583,6 +1716,11 @@
     elements.downloadButton.addEventListener('click', downloadPattern)
 
     await initializeMaskGate()
+    analysisDebugViewer.update({
+      image: sourceImage,
+      analysis: sourceAnalysis,
+      originalSubjectEvidence,
+    })
     renderSourcePreview()
     renderAnalysisSource()
     await generate()
