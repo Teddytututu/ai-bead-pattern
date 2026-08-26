@@ -43,7 +43,15 @@ import {
 import { searchFeaturePairs } from './planning/feature-pair-search.js'
 import { resolveFeatureColors } from './planning/feature-color-resolver.js'
 import { buildStructurePlan } from './planning/structure-planner.js'
-import type { CanvasPlan, OccupancyMode } from './contracts.js'
+import { buildValuePlan } from './planning/value-planner.js'
+import { buildPalettePlan } from './planning/palette-planner.js'
+import type {
+  CanvasPlan,
+  OccupancyMode,
+  PalettePlan,
+  ValuePlan,
+  ValueRole,
+} from './contracts.js'
 import {
   buildSourceShapeModel,
   shapeRasterizationThreshold,
@@ -967,6 +975,72 @@ function finalMeanColorDistance(
   return total / Math.max(1, count)
 }
 
+function valueOrderAccuracy(
+  valuePlan: ValuePlan | undefined,
+  roleIdsByCell: readonly (string | undefined)[] | undefined,
+  colorIds: readonly string[],
+  palette: readonly PreparedColor[],
+  activeMask: Uint8Array,
+): number {
+  if (valuePlan === undefined || roleIdsByCell === undefined) return 0
+  const colorsById = new Map(palette.map((color) => [color.id, color]))
+  const lightnessByRole = new Map<string, { total: number; count: number }>()
+  for (let cell = 0; cell < activeMask.length; cell += 1) {
+    const roleId = roleIdsByCell[cell]
+    const color = colorsById.get(colorIds[cell]!)
+    if (activeMask[cell] !== 1 || roleId === undefined || color === undefined) continue
+    const current = lightnessByRole.get(roleId) ?? { total: 0, count: 0 }
+    current.total += color.lab[0]
+    current.count += 1
+    lightnessByRole.set(roleId, current)
+  }
+  const rolesByRegion = new Map<string, ValueRole[]>()
+  for (const role of valuePlan.roles) {
+    const roles = rolesByRegion.get(role.regionId) ?? []
+    roles.push(role)
+    rolesByRegion.set(role.regionId, roles)
+  }
+  let correct = 0
+  let comparisons = 0
+  for (const roles of rolesByRegion.values()) {
+    const ordered = [...roles].sort((first, second) =>
+      first.targetLightness - second.targetLightness)
+    for (let index = 1; index < ordered.length; index += 1) {
+      const lower = lightnessByRole.get(ordered[index - 1]!.id)
+      const higher = lightnessByRole.get(ordered[index]!.id)
+      if (lower === undefined || higher === undefined) continue
+      const required = Math.min(6, Math.max(
+        ordered[index - 1]!.minimumSeparation,
+        ordered[index]!.minimumSeparation,
+      ))
+      if (higher.total / higher.count - lower.total / lower.count >= required) correct += 1
+      comparisons += 1
+    }
+  }
+  return comparisons === 0 ? 1 : correct / comparisons
+}
+
+function paletteRoleConsistency(
+  palettePlan: PalettePlan | undefined,
+  roleIdsByCell: readonly (string | undefined)[] | undefined,
+  colorIds: readonly string[],
+  activeMask: Uint8Array,
+  excludedCells: ReadonlySet<number>,
+): number {
+  if (palettePlan === undefined || roleIdsByCell === undefined) return 0
+  let matches = 0
+  let total = 0
+  for (let cell = 0; cell < activeMask.length; cell += 1) {
+    const roleId = roleIdsByCell[cell]
+    if (activeMask[cell] !== 1 || excludedCells.has(cell) || roleId === undefined) continue
+    const expected = palettePlan.assignments[roleId]
+    if (expected === undefined) continue
+    if (colorIds[cell] === expected) matches += 1
+    total += 1
+  }
+  return total === 0 ? 1 : matches / total
+}
+
 function boundaryAgreement(
   pixelLabs: readonly Lab[],
   colorIds: readonly string[],
@@ -1495,8 +1569,10 @@ function generateCandidate(
       maximumSourceShiftCells: 0.35,
     })
     : undefined
-  const structureMappingActive = (request.analysis?.semanticRegions?.length ?? 0) > 0
+  const semanticPlanningActive = baseline === 'mvp'
     && structurePlan !== undefined
+    && regionIds.some((regionId) => regionId !== undefined)
+  const structureMappingActive = semanticPlanningActive
   const structuredPixels = structureMappingActive === false
     ? resized.pixels
     : samplePixelsAtSourceMapping(
@@ -1519,19 +1595,45 @@ function generateCandidate(
       regionIds,
     )
     : styledPixels
-  const pixelLabs = pixels.map(rgbToLab)
+  const valuePlanning = semanticPlanningActive && structurePlan !== undefined
+    ? buildValuePlan({
+      structurePlan,
+      pixelLabs: pixels.map(rgbToLab),
+      activeMask,
+      levels: valueLevels,
+    })
+    : undefined
+  const pixelLabs = valuePlanning?.plannedLabs ?? pixels.map(rgbToLab)
   const maximumColors = styleColorLimit(
     style,
     Math.min(request.options.maxColors, context.preparedPalette.length),
   )
-  const selectedPalette = selectPalette(
-    pixelLabs,
-    weights,
-    context.preparedPalette,
-    maximumColors,
-    distanceMethod,
-  )
-  const assigned = assignGrid(pixels, pixelLabs, selectedPalette, baseline, distanceMethod)
+  const palettePlanning = semanticPlanningActive && structurePlan !== undefined
+    && valuePlanning !== undefined
+    ? buildPalettePlan({
+      valuePlan: valuePlanning.plan,
+      roleIdsByCell: valuePlanning.roleIdsByCell,
+      plannedLabs: valuePlanning.plannedLabs,
+      structurePlan,
+      colors: context.preparedPalette,
+      maximumColors,
+      distanceMethod,
+      featurePlacements,
+    })
+    : undefined
+  const selectedPaletteIds = new Set(palettePlanning?.plan.selectedColorIds ?? [])
+  const selectedPalette = palettePlanning === undefined
+    ? selectPalette(
+      pixelLabs,
+      weights,
+      context.preparedPalette,
+      maximumColors,
+      distanceMethod,
+    )
+    : context.preparedPalette.filter((color) => selectedPaletteIds.has(color.id))
+  const assigned = palettePlanning === undefined
+    ? assignGrid(pixels, pixelLabs, selectedPalette, baseline, distanceMethod)
+    : { colorIds: palettePlanning.colorIds }
   const landmarkProtected = protectedCells(
     request.analysis,
     crop,
@@ -1689,6 +1791,20 @@ function generateCandidate(
     activeMask,
   )
   const totalBeads = cells.length
+  const finalValueOrderAccuracy = valueOrderAccuracy(
+    valuePlanning?.plan,
+    valuePlanning?.roleIdsByCell,
+    optimization.colorIds,
+    selectedPalette,
+    activeMask,
+  )
+  const finalPaletteRoleConsistency = paletteRoleConsistency(
+    palettePlanning?.plan,
+    valuePlanning?.roleIdsByCell,
+    optimization.colorIds,
+    activeMask,
+    protectedSet,
+  )
   const visibility = featureVisibility(
     request,
     request.analysis,
@@ -1749,6 +1865,8 @@ function generateCandidate(
       cells: region.cellIndices.length,
       adjacentRegionIds: region.adjacentRegionIds,
     })) ?? [],
+    valueRoles: valuePlanning?.plan.roles ?? [],
+    palettePlan: palettePlanning?.plan,
     structure: request.options.structure ?? {},
     optimization: request.options.optimization ?? {},
   })
@@ -1788,6 +1906,8 @@ function generateCandidate(
       planBoundaryAgreement,
       referenceMeanColorDistance: reference.meanColorDistance,
       referenceBoundaryAgreement: reference.boundaryAgreement,
+      valueOrderAccuracy: finalValueOrderAccuracy,
+      paletteRoleConsistency: finalPaletteRoleConsistency,
       paletteOptimizationChanges: paletteOptimization.changedCells,
       topologyEdits: optimization.topologyEdits,
       shapeApplied: shapeRasterization !== undefined,
@@ -1805,6 +1925,8 @@ function generateCandidate(
     canvasPlan: context.canvasPlan,
     ...(featurePlacements.length === 0 ? {} : { featurePlacements }),
     ...(structurePlan === undefined ? {} : { structurePlan }),
+    ...(valuePlanning === undefined ? {} : { valuePlan: valuePlanning.plan }),
+    ...(palettePlanning === undefined ? {} : { palettePlan: palettePlanning.plan }),
     edits: [...featureColors.edits, ...paletteEdits, ...optimization.edits],
   }
 }
@@ -1823,7 +1945,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.4.0-structure-plan'
+    this.version = config.version ?? '0.5.0-value-palette-plan'
     this.#clock = config.clock ?? Date.now
   }
 

@@ -179,10 +179,10 @@ describe('V2 planning contracts', () => {
     )
   })
 
-  it('exposes the StructurePlan release identity on the baseline engine', () => {
+  it('exposes the ValuePlan and PalettePlan release identity on the baseline engine', () => {
     const algorithm = createPatternAlgorithm()
     assert.equal(algorithm.engine, 'baseline')
-    assert.equal(algorithm.version, '0.4.0-structure-plan')
+    assert.equal(algorithm.version, '0.5.0-value-palette-plan')
   })
 
   it('rejects inconsistent region graphs and feature constraints', () => {

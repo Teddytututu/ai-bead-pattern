@@ -6,7 +6,11 @@ import {
   type MaterialPalette,
   type PixelImage,
 } from '../src/index.js'
-import { validateStructurePlan } from '../src/experimental.js'
+import {
+  validatePalettePlan,
+  validateStructurePlan,
+  validateValuePlan,
+} from '../src/experimental.js'
 
 const palette: MaterialPalette = {
   id: 'feature-test',
@@ -64,6 +68,16 @@ describe('feature planning pipeline integration', () => {
     assert.ok(candidate !== undefined)
     assert.ok(candidate.structurePlan !== undefined)
     assert.doesNotThrow(() => validateStructurePlan(candidate.structurePlan!))
+    assert.ok(candidate.valuePlan !== undefined)
+    assert.doesNotThrow(() => validateValuePlan(candidate.valuePlan!))
+    assert.ok(candidate.palettePlan !== undefined)
+    assert.doesNotThrow(() => validatePalettePlan(candidate.palettePlan!))
+    assert.equal(candidate.pattern.cells.every((cell) =>
+      candidate.palettePlan!.selectedColorIds.includes(cell.colorId)), true)
+    assert.ok(candidate.metrics.valueOrderAccuracy >= 0
+      && candidate.metrics.valueOrderAccuracy <= 1)
+    assert.ok(candidate.metrics.paletteRoleConsistency >= 0
+      && candidate.metrics.paletteRoleConsistency <= 1)
     assert.deepEqual(candidate.featurePlacements?.map((entry) => entry.featureId), [
       'left-eye-center',
       'mouth-center',

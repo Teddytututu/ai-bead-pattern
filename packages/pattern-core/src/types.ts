@@ -1,4 +1,9 @@
-import type { CanvasPlan, StructurePlan } from './contracts.js'
+import type {
+  CanvasPlan,
+  PalettePlan,
+  StructurePlan,
+  ValuePlan,
+} from './contracts.js'
 import type { ResolvedFeaturePlacement } from './planning/feature-placement.js'
 
 export type RGB = readonly [red: number, green: number, blue: number]
@@ -255,6 +260,8 @@ export interface GenerationMetrics {
   planBoundaryAgreement: number
   referenceMeanColorDistance: number
   referenceBoundaryAgreement: number
+  valueOrderAccuracy: number
+  paletteRoleConsistency: number
   paletteOptimizationChanges: number
   topologyEdits: number
   shapeApplied: boolean
@@ -308,6 +315,10 @@ export interface PatternCandidate {
   featurePlacements?: readonly ResolvedFeaturePlacement[]
   /** @experimental Region graph, bounded source mapping, and feature constraints. */
   structurePlan?: StructurePlan
+  /** @experimental Region-level light, base, shadow, and outline roles. */
+  valuePlan?: ValuePlan
+  /** @experimental Global material-color subset and role assignments. */
+  palettePlan?: PalettePlan
   edits: readonly GridEditRecord[]
 }
 

@@ -61,6 +61,10 @@ export type {
 } from './planning/feature-color-resolver.js'
 export { buildStructurePlan } from './planning/structure-planner.js'
 export type { StructurePlanningInput } from './planning/structure-planner.js'
+export { buildValuePlan } from './planning/value-planner.js'
+export type { ValuePlanningInput, ValuePlanningResult } from './planning/value-planner.js'
+export { buildPalettePlan } from './planning/palette-planner.js'
+export type { PalettePlanningInput, PalettePlanningResult } from './planning/palette-planner.js'
 export type {
   LandmarkAllocation,
   ShapeAnchor,
