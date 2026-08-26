@@ -29,6 +29,8 @@ importers:
         specifier: ^0.35.3
         version: 0.35.3(@types/node@24.13.3)
 
+  tools/feature-gate: {}
+
   tools/mask-gate:
     dependencies:
       '@ai-bead-pattern/ai-gateway':

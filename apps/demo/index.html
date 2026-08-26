@@ -813,6 +813,7 @@
             <button class="analysis-debug-layer" type="button" data-analysis-layer="skin" aria-pressed="false">皮肤</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="clothes" aria-pressed="false">衣服</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="landmarks" aria-pressed="false">关键点</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="features" aria-pressed="false">五官落格</button>
           </div>
         </nav>
         <div class="analysis-debug-workspace">
@@ -949,7 +950,7 @@
     }
 
     let sourceImage = createSampleImage()
-    let sourceAnalysis = inferSubjectAnalysis(sourceImage)
+    let sourceAnalysis = createSampleAnalysis(sourceImage)
     let originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
     let savedMaskEditSession
     let candidates = []
@@ -1017,6 +1018,7 @@
           image: sourceImage,
           analysis: sourceAnalysis,
           originalSubjectEvidence,
+          candidate: selectedCandidate,
         })
         renderAnalysisSource()
         setStatus('主体已确认', 'ready')
@@ -1327,6 +1329,39 @@
       return canvasToPixelImage(canvas)
     }
 
+    function createSampleAnalysis(image) {
+      const base = inferSubjectAnalysis(image)
+      const faceMask = base.subjectMaskEvidence.mask
+      const provenance = [{
+        origin: 'heuristic',
+        provider: 'demo-sample',
+        model: 'known-sample-portrait',
+        version: '1',
+      }]
+      return {
+        ...base,
+        landmarks: [
+          { id: 'left-eye-center', kind: 'eye', x: 166, y: 217, confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
+          { id: 'right-eye-center', kind: 'eye', x: 254, y: 217, confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
+          { id: 'nose-tip', kind: 'nose', x: 210, y: 253, confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
+          { id: 'mouth-center', kind: 'mouth', x: 210, y: 276, confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
+        ],
+        semanticRegions: [{
+          id: 'face-skin',
+          label: 'face-skin',
+          mask: faceMask,
+          confidence: 1,
+          importance: 1,
+          provenance,
+        }],
+        modelVersions: {
+          ...base.modelVersions,
+          faceLandmarks: 'demo/known-sample-v1',
+          portraitSemantics: 'demo/known-sample-v1',
+        },
+      }
+    }
+
     function canvasToPixelImage(canvas) {
       const context = canvas.getContext('2d', { willReadFrequently: true })
       return {
@@ -1457,6 +1492,12 @@
       if (selectedCandidate === null) return
       renderPattern(selectedCandidate)
       renderMaterials(selectedCandidate)
+      analysisDebugViewer.update({
+        image: sourceImage,
+        analysis: sourceAnalysis,
+        originalSubjectEvidence,
+        candidate: selectedCandidate,
+      })
       for (const button of elements.candidateList.querySelectorAll('.candidate')) {
         button.setAttribute('aria-pressed', String(button.dataset.id === selectedCandidate.id))
       }
@@ -1598,11 +1639,14 @@
       sourceAnalysis = inferSubjectAnalysis(sourceImage)
       originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
       savedMaskEditSession = undefined
+      candidates = []
+      selectedCandidate = null
       maskEditor.close()
       analysisDebugViewer.update({
         image: sourceImage,
         analysis: sourceAnalysis,
         originalSubjectEvidence,
+        candidate: selectedCandidate,
       })
       elements.fileName.textContent = file.name
       renderAnalysisSource()
@@ -1720,6 +1764,7 @@
       image: sourceImage,
       analysis: sourceAnalysis,
       originalSubjectEvidence,
+      candidate: selectedCandidate,
     })
     renderSourcePreview()
     renderAnalysisSource()

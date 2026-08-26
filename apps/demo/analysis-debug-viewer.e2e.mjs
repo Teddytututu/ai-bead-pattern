@@ -63,3 +63,16 @@ test('keeps a wide source proportional in the mobile analysis viewer', async ({ 
   expect(dimensions.sourceRatio).toBe(2)
   await expect(page.getByRole('button', { name: '关闭图像理解' })).toBeInViewport()
 })
+
+test('shows resolved eye, nose, and mouth cells for the sample portrait', async ({ page }) => {
+  await page.goto('/apps/demo/')
+  await waitForGeneration(page)
+  await page.getByRole('button', { name: '分析图层' }).click()
+
+  const dialog = page.getByRole('dialog', { name: '图像理解' })
+  const features = dialog.getByRole('button', { name: '五官落格', exact: true })
+  await expect(features).toBeEnabled()
+  await features.click()
+  await expect(features).toHaveAttribute('aria-pressed', 'true')
+  await expect(dialog.locator('#analysisDebugStatus')).toContainText('五官')
+})
