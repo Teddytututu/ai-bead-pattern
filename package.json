@@ -16,7 +16,9 @@
     "mask-gate:collect": "pnpm --filter @ai-bead-pattern/mask-gate collect",
     "mask-gate:collect-preference": "pnpm --filter @ai-bead-pattern/mask-gate collect:preference",
     "mask-gate:report": "pnpm --filter @ai-bead-pattern/mask-gate report",
-    "test": "pnpm --filter @ai-bead-pattern/pattern-core test && pnpm --filter @ai-bead-pattern/ai-gateway test && pnpm --filter @ai-bead-pattern/mask-gate test && node --test apps/demo/*.test.mjs",
+    "vision-gate:report": "pnpm --filter @ai-bead-pattern/vision-gate report",
+    "vision-gate:fixtures": "pnpm --filter @ai-bead-pattern/vision-gate fixtures",
+    "test": "pnpm --filter @ai-bead-pattern/pattern-core test && pnpm --filter @ai-bead-pattern/ai-gateway test && pnpm --filter @ai-bead-pattern/mask-gate test && pnpm --filter @ai-bead-pattern/vision-gate test && node --test apps/demo/*.test.mjs",
     "test:e2e": "pnpm build && playwright test",
     "typecheck": "pnpm --filter @ai-bead-pattern/pattern-core typecheck && pnpm --filter @ai-bead-pattern/pattern-core build && pnpm --filter @ai-bead-pattern/ai-gateway typecheck"
   },

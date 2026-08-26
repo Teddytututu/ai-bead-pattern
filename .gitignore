@@ -27,6 +27,8 @@ test-results/
 
 # Private Mask Failure Gate inputs and derived evidence
 work/mask-gate/
+/work/vision-gate/
+/tools/vision-gate/work/
 
 # Local planning workspace
 .planning/

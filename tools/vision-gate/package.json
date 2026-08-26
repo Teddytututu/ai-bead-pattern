@@ -1,0 +1,11 @@
+{
+  "name": "@ai-bead-pattern/vision-gate",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fixtures": "node bin/create-protocol-fixtures.mjs",
+    "report": "node bin/report.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

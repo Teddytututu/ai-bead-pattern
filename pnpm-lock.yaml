@@ -41,6 +41,8 @@ importers:
         specifier: ^0.35.3
         version: 0.35.3(@types/node@24.13.3)
 
+  tools/vision-gate: {}
+
 packages:
 
   '@emnapi/runtime@1.11.3':
