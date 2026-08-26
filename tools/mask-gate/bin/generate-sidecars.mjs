@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { RembgHttpSegmentationProvider } from '@ai-bead-pattern/ai-gateway'
 
 import { generateMaskGateSidecars } from '../src/sidecar.mjs'
+import { resolveCliPath } from '../src/cli-path.mjs'
 
 const execFileAsync = promisify(execFile)
 const { values } = parseArgs({
@@ -39,8 +40,8 @@ const provider = new RembgHttpSegmentationProvider({
   defaultModel: values.model,
 })
 const index = await generateMaskGateSidecars({
-  manifestPath: values.manifest,
-  outputDirectory: values.output,
+  manifestPath: resolveCliPath(values.manifest),
+  outputDirectory: resolveCliPath(values.output),
   provider,
   model: values.model,
   postProcessMask: values['raw-mask'] === false,

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  createIndependentMaskGatePreferenceRecord,
   createMaskGateInteractionRecord,
   createMaskGatePreferenceRecord,
 } from '../src/record.mjs'
@@ -145,5 +146,30 @@ describe('Mask Gate V2 preference records', () => {
     assert.equal(preference.preferenceId, 'portrait-01:rater-a')
     assert.equal(preference.patternPreference, 'after')
     assert.equal(preference.blindComparison.leftVariant, 'after')
+  })
+
+  it('creates an independent blind preference against a confirmed interaction', async () => {
+    const interaction = createMaskGateInteractionRecord({
+      ...baseInput(),
+      outcome: 'confirmed',
+      outcomeAt: 8_000,
+      correctionStartedAt: 1_100,
+      correctionEndedAt: 8_000,
+      subjectAcceptable: true,
+      session,
+      baseMaskValues: Float32Array.from([0, 1]),
+      correctedMaskValues: Float32Array.from([1, 1]),
+      confirmedRevision: 'confirmed:mask',
+      afterSnapshot: snapshot('after'),
+    })
+    const preference = await createIndependentMaskGatePreferenceRecord({
+      interaction,
+      raterId: 'reviewer-b',
+      choice: 'left',
+      ratedAt: 13_000,
+    })
+    assert.equal(preference.preferenceId, 'portrait-01:reviewer-b')
+    assert.equal(preference.attemptId, interaction.attemptId)
+    assert.match(preference.blindComparison.seed, /^[a-f0-9]{64}$/)
   })
 })

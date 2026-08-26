@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 
 import {
@@ -10,6 +11,13 @@ import {
   summarizeMaskGate,
 } from '../src/report.mjs'
 import { loadMaskGateManifest } from '../src/manifest.mjs'
+import { resolveCliPath } from '../src/cli-path.mjs'
+import {
+  renderCategoryBreakdownCsv,
+  renderControlPreservationCsv,
+  renderDeviceBreakdownCsv,
+  renderFailureTagBreakdownCsv,
+} from '../src/report-exports.mjs'
 
 const { values } = parseArgs({
   options: {
@@ -18,6 +26,7 @@ const { values } = parseArgs({
     preferences: { type: 'string' },
     output: { type: 'string' },
     json: { type: 'string' },
+    diagnostics: { type: 'string' },
   },
 })
 
@@ -31,14 +40,24 @@ if (values.records === undefined || values.preferences === undefined
 }
 
 const [manifest, records, preferences] = await Promise.all([
-  loadMaskGateManifest(values.manifest),
-  loadMaskGateRecords(values.records),
-  loadMaskGatePreferences(values.preferences),
+  loadMaskGateManifest(resolveCliPath(values.manifest)),
+  loadMaskGateRecords(resolveCliPath(values.records)),
+  loadMaskGatePreferences(resolveCliPath(values.preferences)),
 ])
 const summary = summarizeMaskGate(records, preferences, undefined, manifest)
 const markdown = renderMaskGateReport(summary)
 if (values.output === undefined) process.stdout.write(markdown)
-else await writeFile(values.output, markdown)
+else await writeFile(resolveCliPath(values.output), markdown)
 if (values.json !== undefined) {
-  await writeFile(values.json, `${JSON.stringify(summary, null, 2)}\n`)
+  await writeFile(resolveCliPath(values.json), `${JSON.stringify(summary, null, 2)}\n`)
+}
+if (values.diagnostics !== undefined) {
+  const diagnosticsDirectory = resolveCliPath(values.diagnostics)
+  await mkdir(diagnosticsDirectory, { recursive: true })
+  await Promise.all([
+    writeFile(join(diagnosticsDirectory, 'category-breakdown.csv'), renderCategoryBreakdownCsv(records)),
+    writeFile(join(diagnosticsDirectory, 'failure-tag-breakdown.csv'), renderFailureTagBreakdownCsv(records)),
+    writeFile(join(diagnosticsDirectory, 'device-breakdown.csv'), renderDeviceBreakdownCsv(records)),
+    writeFile(join(diagnosticsDirectory, 'control-preservation.csv'), renderControlPreservationCsv(records)),
+  ])
 }
