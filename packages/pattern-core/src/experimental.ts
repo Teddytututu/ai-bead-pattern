@@ -65,6 +65,12 @@ export { buildValuePlan } from './planning/value-planner.js'
 export type { ValuePlanningInput, ValuePlanningResult } from './planning/value-planner.js'
 export { buildPalettePlan } from './planning/palette-planner.js'
 export type { PalettePlanningInput, PalettePlanningResult } from './planning/palette-planner.js'
+export { refineGridClusters } from './grid-refinement.js'
+export type {
+  GridRefinementInput,
+  GridRefinementResult,
+} from './grid-refinement.js'
+export type { GridRefinementMode, GridRefinementSummary } from './types.js'
 export type {
   LandmarkAllocation,
   ShapeAnchor,

@@ -59,6 +59,7 @@ describe('feature planning pipeline integration', () => {
       options: {
         canvas: { mode: 'fixed', size: { width: 16, height: 16 } },
         structure: { occupancyMode: 'full-frame' },
+        optimization: { refinementMode: 'quality' },
         maxColors: 3,
         maxCandidates: 1,
         styles: ['simple'],
@@ -78,6 +79,10 @@ describe('feature planning pipeline integration', () => {
       && candidate.metrics.valueOrderAccuracy <= 1)
     assert.ok(candidate.metrics.paletteRoleConsistency >= 0
       && candidate.metrics.paletteRoleConsistency <= 1)
+    assert.equal(candidate.gridRefinement?.mode, 'quality')
+    assert.ok(candidate.gridRefinement!.energyAfter <= candidate.gridRefinement!.energyBefore)
+    assert.equal(candidate.metrics.gridRefinementChanges, candidate.gridRefinement!.changedCells)
+    assert.ok(candidate.metrics.symmetryQuality >= 0 && candidate.metrics.symmetryQuality <= 1)
     assert.deepEqual(candidate.featurePlacements?.map((entry) => entry.featureId), [
       'left-eye-center',
       'mouth-center',
@@ -94,5 +99,24 @@ describe('feature planning pipeline integration', () => {
       assert.equal(candidate.pattern.cells.find((entry) =>
         entry.x === edit.x && entry.y === edit.y)?.colorId, edit.toColorId)
     }
+  })
+
+  it('keeps the established grid path when semantic regions are absent', async () => {
+    const result = await createPatternAlgorithm().generate({
+      image: portrait(),
+      palette,
+      options: {
+        canvas: { mode: 'fixed', size: { width: 16, height: 16 } },
+        optimization: { refinementMode: 'quality' },
+        maxColors: 3,
+        maxCandidates: 1,
+        styles: ['simple'],
+      },
+    })
+
+    const candidate = result.recommended ?? result.bestEffort
+    assert.ok(candidate !== undefined)
+    assert.equal(candidate.gridRefinement, undefined)
+    assert.equal(candidate.metrics.gridRefinementChanges, 0)
   })
 })

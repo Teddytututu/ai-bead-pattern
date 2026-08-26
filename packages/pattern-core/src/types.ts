@@ -37,6 +37,7 @@ export type ColorDistanceMethod = 'delta-e-76' | 'delta-e-2000'
 export type PatternStyle = 'faithful' | 'cute' | 'simple' | 'high-contrast' | 'soft'
 export type BaselineMode = 'a0' | 'a1' | 'mvp'
 export type AlgorithmEngine = 'baseline'
+export type GridRefinementMode = 'fast' | 'quality'
 
 export interface GridSize {
   width: number
@@ -55,6 +56,7 @@ export interface OptimizationOptions {
   paletteCoherence?: number
   localSearchIterations?: number
   aliasPenalty?: number
+  refinementMode?: GridRefinementMode
 }
 
 export interface StructureOptions {
@@ -236,7 +238,7 @@ export interface GridEditRecord {
   fromColorId: string
   toColorId: string
   reason: 'small-region' | 'isolated-cell' | 'stripe' | 'topology' | 'palette-coherence'
-    | 'feature-placement'
+    | 'feature-placement' | 'cluster-refinement' | 'symmetry'
 }
 
 export interface GenerationMetrics {
@@ -263,6 +265,8 @@ export interface GenerationMetrics {
   valueOrderAccuracy: number
   paletteRoleConsistency: number
   paletteOptimizationChanges: number
+  gridRefinementChanges: number
+  symmetryQuality: number
   topologyEdits: number
   shapeApplied: boolean
   subjectOccupancyRatio: number
@@ -274,6 +278,14 @@ export interface GenerationMetrics {
   referenceShapeHoles: number
   targetShapeHoles: number
   shapeEdits: number
+}
+
+export interface GridRefinementSummary {
+  mode: GridRefinementMode
+  changedCells: number
+  energyBefore: number
+  energyAfter: number
+  iterations: number
 }
 
 export interface GenerationTiming {
@@ -319,6 +331,8 @@ export interface PatternCandidate {
   valuePlan?: ValuePlan
   /** @experimental Global material-color subset and role assignments. */
   palettePlan?: PalettePlan
+  /** @experimental Unified cluster cleanup diagnostics. */
+  gridRefinement?: GridRefinementSummary
   edits: readonly GridEditRecord[]
 }
 

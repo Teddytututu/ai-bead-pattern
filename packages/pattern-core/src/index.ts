@@ -54,6 +54,8 @@ export type {
   GenerationStatus,
   GenerationTiming,
   GridEditRecord,
+  GridRefinementMode,
+  GridRefinementSummary,
   GridSize,
   ImageAnalysis,
   ImageLandmark,

@@ -1768,6 +1768,9 @@ describe('deterministic pattern algorithm', () => {
       structure: { occupancyMode: 'outline' as never },
     })), /occupancyMode/)
     await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      optimization: { refinementMode: 'maximum' as never },
+    })), /refinementMode/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
       structure: { shapeRefinementIterations: 1.5 },
     })), /shapeRefinementIterations/)
     await assert.rejects(() => algorithm.generate(fixedRequest(source, {

@@ -179,10 +179,10 @@ describe('V2 planning contracts', () => {
     )
   })
 
-  it('exposes the ValuePlan and PalettePlan release identity on the baseline engine', () => {
+  it('exposes the unified grid refinement release identity on the baseline engine', () => {
     const algorithm = createPatternAlgorithm()
     assert.equal(algorithm.engine, 'baseline')
-    assert.equal(algorithm.version, '0.5.0-value-palette-plan')
+    assert.equal(algorithm.version, '0.6.0-grid-refinement')
   })
 
   it('rejects inconsistent region graphs and feature constraints', () => {

@@ -31,6 +31,7 @@ import {
   landmarkGridRadiusCells,
 } from './landmarks.js'
 import { optimizePaletteAssignments } from './palette-optimization.js'
+import { refineGridClusters } from './grid-refinement.js'
 import {
   planCanvases,
   planCanvasesWithShapeVariants,
@@ -504,7 +505,13 @@ function validateRequest(request: PatternGenerationRequest): void {
       throw new RangeError('maxCandidates exceeds the MVP processing limit')
     }
   }
+  validateEnum(
+    request.options.optimization?.refinementMode,
+    new Set(['fast', 'quality']),
+    'refinementMode',
+  )
   for (const [name, value] of Object.entries(request.options.optimization ?? {})) {
+    if (name === 'refinementMode') continue
     if (value !== undefined && (Number.isFinite(value) === false || value < 0)) {
       throw new RangeError(`Optimization option ${name} must be a finite non-negative number`)
     }
@@ -1135,6 +1142,7 @@ interface FeatureVisibilityResult {
   purity: number
   connectivity: number
   localContrast: number
+  symmetryQuality: number
   valid: boolean
   rejectionReasons: readonly string[]
 }
@@ -1248,6 +1256,7 @@ function featureVisibility(
       purity: 0,
       connectivity: 0,
       localContrast: 0,
+      symmetryQuality: 1,
       valid: true,
       rejectionReasons: [],
     }
@@ -1409,6 +1418,7 @@ function featureVisibility(
     purity: weightedAverage((entry) => entry.purity),
     connectivity: weightedAverage((entry) => entry.connectivity),
     localContrast: weightedAverage((entry) => entry.contrastScore),
+    symmetryQuality: clamp(symmetryScore, 0, 1),
     valid: evaluated.every((entry) => entry.valid) && hardCollision === false,
     rejectionReasons: [...rejectionReasons].sort(),
   }
@@ -1711,40 +1721,57 @@ function generateCandidate(
       optimizationOptions,
       activeMask,
     )
-  const counts = materialCounts(optimization.colorIds, selectedPalette, activeMask)
+  const gridRefinement = semanticPlanningActive && structurePlan !== undefined
+    ? refineGridClusters({
+      colorIds: optimization.colorIds,
+      width: size.width,
+      height: size.height,
+      activeMask,
+      protectedCells: protectedSet,
+      pixelLabs,
+      colors: selectedPalette,
+      boundaryStrength: structurePlan.boundaryStrength,
+      importance: weights,
+      featurePlacements,
+      distanceMethod,
+      mode: request.options.optimization?.refinementMode ?? 'fast',
+    })
+    : undefined
+  const finalColorIds = gridRefinement?.colorIds ?? optimization.colorIds
+  const counts = materialCounts(finalColorIds, selectedPalette, activeMask)
   const usedIds = new Set(counts.map((entry) => entry.colorId))
   const usedPalette = selectedPalette.filter((color) => usedIds.has(color.id))
   const cells: PatternCell[] = []
-  for (let index = 0; index < optimization.colorIds.length; index += 1) {
+  for (let index = 0; index < finalColorIds.length; index += 1) {
     if (activeMask[index] !== 1) continue
     cells.push({
       x: index % size.width,
       y: Math.floor(index / size.width),
-      colorId: optimization.colorIds[index]!,
+      colorId: finalColorIds[index]!,
     })
   }
   const isolatedCells = countIsolatedCells(
-    optimization.colorIds,
+    finalColorIds,
     size.width,
     size.height,
     activeMask,
   )
   const thinStripes = countThinStripes(
-    optimization.colorIds,
+    finalColorIds,
     size.width,
     size.height,
     activeMask,
   )
   const sourceBoundaryAgreement = boundaryAgreement(
     sourceLabs,
-    optimization.colorIds,
+    finalColorIds,
     size.width,
     size.height,
     activeMask,
   )
   const planBoundaryAgreement = boundaryAgreement(
     pixelLabs,
-    optimization.colorIds,
+    finalColorIds,
     size.width,
     size.height,
     activeMask,
@@ -1755,7 +1782,7 @@ function generateCandidate(
     resized.fit,
     size.width,
     size.height,
-    optimization.colorIds,
+    finalColorIds,
     selectedPalette,
     activeMask,
   )
@@ -1780,13 +1807,13 @@ function generateCandidate(
     : colorStructure * 0.55 + shapeStructure * 0.45
   const planMeanColorDistance = finalMeanColorDistance(
     pixelLabs,
-    optimization.colorIds,
+    finalColorIds,
     selectedPalette,
     activeMask,
   )
   const sourceMeanColorDistance = finalMeanColorDistance(
     sourceLabs,
-    optimization.colorIds,
+    finalColorIds,
     selectedPalette,
     activeMask,
   )
@@ -1794,14 +1821,14 @@ function generateCandidate(
   const finalValueOrderAccuracy = valueOrderAccuracy(
     valuePlanning?.plan,
     valuePlanning?.roleIdsByCell,
-    optimization.colorIds,
+    finalColorIds,
     selectedPalette,
     activeMask,
   )
   const finalPaletteRoleConsistency = paletteRoleConsistency(
     palettePlanning?.plan,
     valuePlanning?.roleIdsByCell,
-    optimization.colorIds,
+    finalColorIds,
     activeMask,
     protectedSet,
   )
@@ -1812,7 +1839,7 @@ function generateCandidate(
     size.width,
     size.height,
     resized.fit,
-    optimization.colorIds,
+    finalColorIds,
     selectedPalette,
     activeMask,
     regionIds,
@@ -1909,6 +1936,8 @@ function generateCandidate(
       valueOrderAccuracy: finalValueOrderAccuracy,
       paletteRoleConsistency: finalPaletteRoleConsistency,
       paletteOptimizationChanges: paletteOptimization.changedCells,
+      gridRefinementChanges: gridRefinement?.changedCells ?? 0,
+      symmetryQuality: visibility.symmetryQuality,
       topologyEdits: optimization.topologyEdits,
       shapeApplied: shapeRasterization !== undefined,
       subjectOccupancyRatio: shapeRasterization?.diagnostics.occupancyRatio ?? 1,
@@ -1927,7 +1956,23 @@ function generateCandidate(
     ...(structurePlan === undefined ? {} : { structurePlan }),
     ...(valuePlanning === undefined ? {} : { valuePlan: valuePlanning.plan }),
     ...(palettePlanning === undefined ? {} : { palettePlan: palettePlanning.plan }),
-    edits: [...featureColors.edits, ...paletteEdits, ...optimization.edits],
+    ...(gridRefinement === undefined
+      ? {}
+      : {
+        gridRefinement: {
+          mode: gridRefinement.mode,
+          changedCells: gridRefinement.changedCells,
+          energyBefore: gridRefinement.energyBefore,
+          energyAfter: gridRefinement.energyAfter,
+          iterations: gridRefinement.iterations,
+        },
+      }),
+    edits: [
+      ...featureColors.edits,
+      ...paletteEdits,
+      ...optimization.edits,
+      ...(gridRefinement?.edits ?? []),
+    ],
   }
 }
 
@@ -1945,7 +1990,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.5.0-value-palette-plan'
+    this.version = config.version ?? '0.6.0-grid-refinement'
     this.#clock = config.clock ?? Date.now
   }
 
