@@ -34,6 +34,13 @@ import {
   planCanvases,
   planCanvasesWithShapeVariants,
 } from './planning/canvas-planner.js'
+import {
+  createFeatureConstraint,
+  searchFeaturePlacements,
+  type ResolvedFeaturePlacement,
+} from './planning/feature-placement.js'
+import { searchFeaturePairs } from './planning/feature-pair-search.js'
+import { resolveFeatureColors } from './planning/feature-color-resolver.js'
 import type { CanvasPlan, OccupancyMode } from './contracts.js'
 import {
   buildSourceShapeModel,
@@ -688,6 +695,127 @@ function gridRegionIds(
   return ids
 }
 
+function maskFromActiveCells(width: number, height: number, activeMask: Uint8Array) {
+  return { width, height, values: Float32Array.from(activeMask) }
+}
+
+function carrierMask(
+  carrierRegionId: string,
+  width: number,
+  height: number,
+  regionIds: readonly (string | undefined)[],
+) {
+  return {
+    width,
+    height,
+    values: Float32Array.from(regionIds, (regionId) => Number(regionId === carrierRegionId)),
+  }
+}
+
+function planFeaturePlacements(
+  analysis: ImageAnalysis | undefined,
+  canvasPlan: CanvasPlan,
+  activeMask: Uint8Array,
+  regionIds: readonly (string | undefined)[],
+): readonly ResolvedFeaturePlacement[] {
+  const eligible = (analysis?.landmarks ?? []).filter((landmark) =>
+    landmark.kind === 'eye' || landmark.kind === 'mouth' || landmark.kind === 'nose')
+  if (eligible.length === 0) return []
+  const budgets = new Map(canvasPlan.featureBudgets.map((budget) => [budget.featureId, budget]))
+  const occupancyMask = maskFromActiveCells(canvasPlan.size.width, canvasPlan.size.height, activeMask)
+  const blockedCells = new Set<number>()
+  const selected: ResolvedFeaturePlacement[] = []
+  const handled = new Set<string>()
+  const eyeGroups = new Map<string, ImageLandmark[]>()
+  for (const landmark of eligible) {
+    if (landmark.kind !== 'eye' || landmark.symmetryGroup === undefined) continue
+    const group = eyeGroups.get(landmark.symmetryGroup) ?? []
+    group.push(landmark)
+    eyeGroups.set(landmark.symmetryGroup, group)
+  }
+  for (const group of eyeGroups.values()) {
+    if (group.length !== 2) continue
+    const ordered = [...group].sort((first, second) => first.x - second.x || first.id.localeCompare(second.id))
+    const left = ordered[0]!
+    const right = ordered[1]!
+    const leftBudget = budgets.get(left.id)
+    const rightBudget = budgets.get(right.id)
+    if (leftBudget === undefined || rightBudget === undefined) continue
+    const leftCandidates = searchFeaturePlacements({
+      canvasPlan,
+      budget: leftBudget,
+      landmark: left,
+      occupancyMask,
+      blockedCells,
+      ...(left.carrierRegionId === undefined ? {} : {
+        carrierMask: carrierMask(
+          left.carrierRegionId,
+          canvasPlan.size.width,
+          canvasPlan.size.height,
+          regionIds,
+        ),
+      }),
+    })
+    const rightCandidates = searchFeaturePlacements({
+      canvasPlan,
+      budget: rightBudget,
+      landmark: right,
+      occupancyMask,
+      blockedCells,
+      ...(right.carrierRegionId === undefined ? {} : {
+        carrierMask: carrierMask(
+          right.carrierRegionId,
+          canvasPlan.size.width,
+          canvasPlan.size.height,
+          regionIds,
+        ),
+      }),
+    })
+    const leftConstraint = createFeatureConstraint(leftBudget, left, canvasPlan)
+    const rightConstraint = createFeatureConstraint(rightBudget, right, canvasPlan)
+    const pair = searchFeaturePairs({
+      leftCandidates,
+      rightCandidates,
+      expectedLeftCenter: leftConstraint.targetCenter,
+      expectedRightCenter: rightConstraint.targetCenter,
+      maximumPairs: 1,
+    })[0]
+    if (pair === undefined) continue
+    selected.push(pair.left, pair.right)
+    for (const cell of [...pair.left.occupiedCells, ...pair.right.occupiedCells]) blockedCells.add(cell)
+    handled.add(left.id)
+    handled.add(right.id)
+  }
+  const remaining = eligible.filter((landmark) => handled.has(landmark.id) === false)
+    .sort((first, second) => Number(second.priority === 'hard') - Number(first.priority === 'hard')
+      || second.confidence - first.confidence
+      || first.id.localeCompare(second.id))
+  for (const landmark of remaining) {
+    const budget = budgets.get(landmark.id)
+    if (budget === undefined) continue
+    const placement = searchFeaturePlacements({
+      canvasPlan,
+      budget,
+      landmark,
+      occupancyMask,
+      blockedCells,
+      ...(landmark.carrierRegionId === undefined ? {} : {
+        carrierMask: carrierMask(
+          landmark.carrierRegionId,
+          canvasPlan.size.width,
+          canvasPlan.size.height,
+          regionIds,
+        ),
+      }),
+      maximumCandidates: 1,
+    })[0]
+    if (placement === undefined) continue
+    selected.push(placement)
+    for (const cell of placement.occupiedCells) blockedCells.add(cell)
+  }
+  return selected.sort((first, second) => first.featureId.localeCompare(second.featureId))
+}
+
 function protectedCells(
   analysis: ImageAnalysis | undefined,
   crop: CropRect,
@@ -1331,6 +1459,9 @@ function generateCandidate(
     resized.fit,
     activeMask,
   )
+  const featurePlacements = baseline === 'mvp'
+    ? planFeaturePlacements(request.analysis, context.canvasPlan, activeMask, regionIds)
+    : []
   const pixels = baseline === 'mvp'
     ? designRegionValues(
       styledPixels,
@@ -1364,11 +1495,32 @@ function generateCandidate(
   const protectedSet = new Set([
     ...landmarkProtected,
     ...(shapeRasterization?.protectedCells ?? []),
+    ...featurePlacements.flatMap((placement) => placement.occupiedCells),
   ])
+  const semanticFeatureIds = new Set((request.analysis?.landmarks ?? [])
+    .filter((landmark) => landmark.carrierRegionId !== undefined)
+    .map((landmark) => landmark.id))
+  const colorPlacements = featurePlacements.filter((placement) =>
+    semanticFeatureIds.has(placement.featureId))
+  const featureColors = baseline === 'mvp'
+    ? resolveFeatureColors({
+      placements: colorPlacements,
+      initialColorIds: assigned.colorIds,
+      colors: selectedPalette,
+      width: size.width,
+      height: size.height,
+      activeMask,
+      minimumContrastByFeature: new Map(context.canvasPlan.featureBudgets.map((budget) => [
+        budget.featureId,
+        budget.minimumContrast,
+      ])),
+      distanceMethod,
+    })
+    : { colorIds: assigned.colorIds, edits: [] }
   const paletteOptimization = baseline === 'mvp'
     ? optimizePaletteAssignments({
       pixelLabs,
-      initialColorIds: assigned.colorIds,
+      initialColorIds: featureColors.colorIds,
       colors: selectedPalette,
       width: size.width,
       height: size.height,
@@ -1382,7 +1534,7 @@ function generateCandidate(
     })
     : { colorIds: assigned.colorIds, changedCells: 0 }
   const paletteEdits = paletteOptimization.colorIds.flatMap((colorId, index) => {
-    const fromColorId = assigned.colorIds[index]
+    const fromColorId = featureColors.colorIds[index]
     if (activeMask[index] !== 1 || fromColorId === undefined || fromColorId === colorId) return []
     return [{
       x: index % size.width,
@@ -1542,6 +1694,7 @@ function generateCandidate(
       featureRegionId: landmark.featureRegionId,
       carrierRegionId: landmark.carrierRegionId,
     })) ?? [],
+    featurePlacements,
     structure: request.options.structure ?? {},
     optimization: request.options.optimization ?? {},
   })
@@ -1596,7 +1749,8 @@ function generateCandidate(
     },
     score,
     canvasPlan: context.canvasPlan,
-    edits: [...paletteEdits, ...optimization.edits],
+    ...(featurePlacements.length === 0 ? {} : { featurePlacements }),
+    edits: [...featureColors.edits, ...paletteEdits, ...optimization.edits],
   }
 }
 

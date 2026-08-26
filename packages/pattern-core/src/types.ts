@@ -1,4 +1,5 @@
 import type { CanvasPlan } from './contracts.js'
+import type { ResolvedFeaturePlacement } from './planning/feature-placement.js'
 
 export type RGB = readonly [red: number, green: number, blue: number]
 
@@ -230,6 +231,7 @@ export interface GridEditRecord {
   fromColorId: string
   toColorId: string
   reason: 'small-region' | 'isolated-cell' | 'stripe' | 'topology' | 'palette-coherence'
+    | 'feature-placement'
 }
 
 export interface GenerationMetrics {
@@ -302,6 +304,8 @@ export interface PatternCandidate {
   score: CandidateScore
   /** @experimental Executable V2 planning diagnostics for this candidate. */
   canvasPlan?: CanvasPlan
+  /** @experimental Discrete feature placements resolved before color quantization. */
+  featurePlacements?: readonly ResolvedFeaturePlacement[]
   edits: readonly GridEditRecord[]
 }
 
