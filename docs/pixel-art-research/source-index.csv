@@ -1,0 +1,512 @@
+﻿id,title,creator,source,media_type,quality_grade,access_status,topics,url
+PA-0001,16×16 Pixel Art Tutorial,ilkkke,Lospec catalog / original article,article,B,full-text,调色板与明度 | 光照与体积 | 轮廓与像素簇 | 人物与角色,http://www.photonstorm.com/art/tutorials-art/16x16-pixel-art-tutorial
+PA-0002,A Basic Sprite Tutorial,Kiwi,Lospec catalog / original article,article,B,full-text,工具与导出 | 光照与体积 | 调色板与明度 | 人物与角色,https://2dwillneverdie.com/tutorial/a-basic-sprite-tutorial/
+PA-0003,Ambient Lighting: Portrait,st0ven,Lospec catalog / original article,article,B,full-text,光照与体积 | 人物与角色 | 调色板与明度 | 轮廓与像素簇,http://web.archive.org/web/20070202185612/http://spriteart.com:80/tutorials/02_ambient_face.html
+PA-0004,Ambient Lighting: Sphere,st0ven,Lospec catalog / original article,article,B,full-text,光照与体积 | 轮廓与像素簇 | 调色板与明度 | 人物与角色,http://web.archive.org/web/20070202185717/http://spriteart.com:80/tutorials/02_ambient_sphere.html
+PA-0005,Anti-Aliasing,st0ven,Lospec catalog / original article,article,B,full-text,调色板与明度 | 场景与透视 | 光照与体积 | 轮廓与像素簇,http://web.archive.org/web/20070401222429/http://www.spriteart.com:80/tutorials/01_AA.html
+PA-0006,Background Art (introduction),st0ven,Lospec catalog / original article,article,B,full-text,调色板与明度 | 场景与透视 | 构图与尺度 | 人物与角色,https://web.archive.org/web/20140702161407/http://steve.neonstar.net/mini_background1.htm
+PA-0007,Background Art (introduction) 2,st0ven,Lospec catalog / original article,article,B,full-text,场景与透视 | 调色板与明度 | 光照与体积 | 工具与导出,https://web.archive.org/web/20120705043521/http://steve.neonstar.net:80/mini_background2.htm
+PA-0008,Background Art (introduction) 3,st0ven,Lospec catalog / original article,article,B,full-text,场景与透视 | 光照与体积 | 调色板与明度 | 抗锯齿与抖动,https://web.archive.org/web/20120502132848/http://steve.neonstar.net/mini_background3.htm
+PA-0009,Basics of Animation,Jason Perry,Lospec catalog / original article,article,B,full-text,动画 | 人物与角色 | 光照与体积,http://finalbossblues.com/basics-of-animation/
+PA-0010,Building on a Sprite Base,Jason Perry,Lospec catalog / original article,article,B,full-text,人物与角色 | 光照与体积 | 场景与透视 | 动画,http://finalbossblues.com/building-on-a-sprite-base/
+PA-0011,Chibi Sprites (super deformed),st0ven,Lospec catalog / original article,article,B,full-text,人物与角色 | 光照与体积 | 调色板与明度 | 场景与透视,http://web.archive.org/web/20070419044820/http://www.spriteart.com:80/tutorials/03_fighter_chibi.html
+PA-0012,Creating an RPG Base,Jason Perry,Lospec catalog / original article,article,B,full-text,人物与角色 | 光照与体积 | 调色板与明度 | 场景与透视,http://finalbossblues.com/creating-an-rpg-base/
+PA-0013,Dithering,st0ven,Lospec catalog / original article,article,B,full-text,调色板与明度 | 材质与纹理 | 场景与透视,http://web.archive.org/web/20070401222913/http://www.spriteart.com:80/tutorials/01_dither.html
+PA-0014,Fighter Sprite Faces (female),st0ven,Lospec catalog / original article,article,B,full-text,人物与角色 | 光照与体积 | 调色板与明度 | 轮廓与像素簇,http://web.archive.org/web/20070419050425/http://www.spriteart.com:80/tutorials/02_fighter_face01.html
+PA-0015,Fighter Sprite Faces (male),st0ven,Lospec catalog / original article,article,B,full-text,人物与角色 | 光照与体积 | 调色板与明度 | 轮廓与像素簇,http://web.archive.org/web/20070419035334/http://www.spriteart.com:80/tutorials/02_fighter_face00.html
+PA-0016,Fighter Sprites ('gi-clone'),st0ven,Lospec catalog / original article,article,B,full-text,人物与角色 | 光照与体积 | 调色板与明度 | 材质与纹理,http://web.archive.org/web/20070419050453/http://www.spriteart.com:80/tutorials/03_fighter_sprite.html
+PA-0017,Form and Light,Jason Perry,Lospec catalog / original article,article,B,full-text,光照与体积 | 人物与角色 | 轮廓与像素簇 | 调色板与明度,http://finalbossblues.com/form-and-light/
+PA-0018,FoY Tutorial I - an archeological dig in a vaguely Mediterranean country,Misja van Laatum,Lospec catalog / original article,article,B,full-text,工具与导出 | 场景与透视 | 调色板与明度 | 光照与体积,https://web.archive.org/web/20130604154027/http://www.barnettcollege.com/tutorial1.htm
+PA-0019,Give your sprites depth with sub-pixel animation,Kiwi,Lospec catalog / original article,article,B,full-text,人物与角色 | 动画 | 轮廓与像素簇 | 调色板与明度,https://2dwillneverdie.com/tutorial/give-your-sprites-depth-with-sub-pixel-animation/
+PA-0020,Handmade Antialiasing,Nemesis42,Lospec catalog / original article,article,B,full-text,光照与体积 | 人物与角色 | 调色板与明度 | 场景与透视,http://www.gas13.ru/v3/tutorials/handmade_antialiasing.php
+PA-0021,How to do a pixel head,Craig Robinson,Lospec catalog / original article,article,B,full-text,人物与角色 | 光照与体积,https://web.archive.org/web/20080211140253/http://flipflopflyin.com/g/2006/06/how-to-do-pixel-head.html
+PA-0022,How to Pixel With Photoshop Tutorial,Hannes Drexl,Lospec catalog / original article,article,B,full-text,调色板与明度 | 抗锯齿与抖动 | 工具与导出 | 构图与尺度,http://www.elitepigs.de/blog/archives/78
+PA-0023,Improve your pixel art sprites,Marmontel Boris,Lospec catalog / original article,article,B,full-text,调色板与明度 | 轮廓与像素簇 | 光照与体积 | 场景与透视,https://oni1ink.deviantart.com/journal/Improve-your-pixel-art-sprites-645794349
+PA-0024,Interlacing Scanlines,st0ven,Lospec catalog / original article,article,B,full-text,调色板与明度 | 人物与角色 | 动画 | 材质与纹理,http://web.archive.org/web/20070202185256/http://spriteart.com:80/tutorials/01_interlace.html
+PA-0025,Introduction to Pixel Art,Richard Janes,Lospec catalog / original article,article,B,full-text,调色板与明度 | 光照与体积 | 人物与角色 | 构图与尺度,http://rjanes.com/tutorials/introduction_to_pixel_art.php
+PA-0026,Isometric Pixelart Tutorial Part 1: Setting up Photoshop for Square-Pushing,Gunstar Red,Lospec catalog / original article,article,B,full-text,人物与角色 | 场景与透视 | 调色板与明度 | 图块与地形,http://www.gas13.ru/v3/tutorials/isometric_pixelart_tutorial_setup_photoshop_for_pixelart.php
+PA-0027,Isometric Pixelart Tutorial Part 2: The Mathematics of Isometrics,Gunstar Red,Lospec catalog / original article,article,B,full-text,场景与透视 | 人物与角色 | 图块与地形,http://gas13.ru/v3/tutorials/isometric_pixelart_tutorial_mathematics_of_isometrics.php
+PA-0028,Isometric Pixelart Tutorial Part 3: The Two Types,Gunstar Red,Lospec catalog / original article,article,B,full-text,人物与角色 | 场景与透视 | 图块与地形,http://www.gas13.ru/v3/tutorials/isometric_pixelart_tutorial_the_two_types.php
+PA-0029,Isometric Pixelart Tutorial Part 4: Throwing Shapes,Gunstar Red,Lospec catalog / original article,article,B,full-text,人物与角色 | 场景与透视 | 图块与地形 | 工具与导出,http://www.gas13.ru/v3/tutorials/isometric_pixelart_tutorial_throwing_shapes.php
+PA-0030,Isometric Pixelart Tutorial Part 5: Light Sources and Colours,Gunstar Red,Lospec catalog / original article,article,B,full-text,人物与角色 | 场景与透视 | 轮廓与像素簇 | 调色板与明度,http://www.gas13.ru/v3/tutorials/isometric_pixelart_tutorial_light_sources_and_colours.php
+PA-0031,Isometric Pixelart Tutorial Part 6: Let's Build an Isometric House,Gunstar Red,Lospec catalog / original article,article,B,full-text,场景与透视 | 人物与角色 | 调色板与明度 | 光照与体积,http://www.gas13.ru/v3/tutorials/isometric_pixelart_tutorial_isometric_house.php
+PA-0032,Isometric Pool,Davit Masia,Lospec catalog / original article,article,B,full-text,调色板与明度 | 场景与透视 | 人物与角色 | 图块与地形,http://www.gas13.ru/v3/tutorials/isomteric_pool_pixel_art_tutorial.php
+PA-0033,Isometric Tile: 1:1 ratio,st0ven,Lospec catalog / original article,article,B,full-text,场景与透视 | 图块与地形 | 构图与尺度 | 材质与纹理,http://web.archive.org/web/20070428203805/http://www.spriteart.com:80/tutorials/02_iso_1to1.html
+PA-0034,Isometric Tile: 2:1 ratio,st0ven,Lospec catalog / original article,article,B,full-text,图块与地形 | 场景与透视 | 材质与纹理 | 光照与体积,http://web.archive.org/web/20070401215340/http://spriteart.com:80/tutorials/02_iso_2to1.html
+PA-0035,Kiwi’s 7-step program for learning pixel art,Kiwi,Lospec catalog / original article,article,B,full-text,人物与角色 | 光照与体积 | 调色板与明度 | 构图与尺度,https://2dwillneverdie.com/blog/kiwis-7-step-program-for-learning-pixel-art/
+PA-0036,Learn better anti-aliasing for your pixel art,Kiwi,Lospec catalog / original article,article,B,full-text,抗锯齿与抖动 | 调色板与明度 | 人物与角色 | 光照与体积,https://2dwillneverdie.com/tutorial/learn-better-anti-aliasing-for-your-pixel-art/
+PA-0037,Learn How to Draw Hand-crafted Pixel Art in Photoshop,Russell Tate,Lospec catalog / original article,article,B,full-text,场景与透视 | 调色板与明度 | 轮廓与像素簇 | 工具与导出,https://design.tutsplus.com/articles/learn-how-to-draw-hand-crafted-pixel-art-in-photoshop--psd-5284
+PA-0038,Les Forges Pixel Art Course Chapter 1: The Right Tools,Antoine Gersant,Lospec catalog / original article,article,B,full-text,动画 | 材质与纹理 | 图块与地形 | 调色板与明度,https://opengameart.org/content/chapter-1-the-right-tools
+PA-0039,Les Forges Pixel Art Course Chapter 2: Lines and Curves,Antoine Gersant,Lospec catalog / original article,article,B,full-text,轮廓与像素簇 | 动画 | 材质与纹理 | 图块与地形,https://opengameart.org/content/chapter-2-lines-and-curves
+PA-0040,Les Forges Pixel Art Course Chapter 3: Perspectives,Antoine Gersant,Lospec catalog / original article,article,B,full-text,场景与透视 | 材质与纹理 | 图块与地形 | 动画,https://opengameart.org/content/chapter-3-perspectives
+PA-0041,Les Forges Pixel Art Course Chapter 4: Shadow and light,Antoine Gersant,Lospec catalog / original article,article,B,full-text,光照与体积 | 动画 | 材质与纹理 | 调色板与明度,https://opengameart.org/content/chapter-4-shadow-and-light
+PA-0042,Les Forges Pixel Art Course Chapter 5: Color Palettes,Antoine Gersant,Lospec catalog / original article,article,B,full-text,调色板与明度 | 材质与纹理 | 动画 | 场景与透视,https://opengameart.org/content/chapter-5-color-palettes
+PA-0043,Les Forges Pixel Art Course Chapter 6: Anti-aliasing,Antoine Gersant,Lospec catalog / original article,article,B,full-text,调色板与明度 | 场景与透视 | 动画 | 材质与纹理,https://opengameart.org/content/chapter-6-anti-aliasing
+PA-0044,Les Forges Pixel Art Course Chapter 7: Textures and Dithering,Antoine Gersant,Lospec catalog / original article,article,B,full-text,材质与纹理 | 人物与角色 | 调色板与明度 | 光照与体积,https://opengameart.org/content/chapter-7-textures-and-dithering
+PA-0045,Les Forges Pixel Art Course Chapter 8: A world of tiles,Antoine Gersant,Lospec catalog / original article,article,B,full-text,场景与透视 | 图块与地形 | 调色板与明度 | 光照与体积,https://opengameart.org/content/chapter-8-a-world-of-tiles
+PA-0046,Les Forges Pixel Art Course Preface,Antoine Gersant,Lospec catalog / original article,article,B,full-text,动画 | 材质与纹理 | 图块与地形 | 调色板与明度,https://opengameart.org/content/les-forges-pixel-art-course
+PA-0047,Line weight thickness in sprites,Kiwi,Lospec catalog / original article,article,B,full-text,轮廓与像素簇 | 光照与体积 | 人物与角色 | 调色板与明度,https://2dwillneverdie.com/tutorial/line-weight-thickness-in-sprites/
+PA-0048,Lines and Curves,st0ven,Lospec catalog / original article,article,B,full-text,场景与透视 | 轮廓与像素簇 | 调色板与明度 | 光照与体积,http://web.archive.org/web/20070403061225/http://www.spriteart.com:80/tutorials/01_lines.html
+PA-0049,Mark's Pixel Art Tutorial: Shading,Natomic,Lospec catalog / original article,article,B,full-text,光照与体积 | 调色板与明度 | 场景与透视 | 材质与纹理,https://web.archive.org/web/20120625140733/http://www.natomic.com:80/hosted/marks/mpat/shading.html
+PA-0050,Mini Tutorial: Choosing better colors for AA,Pix3M,Lospec catalog / original article,article,B,full-text,调色板与明度 | 抗锯齿与抖动,https://pix3m.deviantart.com/art/Mini-Tutorial-Choosing-better-colors-for-AA-369986879
+PA-0051,Picking the best colors for your sprite,Kiwi,Lospec catalog / original article,article,B,full-text,调色板与明度 | 人物与角色 | 光照与体积 | 场景与透视,https://2dwillneverdie.com/tutorial/picking-the-best-colors-for-your-sprite/
+PA-0052,Pixel a Capcom Background,Kiwi,Lospec catalog / original article,article,B,full-text,调色板与明度 | 工具与导出 | 场景与透视 | 抗锯齿与抖动,https://2dwillneverdie.com/tutorial/pixel-a-capcom-background/
+PA-0053,Pixel Art & Adobe Photoshop,drububu,Lospec catalog / original article,article,B,full-text,调色板与明度 | 工具与导出 | 场景与透视,http://www.drububu.com/tutorial/pixel-art-and-photoshop.html
+PA-0054,Pixel Art & MS Paint,drububu,Lospec catalog / original article,article,B,full-text,调色板与明度 | 轮廓与像素簇 | 构图与尺度 | 场景与透视,http://www.drububu.com/tutorial/pixel-art-and-ms-paint.html
+PA-0055,Pixel Art & Scaling,drububu,Lospec catalog / original article,article,B,full-text,调色板与明度 | 动画 | 工具与导出 | 抗锯齿与抖动,http://www.drububu.com/tutorial/scaling-pixel-art.html
+PA-0056,Pixel Art Dithering Tutorial - What is Dithering,SpriteLand,Lospec catalog / original article,article,B,full-text,调色板与明度 | 抗锯齿与抖动,http://www.spriteland.com/tutorials/pixel-art-dithering-tutorial-what-is-dithering.html
+PA-0057,Pixel Art Outline & Shading,drububu,Lospec catalog / original article,article,B,full-text,光照与体积 | 轮廓与像素簇 | 调色板与明度 | 场景与透视,http://www.drububu.com/tutorial/pixel-art-and-shading.html
+PA-0058,Pixel Art Outlines,Sam Keddy,Lospec catalog / original article,article,B,full-text,轮廓与像素簇 | 调色板与明度 | 人物与角色 | 场景与透视,http://samkeddy.com/pixel-art-outlines/
+PA-0059,Pixel Art Outlines Part 2: Using Color,Sam Keddy,Lospec catalog / original article,article,B,full-text,调色板与明度 | 轮廓与像素簇 | 场景与透视 | 光照与体积,http://samkeddy.com/pixel-art-outlines-part-2-using-color/
+PA-0060,Pixel Art Tutorial,Niklas Janson,Lospec catalog / original article,article,B,full-text,调色板与明度 | 场景与透视 | 光照与体积 | 人物与角色,http://androidarts.com/pixtut/pixelart.htm
+PA-0061,Pixel Art Tutorial,Derek Yu,Lospec catalog / original article,article,B,full-text,人物与角色 | 调色板与明度 | 光照与体积 | 轮廓与像素簇,http://makegames.tumblr.com/post/42648699708/pixel-art-tutorial
+PA-0062,Pixel Art Tutorial,drububu,Lospec catalog / original article,article,B,full-text,场景与透视 | 调色板与明度 | 光照与体积 | 轮廓与像素簇,http://www.drububu.com/tutorial/
+PA-0063,Pixel Art Tutorial: London Bus,Hervé Piton,Lospec catalog / original article,article,B,full-text,调色板与明度 | 轮廓与像素簇 | 光照与体积 | 构图与尺度,https://16couleurs.wordpress.com/tutoriels/pixel-art-tutorial-london-bus/
+PA-0064,Pixel Face,Kazuya Mochu,Lospec catalog / original article,article,B,full-text,人物与角色 | 调色板与明度 | 场景与透视 | 光照与体积,http://www.gas13.ru/v3/tutorials/pixel_face.php
+PA-0065,Pixel tutorial - Seven solutions to color banding,Pix3M,Lospec catalog / original article,article,B,full-text,调色板与明度 | 抗锯齿与抖动 | 光照与体积 | 材质与纹理,https://pix3m.deviantart.com/art/Pixel-tutorial-Seven-solutions-to-color-banding-373403454
+PA-0066,Pixelblog - 1 - Color Palettes,Slynyrd,Lospec catalog / original article,article,B,full-text,调色板与明度 | 工具与导出 | 构图与尺度,http://www.slynyrd.com/blog/2018/1/10/pixelblog-1-color-palettes
+PA-0067,Pixelblog - 2 - Texture,Slynyrd,Lospec catalog / original article,article,B,full-text,材质与纹理 | 调色板与明度 | 光照与体积 | 场景与透视,http://www.slynyrd.com/blog/2018/2/15/pixelblog-2-texture
+PA-0068,Pixelling A Monster Sprite Tutorial,Richard Janes,Lospec catalog / original article,article,B,full-text,光照与体积 | 人物与角色 | 调色板与明度 | 轮廓与像素簇,http://rjanes.com/tutorials/pixelling_a_monster_sprite.php
+PA-0069,Pixelsource Guides Advanced,Stava,Lospec catalog / original article,article,B,full-text,材质与纹理 | 场景与透视 | 光照与体积 | 人物与角色,http://www.pixelsource.org/Advanced.html
+PA-0070,Pixelsource Guides Basic,Roefl,Lospec catalog / original article,article,B,full-text,光照与体积 | 场景与透视 | 人物与角色 | 材质与纹理,http://www.pixelsource.org/Basic.html
+PA-0071,Read Between the Pixels,Jason Perry,Lospec catalog / original article,article,B,full-text,调色板与明度 | 人物与角色 | 光照与体积 | 动画,http://finalbossblues.com/read-between-the-pixels/
+PA-0072,Realistic Waterflow Imitation,Sergey Kanev,Lospec catalog / original article,article,B,full-text,场景与透视 | 人物与角色 | 动画 | 工具与导出,http://www.gas13.ru/v3/tutorials/waterflow_imitation.php
+PA-0073,Resizing your sprites with Nearest Neighbor,Kiwi,Lospec catalog / original article,article,B,full-text,工具与导出 | 人物与角色 | 调色板与明度 | 光照与体积,https://2dwillneverdie.com/tutorial/resizing-your-sprites-with-nearest-neighbor/
+PA-0074,Reverse Anti-Alaising,st0ven,Lospec catalog / original article,article,B,full-text,场景与透视 | 人物与角色 | 轮廓与像素簇 | 调色板与明度,http://web.archive.org/web/20070410072931/http://www.spriteart.com:80/tutorials/01_revAA.html
+PA-0075,RPG Characters ('RTP' and 'Tall'),st0ven,Lospec catalog / original article,article,B,full-text,人物与角色 | 调色板与明度 | 工具与导出 | 轮廓与像素簇,http://web.archive.org/web/20070304111439/http://www.spriteart.com:80/tutorials/02_rpg_hero.html
+PA-0076,RPG Enemies,st0ven,Lospec catalog / original article,article,B,full-text,调色板与明度 | 光照与体积 | 人物与角色 | 轮廓与像素簇,http://web.archive.org/web/20070331130340/http://spriteart.com:80/tutorials/03_rpg_enemy.html
+PA-0077,RPG Pixel Art: Working Fast,Jason Perry,Lospec catalog / original article,article,B,full-text,工具与导出 | 动画 | 人物与角色 | 调色板与明度,http://finalbossblues.com/rpg-pixel-art-working-fast/
+PA-0078,RPG Summon (Dragon),st0ven,Lospec catalog / original article,article,B,full-text,调色板与明度 | 光照与体积 | 轮廓与像素簇 | 图块与地形,http://web.archive.org/web/20070331130548/http://spriteart.com:80/tutorials/04_rpg_summon.html
+PA-0079,Semi-Transparency (dither),st0ven,Lospec catalog / original article,article,B,full-text,抗锯齿与抖动 | 调色板与明度 | 人物与角色 | 图块与地形,http://web.archive.org/web/20070401215548/http://spriteart.com:80/tutorials/01_trans00.html
+PA-0080,Speed Spriting in Photoshop,Kiwi,Lospec catalog / original article,article,B,full-text,调色板与明度 | 工具与导出 | 人物与角色 | 光照与体积,https://2dwillneverdie.com/tutorial/speed-spriting-in-photoshop/
+PA-0081,Starting with the Basics: Workflow,Kiwi,Lospec catalog / original article,article,B,full-text,场景与透视 | 人物与角色 | 调色板与明度 | 光照与体积,https://2dwillneverdie.com/tutorial/starting-with-the-basics-workflow/
+PA-0082,The best pixel art tools for making your own game,Lauren Morton,Lospec catalog / original article,article,B,full-text,工具与导出 | 图块与地形 | 调色板与明度 | 构图与尺度,https://www.pcgamer.com/best-pixel-art-maker-tools/
+PA-0083,The Making Of: El Zombo,Kiwi,Lospec catalog / original article,article,B,full-text,工具与导出 | 人物与角色 | 光照与体积 | 调色板与明度,https://2dwillneverdie.com/tutorial/the-making-of-el-zombo/
+PA-0084,The Making Of: Tekken Megaman sprite,Kiwi,Lospec catalog / original article,article,B,full-text,工具与导出 | 调色板与明度 | 光照与体积 | 人物与角色,https://2dwillneverdie.com/tutorial/the-making-of-tekken-megaman-sprite/
+PA-0085,The Pixel Aesthetic,Alex Hanson-White,Lospec catalog / original article,article,B,full-text,调色板与明度 | 人物与角色 | 材质与纹理 | 光照与体积,http://www.alexhw.com/pixelAesthetic.html
+PA-0086,The Pixel-Zone - The Grass Tile,st0ven,Lospec catalog / original article,article,B,full-text,场景与透视 | 图块与地形 | 调色板与明度 | 光照与体积,https://web.archive.org/web/20120421122241/http://pixel-zone.rpgdx.net:80/shtml/tutmini-grass.shtml
+PA-0087,The RPG Base’s Four Directions,Jason Perry,Lospec catalog / original article,article,B,full-text,人物与角色 | 轮廓与像素簇 | 场景与透视 | 光照与体积,http://finalbossblues.com/the-rpg-bases-four-directions/
+PA-0088,Thinking in Color,Jason Perry,Lospec catalog / original article,article,B,full-text,调色板与明度 | 人物与角色 | 光照与体积 | 构图与尺度,http://finalbossblues.com/thinking-in-color/
+PA-0089,Tiling Tiles,Jason Perry,Lospec catalog / original article,article,B,full-text,场景与透视 | 图块与地形 | 调色板与明度 | 光照与体积,http://finalbossblues.com/tiling-tiles/
+PA-0090,Tutorial: How to Make a Run Cycle in Pixel Art,Glauber Kotaki,Lospec catalog / original article,article,B,full-text,动画 | 人物与角色 | 工具与导出,http://www.lessmilk.com/tutorial/pixel-art-run-cycle
+PA-0091,Tutorial: Walking Animation for Low-Res Sprites,Manning Krull,Lospec catalog / original article,article,B,full-text,动画 | 人物与角色 | 工具与导出 | 光照与体积,https://web.archive.org/web/20111229192117/http://www.manningkrull.com:80/pixel_art/tutorials/walking.asp
+PA-0092,Using and Choosing Colors,Jason Perry,Lospec catalog / original article,article,B,full-text,调色板与明度 | 光照与体积 | 人物与角色 | 构图与尺度,http://finalbossblues.com/using-and-choosing-colors/
+PA-0093,"Walk Cycles, Part 1",Jason Perry,Lospec catalog / original article,article,B,full-text,动画 | 人物与角色 | 场景与透视 | 抗锯齿与抖动,http://finalbossblues.com/walk-cycles-p1/
+PA-0094,"Walk Cycles, Part 2",Jason Perry,Lospec catalog / original article,article,B,full-text,动画 | 人物与角色 | 光照与体积 | 调色板与明度,http://finalbossblues.com/walk-cycles-part-2/
+PA-0095,"Walk Cycles, Part 3",Jason Perry,Lospec catalog / original article,article,B,full-text,动画 | 人物与角色 | 调色板与明度 | 光照与体积,http://finalbossblues.com/walk-cycles-part-3/
+PA-0096,allen-garvey/dithermark README,allen-garvey,GitHub,github-readme,B,full-readme,抗锯齿与抖动 | 调色板与明度 | 工具与导出,https://github.com/allen-garvey/dithermark
+PA-0097,gametorch/image_to_pixel_art_wasm README,gametorch,GitHub,github-readme,B,full-readme,调色板与明度 | 构图与尺度 | 抗锯齿与抖动,https://github.com/gametorch/image_to_pixel_art_wasm
+PA-0098,giventofly/pixelit README,giventofly,GitHub,github-readme,B,full-readme,构图与尺度 | 调色板与明度 | 抗锯齿与抖动,https://github.com/giventofly/pixelit
+PA-0099,KennethJAllen/proper-pixel-art README,KennethJAllen,GitHub,github-readme,B,full-readme,构图与尺度 | 调色板与明度 | 轮廓与像素簇 | 动画,https://github.com/KennethJAllen/proper-pixel-art
+PA-0100,learnpixelart/pixelart.howto README,learnpixelart,GitHub,github-readme,B,full-readme,人物与角色 | 构图与尺度 | 轮廓与像素簇,https://github.com/learnpixelart/pixelart.howto
+PA-0101,leeoniya/RgbQuant.js README,leeoniya,GitHub,github-readme,B,full-readme,调色板与明度 | 抗锯齿与抖动,https://github.com/leeoniya/RgbQuant.js
+PA-0102,LibreSprite/LibreSprite README,LibreSprite,GitHub,github-readme,B,full-readme,工具与导出 | 动画 | 调色板与明度,https://github.com/LibreSprite/LibreSprite
+PA-0103,lospec/pixel-editor README,lospec,GitHub,github-readme,B,full-readme,工具与导出 | 调色板与明度,https://github.com/lospec/pixel-editor
+PA-0104,Orama-Interactive/Pixelorama README,Orama-Interactive,GitHub,github-readme,B,full-readme,工具与导出 | 动画 | 图块与地形 | 调色板与明度,https://github.com/Orama-Interactive/Pixelorama
+PA-0105,Retro-Diffusion/pixel-art-fixer README,Retro-Diffusion,GitHub,github-readme,B,full-readme,构图与尺度 | 轮廓与像素簇 | 调色板与明度,https://github.com/Retro-Diffusion/pixel-art-fixer
+PA-0106,sedthh/pyxelate README,sedthh,GitHub,github-readme,B,full-readme,构图与尺度 | 调色板与明度 | 抗锯齿与抖动,https://github.com/sedthh/pyxelate
+PA-0107,Siilwyn/awesome-pixel-art README,Siilwyn,GitHub,github-readme,B,full-readme,调色板与明度 | 动画 | 工具与导出,https://github.com/Siilwyn/awesome-pixel-art
+PA-0108,theamusing/perfectPixel README,theamusing,GitHub,github-readme,B,full-readme,构图与尺度 | 轮廓与像素簇 | 调色板与明度,https://github.com/theamusing/perfectPixel
+PA-0109,Aseprite documentation: animation,Aseprite,Aseprite official documentation,official-doc,A,full-text,动画 | 工具与导出 | 人物与角色,https://www.aseprite.org/docs/animation/
+PA-0110,Aseprite documentation: basics,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 人物与角色 | 动画 | 调色板与明度,https://www.aseprite.org/docs/basics/
+PA-0111,Aseprite documentation: color,Aseprite,Aseprite official documentation,official-doc,A,full-text,调色板与明度 | 人物与角色 | 工具与导出 | 场景与透视,https://www.aseprite.org/docs/color/
+PA-0112,Aseprite documentation: color mode,Aseprite,Aseprite official documentation,official-doc,A,full-text,调色板与明度 | 工具与导出 | 人物与角色 | 场景与透视,https://www.aseprite.org/docs/color-mode/
+PA-0113,Aseprite documentation: color profile,Aseprite,Aseprite official documentation,official-doc,A,full-text,调色板与明度 | 工具与导出 | 人物与角色 | 场景与透视,https://www.aseprite.org/docs/color-profile/
+PA-0114,Aseprite documentation: drawing,Aseprite,Aseprite official documentation,official-doc,A,full-text,人物与角色 | 调色板与明度 | 轮廓与像素簇 | 场景与透视,https://www.aseprite.org/docs/drawing/
+PA-0115,Aseprite documentation: exporting,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 动画 | 人物与角色 | 构图与尺度,https://www.aseprite.org/docs/exporting/
+PA-0116,Aseprite documentation: files,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 调色板与明度 | 人物与角色 | 动画,https://www.aseprite.org/docs/files/
+PA-0117,Aseprite documentation: keyboard shortcuts,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 人物与角色 | 调色板与明度,https://www.aseprite.org/docs/keyboard-shortcuts/
+PA-0118,Aseprite documentation: layers,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 场景与透视 | 调色板与明度 | 图块与地形,https://www.aseprite.org/docs/layers/
+PA-0119,Aseprite documentation: preferences,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 调色板与明度 | 人物与角色 | 动画,https://www.aseprite.org/docs/preferences/
+PA-0120,Aseprite documentation: rotate,Aseprite,Aseprite official documentation,official-doc,A,full-text,构图与尺度 | 工具与导出,https://www.aseprite.org/docs/rotate/
+PA-0121,Aseprite documentation: save,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 人物与角色 | 动画,https://www.aseprite.org/docs/save/
+PA-0122,Aseprite documentation: selecting,Aseprite,Aseprite official documentation,official-doc,A,full-text,人物与角色 | 工具与导出 | 构图与尺度 | 动画,https://www.aseprite.org/docs/selecting/
+PA-0123,Aseprite documentation: slices,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 人物与角色 | 调色板与明度 | 构图与尺度,https://www.aseprite.org/docs/slices/
+PA-0124,Aseprite documentation: sprite,Aseprite,Aseprite official documentation,official-doc,A,full-text,人物与角色 | 工具与导出 | 调色板与明度 | 动画,https://www.aseprite.org/docs/sprite/
+PA-0125,Aseprite documentation: sprite sheet,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 人物与角色 | 材质与纹理 | 动画,https://www.aseprite.org/docs/sprite-sheet/
+PA-0126,Aseprite documentation: tilemap,Aseprite,Aseprite official documentation,official-doc,A,full-text,图块与地形 | 工具与导出 | 调色板与明度 | 构图与尺度,https://www.aseprite.org/docs/tilemap/
+PA-0127,Aseprite documentation: transformations,Aseprite,Aseprite official documentation,official-doc,A,full-text,人物与角色 | 工具与导出 | 构图与尺度 | 动画,https://www.aseprite.org/docs/transformations/
+PA-0128,Aseprite documentation: workflow,Aseprite,Aseprite official documentation,official-doc,A,full-text,工具与导出 | 人物与角色 | 动画,https://www.aseprite.org/docs/workflow/
+PA-0129,Aseprite documentation: workspace,Aseprite,Aseprite official documentation,official-doc,A,full-text,人物与角色 | 调色板与明度 | 工具与导出 | 动画,https://www.aseprite.org/docs/workspace/
+PA-0130,Pixelorama documentation: brush,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,工具与导出 | 调色板与明度 | 场景与透视,https://www.pixelorama.org/concepts/brush
+PA-0131,Pixelorama documentation: canvas,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,构图与尺度 | 场景与透视 | 图块与地形 | 调色板与明度,https://www.pixelorama.org/user_manual/user_interface/canvas
+PA-0132,Pixelorama documentation: cel,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,工具与导出 | 动画 | 调色板与明度,https://www.pixelorama.org/concepts/cel
+PA-0133,Pixelorama documentation: color mode,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,调色板与明度 | 工具与导出,https://www.pixelorama.org/concepts/color_mode
+PA-0134,Pixelorama documentation: drawing,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,调色板与明度 | 工具与导出 | 光照与体积 | 构图与尺度,https://www.pixelorama.org/user_manual/drawing
+PA-0135,Pixelorama documentation: image effects,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,调色板与明度 | 动画 | 工具与导出 | 轮廓与像素簇,https://www.pixelorama.org/user_manual/image_effects
+PA-0136,Pixelorama documentation: Import,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,工具与导出 | 动画 | 调色板与明度 | 图块与地形,https://www.pixelorama.org/user_manual/Import
+PA-0137,Pixelorama documentation: introduction,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,工具与导出 | 光照与体积 | 动画,https://www.pixelorama.org/introduction
+PA-0138,Pixelorama documentation: layer,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,工具与导出 | 调色板与明度 | 图块与地形 | 构图与尺度,https://www.pixelorama.org/concepts/layer
+PA-0139,Pixelorama documentation: palettes,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,调色板与明度 | 工具与导出 | 动画 | 人物与角色,https://www.pixelorama.org/user_manual/palettes
+PA-0140,Pixelorama documentation: project,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,工具与导出 | 动画 | 图块与地形 | 调色板与明度,https://www.pixelorama.org/concepts/project
+PA-0141,Pixelorama documentation: save and export,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,工具与导出 | 动画 | 构图与尺度 | 人物与角色,https://www.pixelorama.org/user_manual/save_and_export
+PA-0142,Pixelorama documentation: selecting,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,调色板与明度 | 工具与导出 | 构图与尺度 | 轮廓与像素簇,https://www.pixelorama.org/user_manual/selecting
+PA-0143,Pixelorama documentation: shading,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,调色板与明度 | 光照与体积 | 工具与导出 | 人物与角色,https://www.pixelorama.org/user_manual/shading
+PA-0144,Pixelorama documentation: tilemaps,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,图块与地形 | 工具与导出 | 场景与透视 | 轮廓与像素簇,https://www.pixelorama.org/user_manual/tilemaps
+PA-0145,Pixelorama documentation: timeline,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,动画 | 工具与导出 | 调色板与明度 | 人物与角色,https://www.pixelorama.org/user_manual/user_interface/timeline
+PA-0146,Pixelorama documentation: tools,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,调色板与明度 | 构图与尺度 | 工具与导出 | 场景与透视,https://www.pixelorama.org/user_manual/tools
+PA-0147,Pixelorama documentation: transforming,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,构图与尺度 | 工具与导出 | 抗锯齿与抖动 | 动画,https://www.pixelorama.org/user_manual/transforming
+PA-0148,Pixelorama documentation: user interface basics,Pixelorama,Pixelorama official documentation,official-doc,A,full-text,工具与导出 | 构图与尺度 | 调色板与明度 | 光照与体积,https://www.pixelorama.org/user_manual/user_interface/user_interface_basics
+PA-0149,001 Aseprite pixelart character creation and basic animation walkthrough,Advent1013,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 光照与体积 | 轮廓与像素簇,https://www.youtube.com/watch?v=cL_usZAFB4A
+PA-0150,013 Value and contrast basics,GilmOwO,YouTube,video,B,full-caption,调色板与明度 | 场景与透视,https://www.youtube.com/watch?v=ri2DIQKzGr4
+PA-0151,1-Bit Pixel Art Techniques (Tutorial + Timelapse),Brandon James Greer,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 材质与纹理 | 构图与尺度,https://www.youtube.com/watch?v=0BZwEoj50uw
+PA-0152,1-Point Perspective Pixel Art (sketch + timelapse),Brandon James Greer,YouTube,video,B,full-caption,场景与透视 | 调色板与明度 | 光照与体积 | 构图与尺度,https://www.youtube.com/watch?v=Uf5TiCNf-tU
+PA-0153,1.7 Value and Contrast,Math&Comps,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 光照与体积 | 人物与角色,https://www.youtube.com/watch?v=bB1cPSiMQ6s
+PA-0154,10 Minute Pixel Sprite TUTORIAL for COMPLETE BEGINNERS,Eli Cuaycong,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 构图与尺度 | 工具与导出,https://www.youtube.com/watch?v=mBt3UuLJx9Y
+PA-0155,10 Must-Know Procreate Selection Tricks (Some Might Surprise You!),Art Side of Life - iPad Drawing,YouTube,video,B,full-caption,工具与导出 | 调色板与明度 | 场景与透视 | 构图与尺度,https://www.youtube.com/watch?v=Jdfqw92Z3C0
+PA-0156,10 Pixelorama TIPS & TRICKS that you may not know about,Pixelorama,YouTube,video,B,full-caption,动画 | 工具与导出 | 调色板与明度 | 场景与透视,https://www.youtube.com/watch?v=-FEZeitwpyY
+PA-0157,12 Animation Principles You Need To Know,Saultoons,YouTube,video,B,full-caption,动画 | 人物与角色 | 材质与纹理 | 轮廓与像素簇,https://www.youtube.com/watch?v=vwk5UA927Ok
+PA-0158,13 Pixel Fonts With Free Licensing,P A N T E R,YouTube,video,B,full-caption,调色板与明度,https://www.youtube.com/watch?v=ldQ3Us_bXYE
+PA-0159,17 Tips to Improve Your Pixel Art!,Robinson Pixels,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 光照与体积 | 场景与透视,https://www.youtube.com/watch?v=5Axgvws7724
+PA-0160,20 Art Styles Challenge‼️(Orb Edition),Orb,YouTube,video,B,full-caption,人物与角色 | 光照与体积 | 调色板与明度 | 材质与纹理,https://www.youtube.com/watch?v=o1T7dwFdUUM
+PA-0161,20 Tips for Making Better Pixel Art,Apox Fox,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=PndZ34z5-88
+PA-0162,3 Easy Ways To Knock Out Black In Affinity Photo,IAMRENSI,YouTube,video,B,full-caption,工具与导出 | 轮廓与像素簇 | 调色板与明度 | 场景与透视,https://www.youtube.com/watch?v=nNKe6SHYECk
+PA-0163,"3 PixelArt Techniques/Common Mistakes (Doubles, Jaggies & Outline) (Tutorial for Beginners)",MortMort,YouTube / Lospec curated,video,A,full-caption,轮廓与像素簇 | 人物与角色 | 光照与体积 | 调色板与明度,https://www.youtube.com/watch?v=gW1G_FLsuEs
+PA-0164,3 VALUE STUDY Method to LEVEL UP your Paintings! (BEGINNER FRIENDLY),Jtuffdesigns,YouTube,video,B,full-caption,光照与体积 | 调色板与明度 | 场景与透视 | 材质与纹理,https://www.youtube.com/watch?v=haEmIHFY9E4
+PA-0165,3D PixelArt Tutorial - Godot,Eduardo Schildt,YouTube,video,B,full-caption,材质与纹理 | 调色板与明度 | 轮廓与像素簇 | 动画,https://www.youtube.com/watch?v=7wwE5FLZceY
+PA-0166,6 Pixel Art Drawing Techniques,GDQuest,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 光照与体积 | 构图与尺度,https://www.youtube.com/watch?v=ebF1pIxLpnU
+PA-0167,7 tips to master HD index painting with Krita,GDQuest,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 构图与尺度 | 轮廓与像素簇,https://www.youtube.com/watch?v=1m_0DFcOPAI
+PA-0168,8 Pixel Art Textures - Tutorial,TutsByKai,YouTube,video,B,full-caption,材质与纹理 | 调色板与明度 | 场景与透视 | 光照与体积,https://www.youtube.com/watch?v=nbGROzxIv6k
+PA-0169,8-BIT PIXEL TEXT EFFECT - Adobe Photoshop CC Tutorial (2021),Always Creating,YouTube,video,B,full-caption,工具与导出 | 光照与体积,https://www.youtube.com/watch?v=yWr14yR4Pyc
+PA-0170,80s Pixel T-Shirt Design Using AI Art + Free Fonts. Full Tutorial,Detour Shirts,YouTube,video,B,full-caption,轮廓与像素簇 | 场景与透视 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=GQiYAA7PKDM
+PA-0171,90s Diamond Text Effect - Photoshop Tutorial,Pixel Magic,YouTube,video,B,full-caption,工具与导出 | 调色板与明度 | 场景与透视 | 光照与体积,https://www.youtube.com/watch?v=uWAz-YuAiTQ
+PA-0172,[Let's Pixel] 12x20 Rogue,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 场景与透视 | 光照与体积,https://www.youtube.com/watch?v=DNHIc85rYXI
+PA-0173,[Let's Pixel] 18x18 Bat + 2 Frame Animation,Heartbeast,YouTube / Lospec curated,video,A,full-caption,动画 | 调色板与明度 | 人物与角色 | 光照与体积,https://www.youtube.com/watch?v=IPd2eCh3GhQ
+PA-0174,[Let's Pixel] 18x18 Item Icons,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 轮廓与像素簇 | 光照与体积,https://www.youtube.com/watch?v=JV_3Axv_vH0
+PA-0175,[Let's Pixel] 24x24 Bat with Animation,Heartbeast,YouTube / Lospec curated,video,A,full-caption,动画 | 调色板与明度 | 人物与角色 | 轮廓与像素簇,https://www.youtube.com/watch?v=kXcO8ZrODuQ
+PA-0176,[Let's Pixel] 48x40 Sidian Boss,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 场景与透视 | 轮廓与像素簇,https://www.youtube.com/watch?v=DEBcRgylvLw
+PA-0177,[Let's Pixel] @Pixel_Dailies GameMaker Cake!,Heartbeast,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 调色板与明度 | 构图与尺度,https://www.youtube.com/watch?v=c09FKfRydp4
+PA-0178,[Let's Pixel] Backgrounds,Heartbeast,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 调色板与明度 | 轮廓与像素簇 | 工具与导出,https://www.youtube.com/watch?v=1lKtEk6hH1M
+PA-0179,[Let's Pixel] Blue Wisp,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 轮廓与像素簇 | 人物与角色 | 光照与体积,https://www.youtube.com/watch?v=5Nyi7BCaOzQ
+PA-0180,[Let's Pixel] Boulder,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视 | 光照与体积 | 轮廓与像素簇,https://www.youtube.com/watch?v=Wa2w32YtWsg
+PA-0181,[Let's Pixel] Character and Sword [P3] Attack Animation,Heartbeast,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 构图与尺度 | 调色板与明度,https://www.youtube.com/watch?v=04beJS1HYk8
+PA-0182,[Let's Pixel] Character and Sword! [P2] Animation,Heartbeast,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=SQKm2aTux6o
+PA-0183,[Let's Pixel] Dark Angel,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 工具与导出,https://www.youtube.com/watch?v=LG_7Zx82exE
+PA-0184,[Let's Pixel] Explosion Animation!,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 动画 | 轮廓与像素簇 | 人物与角色,https://www.youtube.com/watch?v=EL25j8a3Li0
+PA-0185,[Let's Pixel] Faces!,Heartbeast,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 人物与角色 | 调色板与明度 | 轮廓与像素簇,https://www.youtube.com/watch?v=8wGpSH4cYng
+PA-0186,[Let's Pixel] Flame Colossus,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 轮廓与像素簇 | 场景与透视 | 人物与角色,https://www.youtube.com/watch?v=LEcLsF0dreU
+PA-0187,[Let's Pixel] Golem Boss!,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 轮廓与像素簇 | 场景与透视,https://www.youtube.com/watch?v=ony-893665c
+PA-0188,[Let's Pixel] Lavarock,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视,https://www.youtube.com/watch?v=fkd47Rksy10
+PA-0189,[Let's Pixel] Metal Armor,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 材质与纹理 | 光照与体积 | 人物与角色,https://www.youtube.com/watch?v=ddpB0Z89M3s
+PA-0190,[Let's Pixel] Random Level Generation [P3] Basic Wall Tiles,Heartbeast,YouTube / Lospec curated,video,A,full-caption,图块与地形 | 调色板与明度 | 场景与透视 | 轮廓与像素簇,https://www.youtube.com/watch?v=TNhqKoThjoQ
+PA-0191,[Let's Pixel] Simple 8-Frame Run Cycle,Heartbeast,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 调色板与明度 | 工具与导出,https://www.youtube.com/watch?v=y6Igao5Uvu8
+PA-0192,[Let's Pixel] Skeleton,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=ZqhYh-Gp0YI
+PA-0193,[Let's Pixel] Small Dragon,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 人物与角色 | 轮廓与像素簇,https://www.youtube.com/watch?v=zGPoXYKgMJ8
+PA-0194,[Let's Pixel] Spruce Tree,Heartbeast,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 调色板与明度 | 动画 | 人物与角色,https://www.youtube.com/watch?v=E_NNLmRuFYY
+PA-0195,[Let's Pixel] Stegosaurus is Awesome,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 工具与导出 | 光照与体积 | 人物与角色,https://www.youtube.com/watch?v=p6pOP0VeujI
+PA-0196,[Let's Pixel] Titan Souls like RPG Character,Heartbeast,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 光照与体积 | 轮廓与像素簇,https://www.youtube.com/watch?v=KFiH1cNPQmw
+PA-0197,[Let's Pixel] Top-Down Shooter Sprites,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 场景与透视 | 光照与体积,https://www.youtube.com/watch?v=iQHSJL_ZcfA
+PA-0198,[Let's Pixel] TREE!,Heartbeast,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 调色板与明度 | 光照与体积 | 人物与角色,https://www.youtube.com/watch?v=RgLG84RiHb0
+PA-0199,[Let's Pixel] Vines,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 构图与尺度 | 动画,https://www.youtube.com/watch?v=CwH3MPO5ss4
+PA-0200,[Let's Pixel] Water Tiles and Pyxel Edit,Heartbeast,YouTube / Lospec curated,video,A,full-caption,图块与地形 | 场景与透视 | 调色板与明度 | 工具与导出,https://www.youtube.com/watch?v=pwCyXkuDaGI
+PA-0201,A beginner friendly practice for starting with pixel art,Pixel Clip,YouTube,video,B,full-caption,构图与尺度 | 调色板与明度 | 轮廓与像素簇 | 人物与角色,https://www.youtube.com/watch?v=SIrC_rbOucQ
+PA-0202,A character design exercise for overthinkers,qrbits,YouTube,video,B,full-caption,人物与角色 | 调色板与明度 | 轮廓与像素簇 | 工具与导出,https://www.youtube.com/watch?v=OHnsa2V171k
+PA-0203,a COMPLETE guide to shading,pikat,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 工具与导出 | 构图与尺度,https://www.youtube.com/watch?v=csvX1JMAl6g
+PA-0204,A Hack to Add Color to Your Character Designs!,pikat,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 工具与导出 | 构图与尺度,https://www.youtube.com/watch?v=NNqGp2DcRK8
+PA-0205,A Programmer's Guide to Pixel Art,DaFluffyPotato,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 构图与尺度 | 场景与透视,https://www.youtube.com/watch?v=4cYAkHfh9wM
+PA-0206,A Simple Tip For Attack Animations,Nootall,YouTube,video,B,full-caption,动画 | 人物与角色,https://www.youtube.com/watch?v=25Pjx-SEbuw
+PA-0207,A Simple Way to Draw CLOTHES (not the 7 fold types),Love Life Drawing,YouTube,video,B,full-caption,人物与角色 | 动画 | 光照与体积 | 轮廓与像素簇,https://www.youtube.com/watch?v=krHsajIoJFc
+PA-0208,Add Any Pattern to Any Fabric in Photoshop!,PiXimperfect,YouTube,video,B,full-caption,工具与导出 | 场景与透视 | 调色板与明度 | 构图与尺度,https://www.youtube.com/watch?v=Z168F2BlAdA
+PA-0209,Add PIXEL perfect TEXT in ASEPRITE (Livestream Tutorial),MortMort,YouTube,video,B,full-caption,人物与角色 | 轮廓与像素簇 | 光照与体积 | 调色板与明度,https://www.youtube.com/watch?v=U-A05iqhuPU
+PA-0210,Affinity is FREE! How to Make Thumbnails - Tutorial,Gael LEVEL,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 构图与尺度 | 场景与透视,https://www.youtube.com/watch?v=ZeUZDn32sk0
+PA-0211,ALAN BECKER - Animating Walk Cycles,AlanBeckerTutorials,YouTube,video,B,full-caption,人物与角色 | 动画 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=2y6aVz0Acx0
+PA-0212,An Aseprite Crash Course In 30 Minutes,AdamCYounis,YouTube,video,B,full-caption,工具与导出 | 人物与角色 | 调色板与明度 | 构图与尺度,https://www.youtube.com/watch?v=59Y6OTzNrhk
+PA-0213,Animate Pixel Art Sprites | Photoshop Tutorial,Flow Studio,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=q2IxC0odOkU
+PA-0214,Animate Player Walk Cycle in Aseprite - Pixel Art Tutorial for Beginners,SpaceCat,YouTube,video,B,full-caption,动画 | 人物与角色 | 调色板与明度 | 构图与尺度,https://www.youtube.com/watch?v=6prNLpNasMI
+PA-0215,Animating a run cycle in pixelart - Kunoichi,MarcoValeKaz,YouTube,video,B,full-caption,动画 | 人物与角色 | 工具与导出,https://www.youtube.com/watch?v=QFxhvOA1tYs
+PA-0216,Animating LEGS (Walk Cycles and Weight) - Doodley,Doodley,YouTube,video,B,full-caption,人物与角色 | 动画 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=6lGPvMLE8Oo
+PA-0217,Animation Basics - Character animation,David Browne,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 轮廓与像素簇 | 调色板与明度,https://www.youtube.com/watch?v=im6iUSnca7Y
+PA-0218,Anime Grass Tutorial | Blender (include Project Files),trungduyng,YouTube,video,B,full-caption,场景与透视 | 调色板与明度 | 材质与纹理 | 光照与体积,https://www.youtube.com/watch?v=M4kMri55rdE
+PA-0219,ANTI ALIASING la NAVAJA SUIZA en el PIXEL ART| Curso DEFINITIVO de Pixel Art,Toronja GB,YouTube,video,B,full-caption,调色板与明度 | 轮廓与像素簇 | 抗锯齿与抖动 | 光照与体积,https://www.youtube.com/watch?v=Bm1gRlXWUT4
+PA-0220,"APRENDA perspectivas pixel art: 2d, top down e isometrica",Como fazer pixel art,YouTube,video,B,full-caption,场景与透视 | 光照与体积 | 人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=22ZQFkpQh2Q
+PA-0221,Arcade Game Typography: The Art of Pixel Type | Overview,Brandon James Greer,YouTube,video,B,full-caption,轮廓与像素簇 | 调色板与明度 | 光照与体积 | 图块与地形,https://www.youtube.com/watch?v=pXuzLy-C1fI
+PA-0222,Architectural Designer Creates a Pixel Art Bathhouse,Pixel Architect,YouTube,video,B,full-caption,场景与透视 | 材质与纹理 | 人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=JBzaK79Jm10
+PA-0223,Architectural Designer Creates a Pixel Art Town,Pixel Architect,YouTube,video,B,full-caption,场景与透视 | 材质与纹理 | 人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=KMJbhee4xTk
+PA-0224,Arnold tutorial - Rendering a pixel art style in MtoA,Arnold renderer,YouTube,video,B,full-caption,光照与体积 | 调色板与明度 | 人物与角色,https://www.youtube.com/watch?v=K_Mww9TRg3Y
+PA-0225,Art Heist: How to Create Pixel Art like Undertale,GoatBlob Pixel,YouTube,video,B,full-caption,人物与角色 | 轮廓与像素簇 | 调色板与明度 | 构图与尺度,https://www.youtube.com/watch?v=wC8nx8Ghhj8
+PA-0226,Artwork on Folded Sleeve: Photific Mockup Tutorial,Photific Mockups,YouTube,video,B,full-caption,工具与导出 | 构图与尺度,https://www.youtube.com/watch?v=9vWp6jw3J80
+PA-0227,Aseprite - How to make Seamless Tiles,koraki,YouTube / Lospec curated,video,A,full-caption,图块与地形 | 调色板与明度 | 场景与透视 | 材质与纹理,https://www.youtube.com/watch?v=6U1WAHwmlc0
+PA-0228,Aseprite Animation Timeline & tools (Pixelart beginner Tutorial),MortMort,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=N4Z4MdZ1KWY
+PA-0229,Aseprite Animation Tutorial (Pixel Art),Saultoons,YouTube,video,B,full-caption,动画 | 工具与导出 | 场景与透视 | 光照与体积,https://www.youtube.com/watch?v=B0enS9BJne4
+PA-0230,Aseprite Brush Tips and Tricks (Pixel Art Tutorial),MortMort,YouTube,video,B,full-caption,图块与地形 | 调色板与明度 | 光照与体积 | 人物与角色,https://www.youtube.com/watch?v=cLESnHw2dPE
+PA-0231,Aseprite for Game Devs: How to Create Seamless Tilemaps Step-by-Step,Pixel Principles,YouTube,video,B,full-caption,图块与地形 | 调色板与明度 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=fkNDanngTfQ
+PA-0232,Aseprite Guide for Beginners (Pixelart Tutorial),MortMort,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 工具与导出 | 人物与角色 | 轮廓与像素簇,https://www.youtube.com/watch?v=Md6W79jtLJM
+PA-0233,Aseprite Pixel Art Portrait - Tutorial,TutsByKai,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 工具与导出 | 轮廓与像素簇,https://www.youtube.com/watch?v=ABcWZQ0W8ns
+PA-0234,Aseprite Pixelart Tutorial - Beginner Friendly Space Scene in Realtime,PixelRocket,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 场景与透视 | 构图与尺度,https://www.youtube.com/watch?v=DqAa9lqT6qg
+PA-0235,Aseprite tilemap for my pixel art game,Pixel Pete - Sad Slime Games  ,YouTube,video,B,full-caption,图块与地形 | 工具与导出 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=lsLfChSfmzA
+PA-0236,Aseprite Top Down Pixel Art Character Design and Animation Part 1 - Tutorial,CouchFerret makes Games,YouTube,video,B,full-caption,人物与角色 | 光照与体积 | 动画 | 调色板与明度,https://www.youtube.com/watch?v=ty-RxDy9_SQ
+PA-0237,Aseprite Tutorial - Create a Pixel Art Smoke Animation,TutsByKai,YouTube,video,B,full-caption,动画 | 光照与体积 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=J3D5UR7vIU8
+PA-0238,Aseprite Tutorial - How to make a Pixel Art House,TutsByKai,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 材质与纹理 | 工具与导出,https://www.youtube.com/watch?v=FogcjAImD-A
+PA-0239,Aseprite Tutorial - How to make a Pixel Art Stone Texture!,TutsByKai,YouTube,video,B,full-caption,调色板与明度 | 材质与纹理 | 场景与透视 | 图块与地形,https://www.youtube.com/watch?v=sg3EffpU6uo
+PA-0240,Aseprite Tutorial For Beginners (Pixel Art),Saultoons,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 构图与尺度 | 场景与透视,https://www.youtube.com/watch?v=tFsETEP01k8
+PA-0241,Aseprite Tutorial Size Guide For RPG MAKER MV | A Sizing Guide For Character Sprites And Spritesheet,FlowPoly,YouTube,video,B,full-caption,人物与角色 | 工具与导出 | 动画 | 调色板与明度,https://www.youtube.com/watch?v=jJAslaoYEJM
+PA-0242,Aseprite: Master Tilemaps & Tilesets Like a Pro (Complete Tutorial),Things Zone,YouTube,video,B,full-caption,图块与地形 | 工具与导出 | 场景与透视 | 人物与角色,https://www.youtube.com/watch?v=4XC6q6s-_dM
+PA-0243,Auto-Tiling while drawing only 5 tiles -- DUAL GRID SYSTEM,Nonsensical 2D,YouTube,video,B,full-caption,图块与地形 | 工具与导出 | 场景与透视 | 材质与纹理,https://www.youtube.com/watch?v=aWcCNGen0cM
+PA-0244,Autotiles in GameMaker,DragoniteSpam,YouTube,video,B,full-caption,图块与地形 | 人物与角色 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=EVXimiZPo28
+PA-0245,Basic Anti-Aliasing for beginners (Pixel Art Tutorial),MortMort,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 场景与透视 | 轮廓与像素簇 | 抗锯齿与抖动,https://www.youtube.com/watch?v=UN-m3o9V7kk
+PA-0246,BASIC COLOR THEORY | Beginner Guide + Concepts,Aka ,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 构图与尺度 | 工具与导出,https://www.youtube.com/watch?v=kGvDQCohHdM
+PA-0247,Basic Photoshop Pixel Art Animation Tutorial Part 5: Frames and Layers by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 构图与尺度,https://www.youtube.com/watch?v=3o9sdu6AAlY
+PA-0248,Basic Pixel Art Tutorial Series: Lines and Outlines,Bizmaster Studios,YouTube,video,B,full-caption,轮廓与像素簇 | 人物与角色,https://www.youtube.com/watch?v=LrinRxOCcNk
+PA-0249,Beginner Pixel Art Tutorial – A Complete Guide,Alvin Roe,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 光照与体积 | 动画,https://www.youtube.com/watch?v=o_EKrg2fIuc
+PA-0250,Beginner Pixel Art: Create Stunning Lush Grass!,Ather Game Dev,YouTube,video,B,full-caption,场景与透视 | 调色板与明度 | 光照与体积 | 图块与地形,https://www.youtube.com/watch?v=9Glc8voKkFY
+PA-0251,Beginner/Intermediate Pixel Art Tutorial - Cluster Painting Technique - #23,Uxtsuki,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 轮廓与像素簇 | 场景与透视,https://www.youtube.com/watch?v=5SLEec_JbCY
+PA-0252,Beginner/Intermediate Pixel Art Tutorial - Clusters - #10,Uxtsuki,YouTube,video,B,full-caption,材质与纹理 | 场景与透视 | 人物与角色 | 光照与体积,https://www.youtube.com/watch?v=tfpbHg6b9IQ
+PA-0253,Beginner’s Guide to Four Legged Animation: Pixel Art Cat Walk (Aseprite Tutorial),Pixel Principles,YouTube,video,B,full-caption,动画 | 工具与导出 | 调色板与明度 | 人物与角色,https://www.youtube.com/watch?v=a_PF-KiJfTU
+PA-0254,Best Canvas Size for Making Pixel Art?,Normal Neighbor,YouTube,video,B,full-caption,调色板与明度 | 构图与尺度 | 场景与透视 | 动画,https://www.youtube.com/watch?v=S7MfGFv6qxQ
+PA-0255,Better Pixel Art Colors with Hue Shifting - Pixel Art Tutorial for Beginners,SpaceCat,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 轮廓与像素簇 | 构图与尺度,https://www.youtube.com/watch?v=Wjjbdm_Ac-E
+PA-0256,Bitmap/Sprite fonts - How to use [Game Maker | Basics],1up Indie,YouTube,video,B,full-caption,人物与角色 | 动画 | 场景与透视,https://www.youtube.com/watch?v=hM3qN0CXl2M
+PA-0257,Blender Tutorial - How to Texture Pixel Art in Blender!,TutsByKai,YouTube,video,B,full-caption,材质与纹理 | 人物与角色 | 光照与体积 | 工具与导出,https://www.youtube.com/watch?v=x76Vt9m_q0w
+PA-0258,Blender Tutorial - Pixel Art with Dithering (Graduated Shadows),Point Cloud,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 构图与尺度 | 材质与纹理,https://www.youtube.com/watch?v=sHwd_TU47dg
+PA-0259,BLOCKBENCH for BEGINNERS - How to make Seamless Textures,MoreByKev,YouTube,video,B,full-caption,材质与纹理 | 调色板与明度 | 人物与角色 | 图块与地形,https://www.youtube.com/watch?v=T6XJ7FZ5s_w
+PA-0260,Bones + Run Cycle in ToonSquid: Quick Guide,Shake my art,YouTube,video,B,full-caption,动画 | 人物与角色 | 工具与导出 | 构图与尺度,https://www.youtube.com/watch?v=45iTzZ0tjiE
+PA-0261,Boost your pixel art by mastering vanishing-point perspective,Pixel Principles,YouTube,video,B,full-caption,场景与透视 | 构图与尺度 | 光照与体积 | 人物与角色,https://www.youtube.com/watch?v=uug1MuOTiaY
+PA-0262,Build Your Levels Faster With Godot's Tilemap System | Platformer Tutorial #3,MakerTech,YouTube,video,B,full-caption,图块与地形 | 工具与导出 | 场景与透视,https://www.youtube.com/watch?v=sbv35boXqac
+PA-0263,CHARACTER & ANIMATION Top down RPG (Pixel Art Tutorial),MortMort,YouTube,video,B,full-caption,人物与角色 | 动画 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=GUEVPYlv474
+PA-0264,Character Design Tips for Pixel Art Beginners,Robinson Pixels,YouTube,video,B,full-caption,人物与角色 | 调色板与明度 | 光照与体积 | 动画,https://www.youtube.com/watch?v=aBdML6sr3wI
+PA-0265,Color Quantization and Dithering,Acerola,YouTube,video,B,full-caption,调色板与明度 | 场景与透视 | 抗锯齿与抖动 | 构图与尺度,https://www.youtube.com/watch?v=8wOUe32Pt-E
+PA-0266,Color theory explained,pikat,YouTube,video,B,full-caption,调色板与明度 | 场景与透视 | 光照与体积 | 材质与纹理,https://www.youtube.com/watch?v=akVAWghc_KE
+PA-0267,Comic Strip Effect in Pixelmator,Vavu Reviews,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 轮廓与像素簇 | 人物与角色,https://www.youtube.com/watch?v=zDRBAOxRyrI
+PA-0268,Como fazer anti-aliasing (tutorial pixel art),Como fazer pixel art,YouTube,video,B,full-caption,抗锯齿与抖动 | 调色板与明度 | 光照与体积 | 场景与透视,https://www.youtube.com/watch?v=5xGucaFO7Co
+PA-0269,COMPLEX pixel art ATTACK animation tutorial,Penusbmic,YouTube,video,B,full-caption,动画 | 工具与导出 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=qODPK9kf-h4
+PA-0270,Constructing Lines and Curves in Pixel Art (Tutorial),Brandon James Greer,YouTube,video,B,full-caption,轮廓与像素簇 | 人物与角色 | 工具与导出 | 材质与纹理,https://www.youtube.com/watch?v=ye21r27kN9I
+PA-0271,Contrast Art Class Part 1,Constrast Art Group,YouTube,video,B,full-caption,调色板与明度 | 场景与透视,https://www.youtube.com/watch?v=4CS3PyBMZkk
+PA-0272,Convert Vector Graphics to Pixel Art in Adobe Illustrator,Vector Art Academy | Illustrator Tutorials by Kat,YouTube,video,B,full-caption,调色板与明度 | 场景与透视 | 工具与导出 | 轮廓与像素簇,https://www.youtube.com/watch?v=HIOhyawNYTU
+PA-0273,Cozy Bakery by the Harbour | Pixel Art Timelapse,Brandon James Greer,YouTube,video,B,full-caption,调色板与明度 | 场景与透视 | 动画 | 光照与体积,https://www.youtube.com/watch?v=LMp_qS7s-ME
+PA-0274,Crafting a Better Shader for Pixel Art Upscaling,t3ssel8r,YouTube,video,B,full-caption,材质与纹理 | 调色板与明度 | 构图与尺度 | 场景与透视,https://www.youtube.com/watch?v=d6tp43wZqps
+PA-0275,Crea una IDLE ANIMATION en PIXEL ART | Curso de ANIMACIONES PIXEL ART - ep1,Nico Pardo,YouTube,video,B,full-caption,动画 | 人物与角色 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=YRZ-IU5l10k
+PA-0276,Create 8 Bit Pixel Art in After Effects | PremiumBeat.com,PremiumBeat by Shutterstock,YouTube,video,B,full-caption,调色板与明度 | 构图与尺度 | 工具与导出 | 动画,https://www.youtube.com/watch?v=raNGXDAfIZw
+PA-0277,Create A 3D Pixel Art House - Blender,ThatOneUnityDev,YouTube,video,B,full-caption,调色板与明度 | 材质与纹理 | 光照与体积 | 人物与角色,https://www.youtube.com/watch?v=zCLORHfzJG4
+PA-0278,Create a FAST walk cycle for a SMALL character /// Learning Pixel Art No.7,Lucky Jacob,YouTube,video,B,full-caption,人物与角色 | 动画,https://www.youtube.com/watch?v=wrmMPnXePfw
+PA-0279,Create a Pixel Art Character using AI! (IT'S ACTUALLY GOOD),Nikola,YouTube,video,B,full-caption,动画 | 人物与角色 | 调色板与明度 | 工具与导出,https://www.youtube.com/watch?v=rvkiN2k2d7g
+PA-0280,Create a pixel texture! - Stardew Valley Tileset Tutorial #1,Designs,YouTube / Lospec curated,video,A,full-caption,材质与纹理 | 场景与透视 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=Q5bq-rUFrmE
+PA-0281,Create and Upload Your First Pixel Art Asset in 7 Minutes (Full Guide),ItsMalkas,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 动画 | 工具与导出,https://www.youtube.com/watch?v=OQUcmtzvta0
+PA-0282,Create Animated Pixel Visualizers / Music Videos / Animations Pokemon Style | Adobe Ps / Ae Tutorial,Max Novak,YouTube,video,B,full-caption,工具与导出 | 人物与角色 | 动画 | 场景与透视,https://www.youtube.com/watch?v=ZNBILpF1j-0
+PA-0283,Create custom colorful fonts for your games,Voycawojka,YouTube,video,B,full-caption,人物与角色 | 工具与导出 | 场景与透视 | 调色板与明度,https://www.youtube.com/watch?v=cmwSS-oLLBo
+PA-0284,Create Grass Sprites in under 5 seconds! (OnSprite Tutorial),onsprite,YouTube,video,B,full-caption,场景与透视 | 调色板与明度 | 人物与角色 | 光照与体积,https://www.youtube.com/watch?v=dLl683PhCQg
+PA-0285,"Create Pixel Art Characters - Easy, Beginner Tutorial!",Megahertzs,YouTube,video,B,full-caption,工具与导出 | 调色板与明度 | 人物与角色 | 光照与体积,https://www.youtube.com/watch?v=OGHaU35w3MU
+PA-0286,Create Pixel Art In Inkscape,Logos By Nick,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 轮廓与像素簇 | 场景与透视,https://www.youtube.com/watch?v=d9EHPNLt4xo
+PA-0287,Creating 3D Lighting for my 2D Game,JohnBrx,YouTube,video,B,full-caption,人物与角色 | 光照与体积 | 场景与透视 | 材质与纹理,https://www.youtube.com/watch?v=UavoVWHrebM
+PA-0288,"Creating 4-Color Pixel Art Palettes, inspired by the SUPER GAMEBOY!",Brandon James Greer,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 构图与尺度 | 人物与角色,https://www.youtube.com/watch?v=PdXpUIATzO0
+PA-0289,Creating A Pixel Art Font in Libresprite,TutsByKai,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 轮廓与像素簇 | 抗锯齿与抖动,https://www.youtube.com/watch?v=SAviNE6P12k
+PA-0290,Creating Abstract Pixel Art Patterns in Aseprite | TutsByKai,TutsByKai,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 场景与透视 | 材质与纹理,https://www.youtube.com/watch?v=rmOepaXcVdk
+PA-0291,Creating Animated Pixelart Water - Aseprite Tutorial,TutsByKai,YouTube,video,B,full-caption,动画 | 场景与透视 | 调色板与明度 | 工具与导出,https://www.youtube.com/watch?v=_iADGsjkLY8
+PA-0292,Creating Character Animations! | Pixel Art Tutorial,Mochibeans,YouTube,video,B,full-caption,动画 | 人物与角色 | 光照与体积 | 调色板与明度,https://www.youtube.com/watch?v=f5TBfNnObUQ
+PA-0293,Creating Pixel Art Clothing - Aseprite Tutorial,TutsByKai,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 光照与体积 | 构图与尺度,https://www.youtube.com/watch?v=_3_78Tr4Uoo
+PA-0294,Creating Pixel Art from an Object (Sizing Tips!),Brandon James Greer,YouTube,video,B,full-caption,光照与体积 | 场景与透视 | 轮廓与像素簇 | 构图与尺度,https://www.youtube.com/watch?v=PtYoLFKkgoQ
+PA-0295,Custom Pixel Typography Tutorial in Photoshop,Collect & Contrast,YouTube,video,B,full-caption,工具与导出 | 调色板与明度 | 场景与透视 | 构图与尺度,https://www.youtube.com/watch?v=nZ8eG3crocA
+PA-0296,Custom Thumbnails Without the Designer Price Tag,Paigon Davis,YouTube,video,B,full-caption,工具与导出 | 构图与尺度 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=QcfQuTLO54I
+PA-0297,Cómo animar un idle FÁCIL de esqueleto en pixel art (tutorial paso a paso),Bloody Mari Bitz,YouTube,video,B,full-caption,动画 | 人物与角色 | 轮廓与像素簇 | 调色板与明度,https://www.youtube.com/watch?v=9O5b99IoRuE
+PA-0298,Diagonal Autotiles in Godot 3.5 - TilePipe Tutorial - Let's Pixel It! with Echo,Echo in a Void,YouTube,video,B,full-caption,图块与地形 | 工具与导出 | 场景与透视 | 材质与纹理,https://www.youtube.com/watch?v=6YWbSjnG4oI
+PA-0299,Dithering and Anti-aliasing Pixel Art,mishmash manifesto,YouTube,video,B,full-caption,光照与体积 | 调色板与明度 | 抗锯齿与抖动,https://www.youtube.com/watch?v=0zAxE8WeiGY
+PA-0300,Dithering and pixel art - Tutorial,Armitage Games,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视 | 抗锯齿与抖动 | 人物与角色,https://www.youtube.com/watch?v=P_DifkmhD5E
+PA-0301,Dithering: How to Create Linear Gradients with Pixel Art,PXLFLX,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 场景与透视,https://www.youtube.com/watch?v=QTCBpSOAvr8
+PA-0302,DON'T miss this when DITHERING!,Mislav | 1 Bit Studio,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 材质与纹理,https://www.youtube.com/watch?v=ZGxcWbnKRWY
+PA-0303,Draw Better Backgrounds For Your Games | Pixel Art Aseprite,Kenmi,YouTube,video,B,full-caption,场景与透视 | 调色板与明度 | 工具与导出 | 光照与体积,https://www.youtube.com/watch?v=5_8w45xgcTs
+PA-0304,Draw boxes (correctly) to improve your art,pikat,YouTube,video,B,full-caption,场景与透视 | 轮廓与像素簇 | 光照与体积,https://www.youtube.com/watch?v=IjpkMgMkA-I
+PA-0305,Draw fewer tiles - by using a Dual-Grid system!,jess::codes,YouTube,video,B,full-caption,图块与地形 | 场景与透视 | 动画,https://www.youtube.com/watch?v=jEWFSv3ivTg
+PA-0306,Draw Yourself as a Stardew Valley Villager! - Photoshop Pixel Art Tutorial,Designs,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 轮廓与像素簇 | 光照与体积,https://www.youtube.com/watch?v=pgqds_cIvAo
+PA-0307,Drawing a pixel character from *scratch*,AdamCYounis,YouTube,video,B,full-caption,人物与角色 | 调色板与明度 | 光照与体积 | 轮廓与像素簇,https://www.youtube.com/watch?v=l1aJq9F855s
+PA-0308,Drawing Basic TILES in PiskelApp (Step by Step Tutorial) #1.,Elliot Greenwood,YouTube,video,B,full-caption,图块与地形 | 调色板与明度 | 工具与导出 | 场景与透视,https://www.youtube.com/watch?v=wKlePXY52ZQ
+PA-0309,Duelyst Attack Animation Tutorial,Adam Kling,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 场景与透视 | 调色板与明度,https://www.youtube.com/watch?v=iJOUTSy0fQI
+PA-0310,Dynamic Lighting For Pixel Art Tutorial - Now You Know Too,Artindi,YouTube,video,B,full-caption,人物与角色 | 调色板与明度 | 光照与体积 | 构图与尺度,https://www.youtube.com/watch?v=vOXrrEvYUVg
+PA-0311,Easiest way to create pixel art UI,PixelLab,YouTube,video,B,full-caption,材质与纹理 | 动画 | 调色板与明度 | 场景与透视,https://www.youtube.com/watch?v=OdRIHQ4ar2c
+PA-0312,EASY 3D Pixel Art Texture Generator in Blender,SouthernShotty,YouTube,video,B,full-caption,调色板与明度 | 材质与纹理 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=0tIY9Yj6apg
+PA-0313,Easy Anti Aliasing Tutorial,Sadface_RL,YouTube,video,B,full-caption,调色板与明度 | 场景与透视 | 工具与导出 | 轮廓与像素簇,https://www.youtube.com/watch?v=AufcHBVO3CQ
+PA-0314,Easy Pixel Art Portrait Tutorial,Saultoons,YouTube,video,B,full-caption,人物与角色 | 光照与体积 | 调色板与明度 | 轮廓与像素簇,https://www.youtube.com/watch?v=p62BV31KUUM
+PA-0315,Easy Pixel Art Tricks You've NEVER Tried Before (probably) | Pixel Art Tutorial,mz_eth,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 工具与导出 | 场景与透视,https://www.youtube.com/watch?v=PGgpgPgwxtI
+PA-0316,Easy PIXEL ART Walk Cycle for Beginners,KiwiBee,YouTube,video,B,full-caption,动画 | 轮廓与像素簇 | 人物与角色 | 图块与地形,https://www.youtube.com/watch?v=mnnLVZeKd2E
+PA-0317,Easy Pixel Art Walk Cycle Tutorial,Saultoons,YouTube,video,B,full-caption,动画 | 材质与纹理 | 人物与角色 | 光照与体积,https://www.youtube.com/watch?v=7T6yOk5n-zk
+PA-0318,Easy Pixel Idle Animation,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=bZ9dHKXSKmM
+PA-0319,Easy Tileset Loop Animation in Photoshop,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 图块与地形 | 场景与透视,https://www.youtube.com/watch?v=7KZqe9lZP3U
+PA-0320,Evaluating Contrast And Exposure Values With A Histogram,ArtOfSoulburn,YouTube,video,B,full-caption,调色板与明度 | 轮廓与像素簇 | 人物与角色 | 场景与透视,https://www.youtube.com/watch?v=CunmIghtXeg
+PA-0321,Every Pixel Art Game Has This Problem...,Barry's Dev Hell,YouTube,video,B,full-caption,光照与体积 | 抗锯齿与抖动 | 构图与尺度 | 人物与角色,https://www.youtube.com/watch?v=QK9wym71F7s
+PA-0322,Everything You Need to Know About ASEPRITE | Pixel Art Fundamentals,Watt,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 人物与角色 | 动画,https://www.youtube.com/watch?v=Ep-_nJNHPc4
+PA-0323,Everything you need to know about Pixel Art! | Pixel Art Tutorial,Mochibeans,YouTube,video,B,full-caption,光照与体积 | 调色板与明度 | 人物与角色 | 场景与透视,https://www.youtube.com/watch?v=TD5Rp__T668
+PA-0324,Export Aseprite to Unity 2D Pixel Art Setup ~ Characters & Tilesets,Chris' Tutorials,YouTube,video,B,full-caption,工具与导出 | 人物与角色 | 场景与透视 | 图块与地形,https://www.youtube.com/watch?v=gLObTgbwazE
+PA-0325,Fast Way to Draw & Animate Pixel Art,C.M. de la VEGA,YouTube,video,B,full-caption,工具与导出 | 人物与角色 | 调色板与明度 | 动画,https://www.youtube.com/watch?v=SfuVudv8iIk
+PA-0326,Few People Know These Hidden Aseprite Features,JoeCoup,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 动画 | 工具与导出,https://www.youtube.com/watch?v=Itw8gg-wpPo
+PA-0327,Fire Emblem GBA Portrait Sprite Tutorial - Pixel Art [8 Tips],Astral Dawn Studios,YouTube,video,B,full-caption,人物与角色 | 调色板与明度 | 轮廓与像素簇 | 光照与体积,https://www.youtube.com/watch?v=njpiE5uuE_Y
+PA-0328,FREE Pixel Dither Effect | NO PLUGINS | After Effects Tutorial,Sergeant Satoshi,YouTube,video,B,full-caption,抗锯齿与抖动 | 工具与导出 | 构图与尺度,https://www.youtube.com/watch?v=w1Eu_FG_yxE
+PA-0329,From Blocks to Masterpieces – The Fundamentals of Isometric Pixel Art,Pixel Principles,YouTube,video,B,full-caption,场景与透视 | 图块与地形 | 光照与体积 | 构图与尺度,https://www.youtube.com/watch?v=nZIrIRWIgis
+PA-0330,From Pixel Art to Stencyl Flash Game Tutorial 1,PXLFLX,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 人物与角色 | 动画 | 场景与透视,https://www.youtube.com/watch?v=4KKjr2x0vBw
+PA-0331,"Full YouTube Thumbnail Workflow (Photo, Lightroom, Photoshop + A/B Testing)",Jon Jags Nee,YouTube,video,B,full-caption,工具与导出 | 调色板与明度 | 构图与尺度 | 光照与体积,https://www.youtube.com/watch?v=A_ovGEFGKWY
+PA-0332,"Gab Does PIXEL ART - Undertale Sprite ""Animation"" Tutorial [Photoshop]",SerenaMidori,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 工具与导出 | 抗锯齿与抖动,https://www.youtube.com/watch?v=kc5tdgTAZXU
+PA-0333,Gab Does PIXEL ART - Undertale Sprite Tutorial [Paint Tool SAI and MS Paint],SerenaMidori,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 场景与透视 | 轮廓与像素簇,https://www.youtube.com/watch?v=Qg89glYffHs
+PA-0334,Game Design School: Character Design,Pixel Pete - Sad Slime Games  ,YouTube,video,B,full-caption,人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=BgniOUnuuGo
+PA-0335,Game sprites: What's the right resolution?,GDQuest,YouTube,video,B,full-caption,构图与尺度 | 人物与角色 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=rr-qj8rD9z0
+PA-0336,GameMaker Basics Part 1 -Walk / Idle Sprite Animation +Top Down 4 Directional,Bastian Entertainment,YouTube,video,B,full-caption,人物与角色 | 动画 | 工具与导出,https://www.youtube.com/watch?v=M4kxcAc2df0
+PA-0337,GameMaker Studio 2 - Platform Shooter - P11 - Let's Pixel an Enemy,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 光照与体积 | 轮廓与像素簇,https://www.youtube.com/watch?v=YJigG9EnCIM
+PA-0338,Get Better at Pixel Art in 5 Minutes | Everything I learned after 300 hours,Sklimmilks,YouTube,video,B,full-caption,人物与角色 | 光照与体积 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=blzqxG5eoh8
+PA-0339,GG basics and texture,Amethyst Liddell,YouTube,video,B,full-caption,调色板与明度 | 材质与纹理 | 光照与体积 | 构图与尺度,https://www.youtube.com/watch?v=pB9ykfImtwI
+PA-0340,Give Your Sprites Outlines in Unity Shader Graph,Daniel Ilett,YouTube,video,B,full-caption,轮廓与像素簇 | 调色板与明度 | 材质与纹理 | 人物与角色,https://www.youtube.com/watch?v=84rZ-rCRsZk
+PA-0341,Godot Autotile Terrains Tutorial - TopDown And Platformer,Sebbyspoons - Game Dev and Pixel Art,YouTube,video,B,full-caption,图块与地形 | 场景与透视 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=EPE2LbdqK8w
+PA-0342,Halftone Dissolve Effect in Photoshop – Beginner Friendly Tutorial,Ty.graphic,YouTube,video,B,full-caption,材质与纹理 | 工具与导出 | 调色板与明度 | 场景与透视,https://www.youtube.com/watch?v=rM8oIevCGHc
+PA-0343,Hand drawn is easier than pixel art | HD graphics vs low-bit vs Hi-bit,Nonsensical 2D,YouTube,video,B,full-caption,构图与尺度 | 调色板与明度 | 图块与地形 | 人物与角色,https://www.youtube.com/watch?v=LMmZnCsE6HM
+PA-0344,HD Index Painting in Photoshop,Dan Fessler,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 调色板与明度 | 抗锯齿与抖动 | 构图与尺度,https://www.youtube.com/watch?v=7Q36EyvaYG8
+PA-0345,HD Index Painting With Krita,GDQuest,YouTube,video,B,full-caption,工具与导出 | 调色板与明度 | 构图与尺度 | 材质与纹理,https://www.youtube.com/watch?v=PU7_FVQpTSE
+PA-0346,"HDR Color Analyzer (RGB, CIE values & nit values for selected pixels) | HDRmaster Tutorial",FF Pictures,YouTube,video,B,full-caption,调色板与明度 | 场景与透视 | 光照与体积 | 工具与导出,https://www.youtube.com/watch?v=aVKqRyz9uuE
+PA-0347,Health Bar Design | Pixel Art Tutorial,Brandon James Greer,YouTube,video,B,full-caption,图块与地形 | 调色板与明度 | 材质与纹理 | 轮廓与像素簇,https://www.youtube.com/watch?v=TAiQdIexu5w
+PA-0348,HJCS Art Online: Concept Art (part 1)- Costume & Clothing,HenryJohnsonCS,YouTube,video,B,full-caption,人物与角色 | 调色板与明度 | 轮廓与像素簇 | 材质与纹理,https://www.youtube.com/watch?v=Dp6GNy2bkdg
+PA-0349,How create Pixel Art For Games - Tutorial - 8Bit Graphic Design,Sparckman,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视 | 材质与纹理 | 工具与导出,https://www.youtube.com/watch?v=5cL3oP6RdTs
+PA-0350,"How do you Shade Metal, Wood, and Transparent Materials |  Beginner Pixel Art Tutorial",Hanapix ,YouTube,video,B,full-caption,材质与纹理 | 光照与体积 | 调色板与明度 | 轮廓与像素簇,https://www.youtube.com/watch?v=qyHSuxq42kY
+PA-0351,How I Animated Hair (pixel art character design),Robinson Pixels,YouTube,video,B,full-caption,人物与角色 | 动画 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=M-5K0vJW5s0
+PA-0352,How I Deal With Colors (Pixel Art),Nootall,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 光照与体积,https://www.youtube.com/watch?v=-6TO0jjgK_k
+PA-0353,How I Design Unique Characters Step by Step!,Penusbmic,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 轮廓与像素簇 | 光照与体积,https://www.youtube.com/watch?v=zRGV_9GRBTc
+PA-0354,How I Developed A Powerful Dithering System for Amazing Pixel Art,techfoundry,YouTube,video,B,full-caption,调色板与明度 | 抗锯齿与抖动 | 场景与透视 | 光照与体积,https://www.youtube.com/watch?v=BmAFQBPr_3E
+PA-0355,HOW I DRAW CLOTHES + PAINTING GUIDE,NIRO,YouTube,video,B,full-caption,光照与体积 | 人物与角色 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=ZCfvcxlsIdE
+PA-0356,How I learned Pixel Art in 30 days (You can too!) - One hour a day of pixel art challenge!,Will Hess,YouTube,video,B,full-caption,人物与角色 | 动画 | 调色板与明度 | 轮廓与像素簇,https://www.youtube.com/watch?v=j3FsRV--1GE
+PA-0357,How I learned to draw hands in a week,pikat,YouTube,video,B,full-caption,光照与体积 | 人物与角色 | 轮廓与像素簇 | 构图与尺度,https://www.youtube.com/watch?v=KJplQ6jDQC0
+PA-0358,How I Made 1 Beach in 3 Ways in『Aseprite』,CheesyPaninie Art,YouTube,video,B,full-caption,场景与透视 | 调色板与明度 | 光照与体积 | 材质与纹理,https://www.youtube.com/watch?v=lFUdpBLKecA
+PA-0359,How I made grass better than 99% of games | Stylized grass 3D pixel art,Dylearn,YouTube,video,B,full-caption,场景与透视 | 调色板与明度 | 人物与角色 | 动画,https://www.youtube.com/watch?v=OxsuWDtjuGw
+PA-0360,How I Made My Pixel Art Grass Tiles [Full Walkthrough],PixelKnight,YouTube,video,B,full-caption,图块与地形 | 场景与透视 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=pGjI9j1X_C4
+PA-0361,How I Made Palette Pixel Shader From Scratch in Godot,DeveloperEzra,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 材质与纹理 | 场景与透视,https://www.youtube.com/watch?v=iDJedqLy_Pw
+PA-0362,How I Made PBR Pixel Art Textures with Blender,Floatharr,YouTube,video,B,full-caption,材质与纹理 | 调色板与明度 | 光照与体积 | 场景与透视,https://www.youtube.com/watch?v=SrgTb-333YA
+PA-0363,How I Made Pixel Art in Illustrator So Easy!,P A N T E R,YouTube,video,B,full-caption,调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=GFYPGrBK_e8
+PA-0364,How I Make Cute Pixel Art & GIF Animations! (Easy Beginner Tutorial),AcidicDoll,YouTube,video,B,full-caption,动画 | 人物与角色 | 构图与尺度 | 工具与导出,https://www.youtube.com/watch?v=1Oi-URZQv08
+PA-0365,How I Make My Thumbnails in 5 Minutes | Canva Tutorial,Rob the Maritimer,YouTube,video,B,full-caption,构图与尺度 | 场景与透视 | 光照与体积 | 调色板与明度,https://www.youtube.com/watch?v=V7Ki4rWMWLk
+PA-0366,How I Make Pixel Art! Step-by-Step (ft. Tyson Hesse Sonic),SauceK,YouTube,video,B,full-caption,轮廓与像素簇 | 人物与角色 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=izSm7vzOkJ4
+PA-0367,How I pick colours for my pixel art - My colour palettes over the years (2017 - Now),Pixel Clip,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 光照与体积 | 场景与透视,https://www.youtube.com/watch?v=PFO-hwdxkxQ
+PA-0368,How I Simplify Anatomy: Art Tips,Ullaiin,YouTube,video,B,full-caption,人物与角色 | 光照与体积 | 场景与透视 | 调色板与明度,https://www.youtube.com/watch?v=VvRENOVbUdM
+PA-0369,How Many Frames Should My Animation Have?,Nootall,YouTube,video,B,full-caption,动画 | 光照与体积 | 人物与角色,https://www.youtube.com/watch?v=nRg_FPJ4r1Q
+PA-0370,"How to ""Proofread"" Your Pixel Art (5 Review Tips!)",Brandon James Greer,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=lHGDz_sz-gk
+PA-0371,How to achieve a pixel art neon/glow effect in Aseprite,War,YouTube,video,B,full-caption,工具与导出 | 调色板与明度 | 动画 | 构图与尺度,https://www.youtube.com/watch?v=WG4ey-rLMZE
+PA-0372,How To Animate Pixel Art | Tutorial,TipTut,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 人物与角色 | 抗锯齿与抖动,https://www.youtube.com/watch?v=VVV6u2d49hs
+PA-0373,How to Animate Pixels! - Animation Basics,Designs,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 工具与导出 | 轮廓与像素簇,https://www.youtube.com/watch?v=5cxBn_NZ-7E
+PA-0374,How to Build 100 Game-Ready Characters Without Drawing,Code Laboratory,YouTube,video,B,full-caption,人物与角色 | 工具与导出 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=sxVuAzI0mLk
+PA-0375,How to Choose Pixel Art Resolutions,TutsByKai,YouTube,video,B,full-caption,调色板与明度 | 光照与体积 | 构图与尺度 | 轮廓与像素簇,https://www.youtube.com/watch?v=rjZCD3ad3jE
+PA-0376,How to Create a Character Sprite Sheet,Designs,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 动画 | 工具与导出 | 轮廓与像素簇,https://www.youtube.com/watch?v=kFhnYYdhIo4
+PA-0377,How to Create a WALKING Animation for a 2D Pixel Character in 2026 (Aseprite Tutorial),TotallyNotBoots,YouTube,video,B,full-caption,动画 | 人物与角色 | 工具与导出,https://www.youtube.com/watch?v=LNOr38gFeO0
+PA-0378,How to Create Pixel Art and Animations with Piskel Tutorial 5 - Basic Animation,TodaysTuts,YouTube,video,B,full-caption,动画 | 人物与角色 | 工具与导出,https://www.youtube.com/watch?v=D__KfZriruA
+PA-0379,How to create Pixel Art Farm Tiles | A step-by-step tutorial,Hanapix ,YouTube,video,B,full-caption,光照与体积 | 调色板与明度 | 轮廓与像素簇 | 人物与角色,https://www.youtube.com/watch?v=qLDve0jbvbo
+PA-0380,How to Create Pixel Art in Photoshop: The Essential Guide,Brookes Eggleston - Character Design Forge,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=gEqbQ6HL0dc
+PA-0381,How to do Pixel Art: Animating (3),Fabraz,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 人物与角色 | 场景与透视,https://www.youtube.com/watch?v=ZaNoHVAvE6E
+PA-0382,How to do Pixel Art: Basics (1),Fabraz,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 工具与导出 | 调色板与明度 | 抗锯齿与抖动,https://www.youtube.com/watch?v=CXOmEjeQhoI
+PA-0383,How to do Pixel Art: Drawing (2),Fabraz,YouTube / Lospec curated,video,A,full-caption,轮廓与像素簇 | 调色板与明度 | 工具与导出 | 光照与体积,https://www.youtube.com/watch?v=Bc0SJjpCK9s
+PA-0384,How to draw a bird - Step by step pixel art tutorial in Aseprite,Jep Jep,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视 | 光照与体积 | 人物与角色,https://www.youtube.com/watch?v=o61i14fB3XU
+PA-0385,How To Draw Isometric Pixel Art | Photoshop Tutorial,TipTut,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 工具与导出 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=FVkbMAd_rtU
+PA-0386,How To Draw Pixel Art | Tutorial,TipTut,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 人物与角色 | 工具与导出,https://www.youtube.com/watch?v=ED8EGP0ceQk
+PA-0387,How to Make an Animated Pixel Art Loop GIF File in Photoshop,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 场景与透视 | 抗锯齿与抖动,https://www.youtube.com/watch?v=QMLyubeYCwM
+PA-0388,How to Make Pixel Art / Beginner Photoshop Tutorial / By Nick Casale,Nick Casale,YouTube / Lospec curated,video,A,full-caption,构图与尺度 | 工具与导出 | 人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=ZawqggyANc8
+PA-0389,How To Pixel Arl Tutorials [7] - Projectiles (Part 1/3),Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,材质与纹理 | 调色板与明度 | 动画 | 场景与透视,https://www.youtube.com/watch?v=MzpPEMYlNhM
+PA-0390,How To Pixel Art Tutorial Part 10: Tile Basics,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 图块与地形 | 工具与导出 | 材质与纹理,https://www.youtube.com/watch?v=5zlqZ7x8N5g
+PA-0391,How To Pixel Art Tutorial Part 11: Character Design,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 人物与角色 | 调色板与明度 | 轮廓与像素簇,https://www.youtube.com/watch?v=y5JEc-A8PzY
+PA-0392,How To Pixel Art Tutorial Part 12: Animation Basics,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 光照与体积 | 调色板与明度,https://www.youtube.com/watch?v=QVahJxsg0TY
+PA-0393,How To Pixel Art Tutorial Part 13: Base Sprite for Animation,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 动画 | 轮廓与像素簇,https://www.youtube.com/watch?v=y1wQEDCG-0s
+PA-0394,How To Pixel Art Tutorial Part 14: Setting Up Layers,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 人物与角色 | 动画 | 场景与透视,https://www.youtube.com/watch?v=ZgSN0wff5Mw
+PA-0395,How To Pixel Art Tutorial Part 15: Idle Animation,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 工具与导出 | 光照与体积,https://www.youtube.com/watch?v=9sKpG7VMEBQ
+PA-0396,How To Pixel Art Tutorial Part 16: Walk Cycle,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=nQZECTSzaaI
+PA-0397,How To Pixel Art Tutorial Part 1: What Programs?,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 光照与体积,https://www.youtube.com/watch?v=wBHZcECS0dk
+PA-0398,How To Pixel Art Tutorial Part 2: Basic Heart,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 构图与尺度 | 轮廓与像素簇 | 光照与体积,https://www.youtube.com/watch?v=ZWbEgYD6iWc
+PA-0399,How To Pixel Art Tutorial Part 3: Dithering,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 轮廓与像素簇,https://www.youtube.com/watch?v=ATetLq-JR7s
+PA-0400,How To Pixel Art Tutorial Part 4: Form,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 人物与角色,https://www.youtube.com/watch?v=QZ0_jDEnqbk
+PA-0401,How To Pixel Art Tutorial Part 5: Outlines,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 轮廓与像素簇 | 光照与体积 | 场景与透视,https://www.youtube.com/watch?v=6uN1SIcWkjk
+PA-0402,How To Pixel Art Tutorial Part 6: Pixel People,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 光照与体积 | 动画,https://www.youtube.com/watch?v=mHBtnBSNGRM
+PA-0403,How To Pixel Art Tutorial Part 7: Sword & Sworcery,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 人物与角色 | 场景与透视,https://www.youtube.com/watch?v=S3qbOZSP-vs
+PA-0404,How To Pixel Art Tutorial Part 8: Background,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 场景与透视 | 调色板与明度 | 动画,https://www.youtube.com/watch?v=Q2xORs-ZU3o
+PA-0405,How To Pixel Art Tutorial Part 9: Colour & Depth,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 调色板与明度 | 人物与角色 | 工具与导出,https://www.youtube.com/watch?v=UDEQk9QYpaI
+PA-0406,How To Pixel Art Tutorials [10] - Outline Basics,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视 | 轮廓与像素簇 | 人物与角色,https://www.youtube.com/watch?v=ngUlmAw7T9s
+PA-0407,How To Pixel Art Tutorials [11] - Outlines - Advanced,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 人物与角色 | 轮廓与像素簇 | 调色板与明度,https://www.youtube.com/watch?v=Nso_fWpeUmI
+PA-0408,How To Pixel Art Tutorials [12] - 2&4 Frames Walk/Run Cycle Animations,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=9lemPuqxIug
+PA-0409,How To Pixel Art Tutorials [13] - Draw 32x32 Character (Part 1),Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 光照与体积 | 场景与透视,https://www.youtube.com/watch?v=ExRm4HvRIHA
+PA-0410,How To Pixel Art Tutorials [14] - Draw 32x32 Character (Part 2),Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 光照与体积 | 调色板与明度 | 材质与纹理,https://www.youtube.com/watch?v=b9doLOtPciY
+PA-0411,How To Pixel Art Tutorials [15] - 16x16 RPG Character (4 sides),Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 动画 | 调色板与明度,https://www.youtube.com/watch?v=DGhVEZHx8H0
+PA-0412,How To Pixel Art Tutorials [16] - Lines / Curves / Jaggies,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 轮廓与像素簇 | 人物与角色 | 场景与透视,https://www.youtube.com/watch?v=U6X2sFtugT8
+PA-0413,How To Pixel Art Tutorials [17] - Walk Cycle (6 & 8 frames),Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,动画 | 人物与角色 | 调色板与明度 | 构图与尺度,https://www.youtube.com/watch?v=5QTCwiJUmmo
+PA-0414,How To Pixel Art Tutorials [18] - Water (Simple),Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视 | 图块与地形 | 光照与体积,https://www.youtube.com/watch?v=6zF0ub7WqvE
+PA-0415,How To Pixel Art Tutorials [1] - What Software / Programs,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,构图与尺度 | 工具与导出,https://www.youtube.com/watch?v=Mv3EPJjQ6Rc
+PA-0416,"How To Pixel Art Tutorials [2] - Hue, Saturation, Value",Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,调色板与明度,https://www.youtube.com/watch?v=AX9pdObMAvk
+PA-0417,How To Pixel Art Tutorials [3] - Draw 8x8 Pixel Character,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=m5PHiJjt270
+PA-0418,How To Pixel Art Tutorials [4] - Tile Basics,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 图块与地形 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=a0tFzjv06rM
+PA-0419,How To Pixel Art Tutorials [5] - Dithering,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=mj1nWEysUAs
+PA-0420,How To Pixel Art Tutorials [6] - Draw 16x16 Character,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 光照与体积 | 调色板与明度 | 构图与尺度,https://www.youtube.com/watch?v=mZIEEJ7AcGg
+PA-0421,How To Pixel Art Tutorials [8] - Projectiles (Part 2/3),Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,动画 | 场景与透视 | 调色板与明度 | 材质与纹理,https://www.youtube.com/watch?v=y6Hkr5GvlEo
+PA-0422,How To Pixel Art Tutorials [9] - Projectiles (Part 3/3),Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 动画,https://www.youtube.com/watch?v=lXNGMutr_Qc
+PA-0423,How to Rotate Pixel Art for HD: A Photoshop Tutorial by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 动画 | 抗锯齿与抖动 | 人物与角色,https://www.youtube.com/watch?v=X5laVIYE-Ic
+PA-0424,How to Upscale Pixel Art in Photoshop,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 抗锯齿与抖动,https://www.youtube.com/watch?v=58TLD2NombU
+PA-0425,How to Use the Free Program Piskel to Make Pixel Art and Animation: Basic Tutorial by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 调色板与明度 | 工具与导出 | 构图与尺度,https://www.youtube.com/watch?v=tlpCU871Xyg
+PA-0426,Instant Pixel Art with Photoshop and Krita (Indexed Color),IA,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 工具与导出 | 人物与角色 | 光照与体积,https://www.youtube.com/watch?v=MZefUlg0pc4
+PA-0427,Intro To Pixel Art: Absolute Beginner (Episode 1),Skelecopter Games,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 轮廓与像素簇 | 光照与体积,https://www.youtube.com/watch?v=WfWUi0BeqXg
+PA-0428,Isometric Pixel Art Tutorial | Photoshop CC,Flow Studio,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视 | 光照与体积 | 工具与导出,https://www.youtube.com/watch?v=zcD5AljC8x4
+PA-0429,Let's Make a Snowfall Pixel Art Animation Loop - Photoshop Tutorial by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 动画 | 场景与透视 | 调色板与明度,https://www.youtube.com/watch?v=9j5fwyqOQc4
+PA-0430,Let's Pixel - Mech Soldier,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=h0bhGiw49Qo
+PA-0431,Let's Pixel - Minotaur,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 轮廓与像素簇 | 人物与角色,https://www.youtube.com/watch?v=h2mR9GhWHtA
+PA-0432,Let's Pixel - Platformer Shooter Character,Heartbeast,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 轮廓与像素簇 | 光照与体积,https://www.youtube.com/watch?v=zFu-cXlwgA0
+PA-0433,Let's Pixel - Tiger - Learning About Values,Heartbeast,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=CrwmkSC7DTo
+PA-0434,OG VIDEO: Basic Pixel Art Tutorial: Zarting Arting,Zartbot,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 光照与体积 | 人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=GECdvBzkaCs
+PA-0435,OpenGameArt Pixel Art Tutorial 3: The Basics,OpenGameArt.org,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 调色板与明度 | 工具与导出 | 轮廓与像素簇,https://www.youtube.com/watch?v=EK5VOK9FD_M
+PA-0436,OpenGameArt Pixel Art Tutorial Part 1: Choosing an Editor,OpenGameArt.org,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 调色板与明度 | 人物与角色,https://www.youtube.com/watch?v=gNMPoZzWIAM
+PA-0437,OpenGameArt Pixel Art Tutorial Part 2: Configuring Krita for Pixel Art,OpenGameArt.org,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 工具与导出 | 轮廓与像素簇 | 抗锯齿与抖动,https://www.youtube.com/watch?v=tOqdE4JJOjU
+PA-0438,paint tool SAI -- pixel art tutorial -- UPDATED,hope Bilyea,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 调色板与明度 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=TFT7QWNsn2Y
+PA-0439,PHA ProTips - Pixel Characters in Photoshop,Powerhouse Animation Studios,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 工具与导出 | 轮廓与像素簇,https://www.youtube.com/watch?v=33-Zv-Nt80I
+PA-0440,Photoshop Tutorial: Managing the Canvas by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 构图与尺度 | 工具与导出 | 场景与透视,https://www.youtube.com/watch?v=f-tpMOeLvbw
+PA-0441,Picking Strong Colors with Hue Shifting,GDQuest,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 场景与透视 | 人物与角色,https://www.youtube.com/watch?v=RL_5va7jEx8
+PA-0442,Piskel - How to Make Pixel Art Tutorial Video,Skylent Games,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 人物与角色 | 调色板与明度 | 场景与透视,https://www.youtube.com/watch?v=z2m7-4WXccc
+PA-0443,Pixel Art - Photoshop Tutorial,Brackeys,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 调色板与明度 | 场景与透视 | 构图与尺度,https://www.youtube.com/watch?v=hFZBUWHVSrM
+PA-0444,Pixel Art Animated Torch Tutorial by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 场景与透视,https://www.youtube.com/watch?v=LJ5OY_rfrvU
+PA-0445,Pixel Art Animation Basics in Photoshop Tutorial Part 4: How to Export to a Movie File,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 构图与尺度,https://www.youtube.com/watch?v=YccrLfemNOE
+PA-0446,Pixel Art Animation Basics Tutorial Part 3: Looping,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出,https://www.youtube.com/watch?v=VgIPPjza8RQ
+PA-0447,Pixel Art Animation in Photoshop Tutorial Part 1: Basics by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=5AMo2ciBN_w
+PA-0448,Pixel Art Animation in Photoshop Tutorial Part 2: Moving Layers by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出,https://www.youtube.com/watch?v=a8_bwy9Xpf8
+PA-0449,Pixel Art Basic Animation in Photoshop Tutorial Part 6: Moving Parts by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 人物与角色,https://www.youtube.com/watch?v=rztFGF1i_bs
+PA-0450,Pixel Art Basics in Photoshop Part 1: Drawing by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 调色板与明度 | 光照与体积 | 场景与透视,https://www.youtube.com/watch?v=TwHW8HIrV5A
+PA-0451,Pixel Art Basics in Photoshop Part 2: Colors and Lighting by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 工具与导出 | 场景与透视,https://www.youtube.com/watch?v=4LwH_pRbAtU
+PA-0452,Pixel Art Basics in Photoshop Tutorial Part 3 Layers by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 场景与透视 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=Xi4N21cLCs4
+PA-0453,Pixel Art Basics Tutorial Part 4: Isometric Shapes by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 构图与尺度 | 动画 | 工具与导出,https://www.youtube.com/watch?v=iOdxrO-xEYE
+PA-0454,Pixel Art Basics Tutorial Part 5: Outlines by PXLFLX,PXLFLX,YouTube / Lospec curated,video,A,full-caption,轮廓与像素簇 | 人物与角色,https://www.youtube.com/watch?v=_ZCW4gWqIvk
+PA-0455,PIXEL ART in Photoshop (Tutorial),Brackeys,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 工具与导出 | 构图与尺度 | 场景与透视,https://www.youtube.com/watch?v=rLdA4Amea7Y
+PA-0456,Pixel Art Tips #10: Pillow-shading,SolarLune,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=FY-XtO3s-RQ
+PA-0457,Pixel Art Tips #11 - Attention to Detail,SolarLune,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 光照与体积 | 材质与纹理,https://www.youtube.com/watch?v=D2uaPFMdMzE
+PA-0458,Pixel Art Tips #7 - Outlines,SolarLune,YouTube / Lospec curated,video,A,full-caption,轮廓与像素簇 | 调色板与明度 | 人物与角色 | 构图与尺度,https://www.youtube.com/watch?v=4BSBb6YLe6M
+PA-0459,Pixel Art Tips #9: Basic Anti-aliasing,SolarLune,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 场景与透视 | 轮廓与像素簇,https://www.youtube.com/watch?v=Uq0f1nGMnx0
+PA-0460,Pixel Art Tutorial #8 - Using Palettes In GIMP,SolarLune,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 光照与体积 | 构图与尺度,https://www.youtube.com/watch?v=1tAnS6eOvPs
+PA-0461,Pixel Art Tutorial - Creating your first level tiles in Photoshop,Overbound,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=cXa0x9no72E
+PA-0462,Pixel Art Tutorial - Curved Metal Platforms in Photoshop,Overbound,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视 | 轮廓与像素簇 | 材质与纹理,https://www.youtube.com/watch?v=WnfJGeWTyhs
+PA-0463,Pixel Art Tutorial - Grass Hills and Grass Slopes Easy in Photoshop,Overbound,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 抗锯齿与抖动 | 工具与导出 | 轮廓与像素簇,https://www.youtube.com/watch?v=bY287jJcgeM
+PA-0464,"Pixel Art Tutorial - Grids, Measuring and Moving Pixels in Photoshop",Overbound,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 抗锯齿与抖动 | 工具与导出,https://www.youtube.com/watch?v=aBoWASqb1Uw
+PA-0465,Pixel Art Tutorial - How to make City Building background tiles,Overbound,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 调色板与明度 | 光照与体积 | 工具与导出,https://www.youtube.com/watch?v=QCoeb5KrCsQ
+PA-0466,Pixel Art Tutorial - How to make Metallic Platform Tiles in Photoshop,Overbound,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 图块与地形 | 材质与纹理,https://www.youtube.com/watch?v=vK4pLJZfo_E
+PA-0467,Pixel Art Tutorial - Paint & Color Tools in Photoshop,Overbound,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 工具与导出 | 场景与透视 | 光照与体积,https://www.youtube.com/watch?v=2wYoQzoC9tg
+PA-0468,Pixel Art Tutorial - Turn Photos into Pixel Art in Photoshop,Overbound,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 场景与透视 | 工具与导出 | 抗锯齿与抖动,https://www.youtube.com/watch?v=FcMPkuzZlVw
+PA-0469,Pixel Art Tutorial 1 - Torch,SolarLune,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 场景与透视,https://www.youtube.com/watch?v=RLvDDZnccQE
+PA-0470,Pixel Art Tutorial 2 - Perspective,SolarLune,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 场景与透视 | 人物与角色 | 调色板与明度,https://www.youtube.com/watch?v=k7iclUKhccI
+PA-0471,Pixel Art Tutorial 6 - Hue Shifting and Saturation Shading,SolarLune,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 光照与体积 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=yRCTL0PA4X0
+PA-0472,Pixel Art Tutorial Series - Part 3 - Light and Shadows,SolarLune,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 场景与透视 | 调色板与明度 | 人物与角色,https://www.youtube.com/watch?v=lWH8-weFsbA
+PA-0473,Pixel Art Tutorial Series - Part 5: Simple Animation - Run Cycle,SolarLune,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 调色板与明度 | 人物与角色,https://www.youtube.com/watch?v=g5eAQK42ezs
+PA-0474,Pixel Art Tutorial Series Part 4: Color Contrast,SolarLune,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 轮廓与像素簇 | 光照与体积,https://www.youtube.com/watch?v=1wsxDtBSvt8
+PA-0475,Pixel Art Tutorial~,LeslieLu Marie,YouTube / Lospec curated,video,A,full-caption,轮廓与像素簇 | 人物与角色 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=9mvwBzJkNio
+PA-0476,"Pixel Art/Sprite Tutorial -  Crack Ground Animation, Lava in Photoshop",Overbound,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 动画 | 材质与纹理 | 调色板与明度,https://www.youtube.com/watch?v=I2DbEbGWq_k
+PA-0477,Pixel Game Art Animated Background Tutorial in Photoshop,Jaysen Batchelor,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 调色板与明度 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=1SSU1S8qxkM
+PA-0478,Pixel Game Art Design in Photoshop: Character animation & background tutorial,Jaysen Batchelor,YouTube / Lospec curated,video,A,full-caption,动画 | 工具与导出 | 调色板与明度 | 人物与角色,https://www.youtube.com/watch?v=0EDnAdJZNXA
+PA-0479,Pixelart tutorial: soil and rock,Michel Mohr,YouTube / Lospec curated,video,A,full-caption,场景与透视 | 调色板与明度 | 材质与纹理 | 光照与体积,https://www.youtube.com/watch?v=-OL1snU11Cs
+PA-0480,Playcrafting: Pixel Art Class by Fabraz,Fabraz,YouTube / Lospec curated,video,A,full-caption,动画 | 光照与体积 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=M5BnMaamj2k
+PA-0481,Pyxel Edit Tutorial Part 1/3: Basics,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 构图与尺度 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=7iHm0QZIDWY
+PA-0482,Pyxel Edit Tutorial Part 2/3: Tiling,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,图块与地形 | 工具与导出 | 光照与体积 | 场景与透视,https://www.youtube.com/watch?v=T-BFtcfzofg
+PA-0483,Pyxel Edit Tutorial Part 3/3: Animation,Christopher Yabsley,YouTube / Lospec curated,video,A,full-caption,动画 | 图块与地形 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=gSxPk1-dsd8
+PA-0484,Retronator advanced pixel art tip: Quick dithering,Retronator,YouTube / Lospec curated,video,A,full-caption,工具与导出 | 调色板与明度 | 光照与体积 | 构图与尺度,https://www.youtube.com/watch?v=51f1m_cj7aA
+PA-0485,Retronator Pixel Art Paintover — Episode 1,Retronator,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 调色板与明度 | 材质与纹理 | 轮廓与像素簇,https://www.youtube.com/watch?v=To5mxZ--UZo
+PA-0486,Rotoscoping and pixel art - Tutorial,Armitage Games,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 动画 | 工具与导出 | 调色板与明度,https://www.youtube.com/watch?v=-jvXJs97bPo
+PA-0487,Spriting Process - 6-21-14,SolarLune,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 调色板与明度 | 光照与体积 | 动画,https://www.youtube.com/watch?v=8lxCdeL1--4
+PA-0488,STARBOUND Character Tutorial + FREE Templates,Dual Core Studio,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 调色板与明度 | 人物与角色,https://www.youtube.com/watch?v=gU0L4P7kXcE
+PA-0489,Stardew Valley EARTH DAY! Tree Tutorial,Designs,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 场景与透视 | 调色板与明度 | 工具与导出,https://www.youtube.com/watch?v=MZzwXJ7-KyM
+PA-0490,TILESET in Photoshop (Tutorial),Brackeys,YouTube / Lospec curated,video,A,full-caption,图块与地形 | 工具与导出 | 场景与透视 | 光照与体积,https://www.youtube.com/watch?v=aaEEujLtsr8
+PA-0491,TODOS los PIXEL ART se mejoran con LEGIBILIDAD | Curso DEFINITIVO de Pixel Art,Toronja GB,YouTube,video,B,full-caption,轮廓与像素簇 | 调色板与明度 | 光照与体积 | 构图与尺度,https://www.youtube.com/watch?v=6OlPVIRgLko
+PA-0492,Tutorial: How-to Make Pixel Art in Photoshop,Matt Borchert,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 工具与导出 | 构图与尺度 | 抗锯齿与抖动,https://www.youtube.com/watch?v=uyRCxhgyNuE
+PA-0493,Tutorial: Pixel art tile floor,Michel Mohr,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 图块与地形 | 材质与纹理 | 调色板与明度,https://www.youtube.com/watch?v=h2bTSCIxRWk
+PA-0494,Tutorial: Pixel art transition tiles & materials,Michel Mohr,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 调色板与明度 | 工具与导出 | 材质与纹理,https://www.youtube.com/watch?v=tFguVDoWowc
+PA-0495,Tutorial: Pixel art wall texture,Michel Mohr,YouTube / Lospec curated,video,A,full-caption,光照与体积 | 材质与纹理 | 调色板与明度 | 轮廓与像素簇,https://www.youtube.com/watch?v=pTqPZutyQKQ
+PA-0496,Tutorial: Pixel art wood floor texture,Michel Mohr,YouTube / Lospec curated,video,A,full-caption,材质与纹理 | 光照与体积 | 调色板与明度 | 图块与地形,https://www.youtube.com/watch?v=9pfRfnfZnJA
+PA-0497,Video Game Pixel Art Character DesignTutorial: Learn how to create a pixel character in Piskel,Jaysen Batchelor,YouTube / Lospec curated,video,A,full-caption,调色板与明度 | 人物与角色 | 工具与导出 | 光照与体积,https://www.youtube.com/watch?v=N0TAOUe6fG4
+PA-0498,What SIze To Make PixelArt (Pixelart Tutorial for beginners),MortMort,YouTube / Lospec curated,video,A,full-caption,人物与角色 | 构图与尺度 | 场景与透视 | 光照与体积,https://www.youtube.com/watch?v=AXb-VBZTKDA
+PA-0499,¿Qué son los CLUSTERS? | Pixel art en español,Toronja GB,YouTube,video,B,full-caption,调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=R5b27t8UPjU
+PA-0500,“How do you start Pixel Art?”…Here’s what I did!,Brandon James Greer,YouTube,video,B,full-caption,人物与角色 | 调色板与明度 | 构图与尺度 | 场景与透视,https://www.youtube.com/watch?v=WUlgvNe4BLU
+PA-0501,◼️ How to create cool pixelated effects - Quick & Easy (Illustrator & Photoshop Tutorial),Elbert Tiao,YouTube,video,B,full-caption,调色板与明度 | 场景与透视 | 构图与尺度 | 人物与角色,https://www.youtube.com/watch?v=X10MYjBh08Q
+PA-0502,"✅ PIXELLAB REVIEW 2022! ( HOW TO USE PIXELLAB  ) - WEB ART THUMBNAIL, ETC!",Shawn Powell,YouTube,video,B,full-caption,场景与透视 | 工具与导出 | 调色板与明度 | 光照与体积,https://www.youtube.com/watch?v=FDsDO_Woo8w
+PA-0503,🌳 HOW TO PAINT SIMPLE ENVIRONMENTS (plus free brushes!),Marc Brunet,YouTube,video,B,full-caption,场景与透视 | 调色板与明度 | 光照与体积 | 工具与导出,https://www.youtube.com/watch?v=pmdc2zQ9jvM
+PA-0504,🎞️Cómo ANIMAR Personajes pixel art Top Down (Caminar a 4 direcciones) 👾🔥,Omel Pixela,YouTube,video,B,full-caption,动画 | 人物与角色 | 工具与导出 | 构图与尺度,https://www.youtube.com/watch?v=q3YljScJA7E
+PA-0505,🎨 Cómo hacer texturas de Hojas pixel Art - nivel Pro 🌳🔥,Omel Pixela,YouTube,video,B,full-caption,轮廓与像素簇 | 调色板与明度 | 工具与导出 | 光照与体积,https://www.youtube.com/watch?v=rqdeu3_wuKQ
+PA-0506,👨‍🎓Tutorial Pixelart (Cap. 4)¿QUÉ ES el DITHERING y CÓMO HACERLO en PIXELART?,Elias_Lozano_Shorts,YouTube,video,B,full-caption,材质与纹理 | 调色板与明度 | 构图与尺度 | 场景与透视,https://www.youtube.com/watch?v=-FHxHUNZlEM
+PA-0507,👨‍🎓Tutorial Pixelart (Cap. 6) ¿Qué es el Antialiasing?,Elias_Lozano_Shorts,YouTube,video,B,full-caption,调色板与明度 | 工具与导出 | 轮廓与像素簇 | 抗锯齿与抖动,https://www.youtube.com/watch?v=7eaNcqyefKQ
+PA-0508,📖02 ‣ 📼02 ‣ TileSet Asset Creation (in Aseprite) ‣ Metroidvania Forge Godot 4 Tutorial Series,Michael Games,YouTube,video,B,full-caption,图块与地形 | 调色板与明度 | 场景与透视 | 工具与导出,https://www.youtube.com/watch?v=HAOC0FCHWNg
+PA-0509,🔴DEJA de USAR Colores FEOS en PIXEL ART (PALETAS),Omel Pixela,YouTube,video,B,full-caption,调色板与明度 | 人物与角色 | 工具与导出 | 光照与体积,https://www.youtube.com/watch?v=COGHkE2czXY
+PA-0510,🖌️GUIA PIXEL ART #15 – Peinados Básicos,Héroe del Pixel,YouTube,video,B,full-caption,人物与角色,https://www.youtube.com/watch?v=vlUrIYRdCMo
+PA-0511,🧍 FULL BODY ANATOMY CRASH COURSE (for artists),Marc Brunet,YouTube,video,B,full-caption,人物与角色 | 光照与体积 | 动画,https://www.youtube.com/watch?v=XP9d0_5HjyA

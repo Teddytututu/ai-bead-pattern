@@ -35,6 +35,11 @@ const surrounding = [
   [-1, 0], [1, 0],
   [-1, 1], [0, 1], [1, 1],
 ] as const
+const surroundingClockwise = [
+  [-1, -1], [0, -1], [1, -1], [1, 0],
+  [1, 1], [0, 1], [-1, 1], [-1, 0],
+] as const
+const clusterArcWeight = 2.5
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
@@ -112,6 +117,66 @@ function dataEnergy(
     * (0.65 + clamp(input.importance[cell] ?? 0, 0, 2) * 0.7)
 }
 
+function colorIdAt(
+  colorIds: readonly string[],
+  cell: number,
+  overrideCell: number,
+  overrideId: string,
+): string {
+  return cell === overrideCell ? overrideId : colorIds[cell]!
+}
+
+function neighborArcPenalty(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+  center: number,
+  overrideCell: number,
+  overrideId: string,
+): number {
+  const x = center % input.width
+  const y = Math.floor(center / input.width)
+  const centerId = colorIdAt(colorIds, center, overrideCell, overrideId)
+  let firstMatch: boolean | undefined
+  let previousMatch = false
+  let transitions = 0
+  for (const [offsetX, offsetY] of surroundingClockwise) {
+    const nextX = x + offsetX
+    const nextY = y + offsetY
+    if (isActive(input, nextX, nextY) === false) return 0
+    const next = cellIndex(nextX, nextY, input.width)
+    const matches = colorIdAt(colorIds, next, overrideCell, overrideId) === centerId
+    if (firstMatch === undefined) firstMatch = matches
+    else if (matches !== previousMatch) transitions += 1
+    previousMatch = matches
+  }
+  if (previousMatch !== firstMatch) transitions += 1
+  return Math.max(0, transitions - 2)
+}
+
+function localClusterArcEnergy(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+  cell: number,
+  candidateId: string,
+): number {
+  if (input.mode !== 'quality') return 0
+  const x = cell % input.width
+  const y = Math.floor(cell / input.width)
+  const minimumX = Math.max(0, x - 1)
+  const maximumX = Math.min(input.width - 1, x + 1)
+  const minimumY = Math.max(0, y - 1)
+  const maximumY = Math.min(input.height - 1, y + 1)
+  let energy = 0
+  for (let centerY = minimumY; centerY <= maximumY; centerY += 1) {
+    for (let centerX = minimumX; centerX <= maximumX; centerX += 1) {
+      const center = cellIndex(centerX, centerY, input.width)
+      if (input.activeMask[center] !== 1) continue
+      energy += neighborArcPenalty(input, colorIds, center, cell, candidateId)
+    }
+  }
+  return energy * clusterArcWeight
+}
+
 function localEnergy(
   input: GridRefinementInput,
   colorIds: readonly string[],
@@ -168,6 +233,7 @@ function localEnergy(
     && colorIds[mirror] !== candidateId) {
     energy += 2.5
   }
+  energy += localClusterArcEnergy(input, colorIds, cell, candidateId)
   return energy
 }
 
@@ -203,6 +269,9 @@ function totalEnergy(
     const mirror = mirroredCell(input, cell, axis)
     if (input.mode === 'quality' && mirror !== undefined && cell < mirror
       && colorIds[mirror] !== colorIds[cell]) energy += 2.5
+    if (input.mode === 'quality') {
+      energy += neighborArcPenalty(input, colorIds, cell, cell, colorIds[cell]!) * clusterArcWeight
+    }
   }
   for (let y = 0; y + 1 < input.height; y += 1) {
     for (let x = 0; x + 1 < input.width; x += 1) {
