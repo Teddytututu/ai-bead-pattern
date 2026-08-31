@@ -1800,34 +1800,66 @@
     function createSampleAnalysis(image) {
       const base = inferSubjectAnalysis(image)
       const faceMask = base.subjectMaskEvidence.mask
+      const width = image.width
+      const height = image.height
+      const point = (x, y) => ({ x: width * x, y: height * y })
       const provenance = [{
         origin: 'heuristic',
         provider: 'demo-sample',
-        model: 'known-sample-portrait',
-        version: '1',
+        model: 'bundled-cc0-cat',
+        version: '2026-09-01',
       }]
       return {
         ...base,
+        imageType: 'pet',
         landmarks: [
-          { id: 'left-eye-center', kind: 'eye', x: 166, y: 217, confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
-          { id: 'right-eye-center', kind: 'eye', x: 254, y: 217, confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
-          { id: 'nose-tip', kind: 'nose', x: 210, y: 253, confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
-          { id: 'mouth-center', kind: 'mouth', x: 210, y: 276, confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
+          { id: 'left-eye-center', kind: 'eye', ...point(0.39, 0.41), confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
+          { id: 'right-eye-center', kind: 'eye', ...point(0.61, 0.41), confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
+          { id: 'nose-tip', kind: 'nose', ...point(0.5, 0.51), confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
+          { id: 'mouth-center', kind: 'mouth', ...point(0.5, 0.56), confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
+          { id: 'left-ear-tip', kind: 'ear', ...point(0.34, 0.12), confidence: 0.96, priority: 'hard', carrierRegionId: 'subject', provenance },
+          { id: 'right-ear-tip', kind: 'ear', ...point(0.72, 0.15), confidence: 0.96, priority: 'hard', carrierRegionId: 'subject', provenance },
         ],
-        semanticRegions: [{
-          id: 'face-skin',
-          label: 'face-skin',
-          mask: faceMask,
-          confidence: 1,
-          importance: 1,
-          provenance,
-        }],
+        semanticRegions: [
+          {
+            id: 'subject',
+            label: 'subject',
+            mask: base.subjectMaskEvidence.mask,
+            confidence: 1,
+            importance: 0.9,
+            provenance,
+          },
+          {
+            id: 'face-skin',
+            label: 'face-skin',
+            mask: faceMask,
+            confidence: 1,
+            importance: 1,
+            provenance,
+          },
+        ],
         modelVersions: {
           ...base.modelVersions,
-          faceLandmarks: 'demo/known-sample-v1',
-          portraitSemantics: 'demo/known-sample-v1',
+          faceLandmarks: 'demo/bundled-cat-v1',
+          portraitSemantics: 'demo/bundled-cat-v1',
         },
       }
+    }
+
+    async function loadBundledSample() {
+      const response = await fetch('./assets/sample-cat.png', { cache: 'no-store' })
+      if (response.ok === false) throw new Error(`示例图加载失败: ${response.status}`)
+      const bitmap = await createImageBitmap(await response.blob())
+      const maximum = 512
+      const scale = Math.min(1, maximum / Math.max(bitmap.width, bitmap.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+      bitmap.close()
+      const image = canvasToPixelImage(canvas)
+      return { image, analysis: createSampleAnalysis(image) }
     }
 
     function canvasToPixelImage(canvas) {
@@ -2385,6 +2417,17 @@
     })
     elements.downloadButton.addEventListener('click', downloadPattern)
 
+    try {
+      const bundledSample = await loadBundledSample()
+      sourceImage = bundledSample.image
+      sourceAnalysis = bundledSample.analysis
+      originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
+      analysisByRoute = new Map([['deterministic', sourceAnalysis]])
+      originalEvidenceByRoute = new Map([['deterministic', originalSubjectEvidence]])
+      elements.fileName.textContent = 'sample-cat.png'
+    } catch (error) {
+      console.warn(error)
+    }
     await Promise.all([initializeMaskGate(), initializeAiRoutes()])
     refreshAnalysisDebugViewer()
     renderSourcePreview()
