@@ -185,7 +185,7 @@ export function createPreferenceWorkbenchController({
       const header = document.createElement('button')
       header.type = 'button'
       header.className = 'preference-candidate-header'
-      header.textContent = `${index + 1}. ${candidate.style} · ${candidate.pattern.width}×${candidate.pattern.height}`
+      header.textContent = `${index + 1}. ${candidate.style} · ${candidate.pattern.width}×${candidate.pattern.height}${candidate.id === selectedCandidateId ? ' · 当前标注' : ''}`
       header.addEventListener('click', () => {
         selectedCandidateId = candidate.id
         render()
@@ -344,7 +344,7 @@ export function createPreferenceWorkbenchController({
     elements.progressText.textContent = `${progress.percent}% · ${progress.scored}/${progress.totalScores} 项评分 · ${progress.annotations} 个位置`
     elements.undo.disabled = session.history.length === 0
     elements.redo.disabled = session.future.length === 0
-    elements.status.textContent = `${session.annotatorId} · ${session.comparisons.length} 次比较 · ${layerLabels[layer]}`
+    elements.status.textContent = `${session.annotatorId} · ${session.comparisons.length} 次比较 · 当前 ${candidateLabel(selectedCandidateId)} · ${layerLabels[layer]} · 点击候选网格记录问题`
   }
 
   function candidateLabel(candidateId) {

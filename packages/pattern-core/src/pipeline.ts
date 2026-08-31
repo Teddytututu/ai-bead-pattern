@@ -2221,6 +2221,9 @@ function generateCandidate(
     gridRefinement?.diagnosticsAfter.smallComponents ?? 0,
     gridRefinement?.diagnosticsAfter.singleCellBands ?? 0,
   )
+  if (context.occupancyMode === 'full-frame' && subjectMaskTrust(request.analysis) >= 0.75) {
+    score.total = clamp(score.total - 0.14, 0, 1)
+  }
   const artDirectionExecution = {
     enabled: explicitArtDirection,
     importance: importanceExecution.summary,
@@ -2505,7 +2508,13 @@ export class DeterministicPatternAlgorithm {
       }
     }
     candidateGenerationMs = Math.max(0, performance.now() - candidateGenerationStartedAt)
+    const preferSubjectShape = request.options.structure?.occupancyMode === 'auto'
+      && hasConfidentSubjectMask(request.analysis)
     candidates.sort((first, second) => Number(second.valid) - Number(first.valid)
+      || (preferSubjectShape
+        ? Number(second.canvasPlan?.occupancyMode === 'subject-shape')
+          - Number(first.canvasPlan?.occupancyMode === 'subject-shape')
+        : 0)
       || second.score.total - first.score.total
       || first.id.localeCompare(second.id))
     const maximumCandidates = Math.max(1, Math.floor(request.options.maxCandidates ?? 5))

@@ -15,6 +15,10 @@ test('generates a refined pattern with planning diagnostics', async ({ page }) =
   await expect(page.locator('#valueRoleCount')).not.toHaveText('--')
   await expect(page.locator('#paletteRoleCount')).not.toHaveText('--')
   await expect(page.locator('#gridRefinementEnergy')).toContainText('→')
+  await expect(page.locator('#toggleOutlineButton')).toHaveText('轮廓线：关')
+  await page.locator('#toggleOutlineButton').click()
+  await expect(page.locator('#toggleOutlineButton')).toHaveText('轮廓线：开')
+  await expect(page.locator('#toggleOutlineButton')).toHaveAttribute('aria-pressed', 'true')
   expect(errors).toEqual([])
 })
 
@@ -24,6 +28,7 @@ test('records multidimensional scores, localized issues, comparison, and session
 
   await page.locator('#preferenceStartButton').click()
   await expect(page.locator('#preferenceWorkbenchDialog')).toBeVisible()
+  await expect(page.locator('.preference-workbench-hint')).toContainText('点候选标题')
   await expect(page.locator('.preference-candidate-card')).toHaveCount(4)
   await expect(page.locator('#preferenceAxisScores input[type="range"]')).toHaveCount(11)
   await expect(page.locator('#preferenceIssueTags button')).toHaveCount(14)

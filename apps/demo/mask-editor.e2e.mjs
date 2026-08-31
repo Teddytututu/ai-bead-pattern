@@ -5,6 +5,7 @@ async function waitForGeneration(page) {
 }
 
 async function uploadWideImage(page) {
+  await expect(page.locator('#fileInput')).toBeEnabled({ timeout: 20_000 })
   await page.evaluate(async () => {
     const canvas = document.createElement('canvas')
     canvas.width = 80

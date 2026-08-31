@@ -31,6 +31,85 @@ export function normalizePointerPoint(clientX, clientY, rect) {
   }
 }
 
+function luminance(data, index) {
+  return data[index] * 0.2126 + data[index + 1] * 0.7152 + data[index + 2] * 0.0722
+}
+
+function edgeStrength(image, x, y) {
+  const { width, height, data } = image
+  const at = (sampleX, sampleY) => {
+    const sx = Math.min(width - 1, Math.max(0, sampleX))
+    const sy = Math.min(height - 1, Math.max(0, sampleY))
+    return luminance(data, (sy * width + sx) * 4)
+  }
+  const gx = at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1)
+    - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)
+  const gy = at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1)
+    - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)
+  return Math.min(1, Math.hypot(gx, gy) / 1_020)
+}
+
+export function snapStrokeToBoundary(points, image, options = {}) {
+  if (!Array.isArray(points) || points.length === 0) {
+    return { points: [], snappedCount: 0, meanDistance: 0, confidence: 0 }
+  }
+  if (!image || !Number.isInteger(image.width) || !Number.isInteger(image.height)
+    || !(image.data instanceof Uint8ClampedArray)
+    || image.data.length !== image.width * image.height * 4) {
+    throw new RangeError('Snap image must contain RGBA pixels aligned to its dimensions')
+  }
+  const maxDistanceNormalized = Math.min(0.25, Math.max(0.005, options.maxDistanceNormalized ?? 0.06))
+  const endpointLock = Math.min(0.25, Math.max(0, options.endpointLock ?? 0.015))
+  const maxDistance = Math.min(
+    maxDistanceNormalized * Math.min(image.width, image.height),
+    12,
+  )
+  const output = points.map((point) => ({ x: point.x, y: point.y }))
+  let snappedCount = 0
+  let totalDistance = 0
+  let totalConfidence = 0
+  for (let index = 0; index < points.length; index += 1) {
+    const point = points[index]
+    const endpoint = index === 0 || index === points.length - 1
+    if (endpoint && endpointLock > 0) {
+      totalConfidence += 0.8
+      continue
+    }
+    const sourceX = point.x * Math.max(0, image.width - 1)
+    const sourceY = point.y * Math.max(0, image.height - 1)
+    const radius = Math.max(1, Math.ceil(maxDistance))
+    let best
+    for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
+      for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
+        const distance = Math.hypot(offsetX, offsetY)
+        if (distance > maxDistance) continue
+        const x = Math.min(image.width - 1, Math.max(0, Math.round(sourceX + offsetX)))
+        const y = Math.min(image.height - 1, Math.max(0, Math.round(sourceY + offsetY)))
+        const edge = edgeStrength(image, x, y)
+        const score = edge - distance / Math.max(1, maxDistance) * 0.28
+        if (best === undefined || score > best.score) best = { x, y, score, edge, distance }
+      }
+    }
+    if (best === undefined || best.edge < 0.08) {
+      totalConfidence += best?.edge ?? 0
+      continue
+    }
+    output[index] = {
+      x: best.x / Math.max(1, image.width - 1),
+      y: best.y / Math.max(1, image.height - 1),
+    }
+    snappedCount += 1
+    totalDistance += best.distance / Math.max(1, Math.min(image.width, image.height))
+    totalConfidence += Math.min(1, best.edge * 1.8)
+  }
+  return {
+    points: output,
+    snappedCount,
+    meanDistance: snappedCount === 0 ? 0 : totalDistance / snappedCount,
+    confidence: totalConfidence / points.length,
+  }
+}
+
 function writePixel(target, index, color, alpha) {
   const offset = index * 4
   target[offset] = color[0]
@@ -50,11 +129,11 @@ export function composeMaskOverlay(baseValues, currentValues) {
     const added = Math.max(0, current - base)
     const erased = Math.max(0, base - current)
     if (added > 0.01) {
-      writePixel(overlay, index, [36, 112, 185], 168 * added)
+      writePixel(overlay, index, [23, 126, 255], 224 * added)
     } else if (erased > 0.01) {
-      writePixel(overlay, index, [214, 83, 77], 168 * erased)
+      writePixel(overlay, index, [236, 54, 63], 224 * erased)
     } else if (base > 0.01) {
-      writePixel(overlay, index, [40, 125, 115], 92 * base)
+      writePixel(overlay, index, [24, 169, 133], 148 * base)
     }
   }
   return overlay
@@ -93,8 +172,8 @@ export function createLiveStrokePreview(canvas) {
       const shortEdge = Math.min(canvas.width, canvas.height)
       const radius = Math.max(0.5, radiusNormalized * shortEdge)
       const color = mode === 'erase'
-        ? 'rgba(214, 83, 77, 0.66)'
-        : 'rgba(36, 112, 185, 0.66)'
+        ? 'rgba(255, 74, 82, 0.9)'
+        : 'rgba(255, 206, 64, 0.94)'
       const pointAt = (index) => ({
         x: points[index].x * canvas.width,
         y: points[index].y * canvas.height,
@@ -144,6 +223,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
   let previewFrame
   let closeOutcome
   let firstPointerType
+  let snapSummary
   const sourceBuffer = document.createElement('canvas')
   const overlayBuffer = document.createElement('canvas')
   const livePreview = createLiveStrokePreview(elements.canvas)
@@ -187,10 +267,14 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     const dirty = maskEditSessionIsDirty(session, confirmedSession)
     elements.undoButton.disabled = session?.cursor === 0
     elements.redoButton.disabled = session === undefined || session.cursor === session.strokes.length
+    const snapText = snapSummary === undefined
+      ? ''
+      : ` · 自动贴边 ${snapSummary.snappedCount} 点`
     elements.detail.textContent = session === undefined
       ? '0 笔'
-      : `${session.cursor} / ${session.strokes.length} 笔 · ${dirty ? '待确认，取消将放弃' : '已确认'}`
+      : `${session.cursor} / ${session.strokes.length} 笔 · ${dirty ? '待确认，取消将放弃' : '已确认'}${snapText}`
     elements.detail.dataset.dirty = String(dirty)
+    elements.dialog.dataset.maskMode = mode
     setPressed(elements.modeControl, 'data-mask-mode', mode)
     setPressed(elements.radiusControl, 'data-mask-radius', radiusNormalized)
   }
@@ -264,9 +348,14 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     livePreview.reset()
     if (commit) {
       appendPoint(event)
+      snapSummary = snapStrokeToBoundary(pointerPoints, sourceImage, {
+        maxDistanceNormalized: 0.045,
+        endpointLock: 0.02,
+      })
       session = core.appendMaskEditStroke(session, {
         ...currentPointerStroke(),
         id: uniqueStrokeId(),
+        points: snapSummary.points,
       })
       rebuildDraft()
     } else {
@@ -366,6 +455,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
       session = confirmedSession
       closeOutcome = 'cancelled'
       firstPointerType = undefined
+      snapSummary = undefined
       strokeSequence = session.strokes.length + 1
       prepareImageBuffers()
       elements.dialog.showModal()

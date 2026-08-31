@@ -8,6 +8,7 @@ import {
   fitContainRect,
   maskEditSessionIsDirty,
   normalizePointerPoint,
+  snapStrokeToBoundary,
 } from './mask-editor.mjs'
 
 function createRecordingCanvas(width = 2048, height = 2048) {
@@ -62,9 +63,9 @@ describe('demo mask editor helpers', () => {
     const current = new Float32Array([1, 1, 0, 0])
     const overlay = composeMaskOverlay(base, current)
 
-    assert.deepEqual([...overlay.slice(0, 4)], [40, 125, 115, 92])
-    assert.deepEqual([...overlay.slice(4, 8)], [36, 112, 185, 168])
-    assert.deepEqual([...overlay.slice(8, 12)], [214, 83, 77, 168])
+    assert.deepEqual([...overlay.slice(0, 4)], [24, 169, 133, 148])
+    assert.deepEqual([...overlay.slice(4, 8)], [23, 126, 255, 224])
+    assert.deepEqual([...overlay.slice(8, 12)], [236, 54, 63, 224])
     assert.deepEqual([...overlay.slice(12, 16)], [0, 0, 0, 0])
   })
 
@@ -124,6 +125,34 @@ describe('demo mask editor helpers', () => {
     })
   })
 
+  it('snaps a hand-drawn path toward a strong source boundary while keeping endpoints', () => {
+    const width = 9
+    const height = 9
+    const data = new Uint8ClampedArray(width * height * 4)
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const value = x >= 4 ? 240 : 20
+        const index = (y * width + x) * 4
+        data[index] = value
+        data[index + 1] = value
+        data[index + 2] = value
+        data[index + 3] = 255
+      }
+    }
+    const result = snapStrokeToBoundary(
+      [{ x: 0.2, y: 0.5 }, { x: 0.47, y: 0.5 }, { x: 0.51, y: 0.5 }, { x: 0.8, y: 0.5 }],
+      { width, height, data },
+      { maxDistanceNormalized: 0.12, endpointLock: 0.02 },
+    )
+
+    assert.deepEqual(result.points[0], { x: 0.2, y: 0.5 })
+    assert.deepEqual(result.points.at(-1), { x: 0.8, y: 0.5 })
+    assert.ok(Math.abs(result.points[1].x - 0.5) < 0.06)
+    assert.ok(Math.abs(result.points[2].x - 0.5) < 0.06)
+    assert.ok(result.snappedCount >= 2)
+    assert.ok(result.confidence > 0.5)
+  })
+
   it('wires the editor to the original evidence and saved edit session', async () => {
     const html = await readFile(new URL('./index.html', import.meta.url), 'utf8')
 
@@ -143,5 +172,12 @@ describe('demo mask editor helpers', () => {
     assert.ok(confirmationBlock.indexOf('applyCorrectedSubjectEvidence(sourceAnalysis, evidence)')
       < confirmationBlock.indexOf('await generate()'))
     assert.equal(confirmationBlock.match(/await generate\(\)/g)?.length, 1)
+  })
+
+  it('keeps structure guidance enabled and exposes an outline comparison control', async () => {
+    const html = await readFile(new URL('./index.html', import.meta.url), 'utf8')
+    assert.match(html, /importanceStrength:\s*3\.5/)
+    assert.match(html, /id="toggleOutlineButton"/)
+    assert.match(html, /outline:\s*showOutline/)
   })
 })

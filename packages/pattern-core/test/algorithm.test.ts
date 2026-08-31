@@ -856,6 +856,41 @@ describe('deterministic pattern algorithm', () => {
     }
   })
 
+  it('prefers the subject-shaped candidate when a trusted mask isolates the subject', async () => {
+    const source = image(8, 8, Array.from({ length: 64 }, (_, index) => {
+      const x = index % 8
+      const y = Math.floor(index / 8)
+      return x >= 2 && x < 6 && y >= 1 && y < 7 ? [112, 72, 48] as const : [245, 245, 242] as const
+    }))
+    const subjectValues = new Float32Array(64)
+    for (let y = 1; y < 7; y += 1) {
+      for (let x = 2; x < 6; x += 1) subjectValues[y * 8 + x] = 1
+    }
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: source,
+      palette,
+      analysis: {
+        confidence: 1,
+        subjectMaskEvidence: {
+          mask: { width: 8, height: 8, values: subjectValues },
+          confidence: 1,
+          source: 'ai',
+          revision: 'trusted-mask',
+          provenance: [{ origin: 'model', provider: 'test', model: 'mask', version: '1' }],
+        },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 8, height: 8 } },
+        maxColors: 5,
+        maxCandidates: 2,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'auto' },
+      },
+    })
+
+    assert.equal(candidate(result).canvasPlan?.occupancyMode, 'subject-shape')
+  })
+
   it('uses the subject shape to evaluate explicit full-frame canvas plans', async () => {
     const source = image(8, 8, Array.from({ length: 64 }, () => [255, 0, 0] as const))
     const subjectValues = new Float32Array(64)
