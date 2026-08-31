@@ -61,6 +61,53 @@ describe('source shape planning', () => {
     assert.deepEqual([...raster.activeMask], [1, 0, 1, 0])
   })
 
+  it('uses traced contours as sparse boundary anchors during rasterization', () => {
+    const subject = mask(8, 8, Array.from({ length: 64 }, (_, index) => {
+      const x = index % 8
+      const y = Math.floor(index / 8)
+      return x >= 2 && x <= 5 && y >= 2 && y <= 5 ? 1 : 0
+    }))
+    const crop = fullCrop(8, 8)
+    const raster = rasterizeSourceShape(
+      buildSourceShapeModel(subject, 1),
+      crop,
+      fitCropToCanvas(crop, 8, 8),
+      8,
+      8,
+      [],
+    )
+
+    assert.ok(raster.boundaryAnchors.size >= 4)
+    assert.equal([...raster.boundaryAnchors].every((cell) => raster.activeMask[cell] === 1), true)
+  })
+
+  it('preserves a connected one-pixel outline when thin-structure protection is enabled', () => {
+    const size = 128
+    const values = new Float32Array(size * size)
+    for (let x = 16; x <= 111; x += 1) {
+      values[16 * size + x] = 1
+      values[111 * size + x] = 1
+    }
+    for (let y = 16; y <= 111; y += 1) {
+      values[y * size + 16] = 1
+      values[y * size + 111] = 1
+    }
+    const crop = fullCrop(size, size)
+    const raster = rasterizeSourceShape(
+      buildSourceShapeModel(mask(size, size, values), 1),
+      crop,
+      fitCropToCanvas(crop, 32, 32),
+      32,
+      32,
+      [],
+      { preserveThinStructures: true },
+    )
+
+    const occupied = raster.activeMask.reduce((sum, value) => sum + value, 0)
+    assert.ok(occupied >= 80, `Expected a preserved outline, received ${occupied} cells`)
+    assert.equal(raster.diagnostics.targetComponents, 1)
+  })
+
   it('preserves a deliberate hole and separate source components', () => {
     const ring = mask(7, 5, [
       1, 1, 1, 0, 1, 1, 0,

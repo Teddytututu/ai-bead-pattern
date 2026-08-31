@@ -64,6 +64,9 @@ describe('unified grid refinement', () => {
     assert.equal(result.colorIds[4], 'red')
     assert.equal(result.changedCells, 1)
     assert.ok(result.energyAfter < result.energyBefore)
+    assert.equal(result.diagnosticsBefore.smallComponents, 1)
+    assert.equal(result.diagnosticsAfter.smallComponents, 0)
+    assert.ok(result.diagnosticsAfter.singleCellBands <= result.diagnosticsBefore.singleCellBands)
   })
 
   it('keeps protected feature cells fixed', () => {
@@ -141,5 +144,42 @@ describe('unified grid refinement', () => {
 
     assert.ok(fragmentedArcCount(result.colorIds, 4, 4) < fragmentedArcCount(colorIds, 4, 4))
     assert.ok(result.energyAfter < result.energyBefore)
+    assert.ok(result.diagnosticsAfter.fragmentedArcSegments
+      < result.diagnosticsBefore.fragmentedArcSegments)
+  })
+
+  it('uses quality budgets to reduce transition, dither, switch, and local-noise violations', () => {
+    const colorIds = [
+      'dark', 'light', 'dark', 'light',
+      'light', 'dark', 'light', 'dark',
+      'dark', 'light', 'dark', 'light',
+      'light', 'dark', 'light', 'dark',
+    ]
+    const result = refineGridClusters({
+      colorIds,
+      width: 4,
+      height: 4,
+      activeMask: new Uint8Array(16).fill(1),
+      protectedCells: new Set(),
+      pixelLabs: Array.from({ length: 16 }, () => [50.5, 0, 0] as Lab),
+      colors: closeColors,
+      boundaryStrength: new Float32Array(16),
+      importance: new Array(16).fill(0),
+      featurePlacements: [],
+      distanceMethod: 'delta-e-2000',
+      mode: 'quality',
+      budgets: {
+        transitionCells: 0,
+        ditherPatterns: 0,
+        maximumColorSwitches: 0,
+        localNoiseCells: 0,
+      },
+    })
+
+    assert.ok(result.budgetViolationsBefore.total > 0)
+    assert.ok(result.budgetViolationsAfter.total < result.budgetViolationsBefore.total)
+    assert.ok(result.diagnosticsAfter.colorSwitches < result.diagnosticsBefore.colorSwitches)
+    assert.ok(result.diagnosticsAfter.localNoiseCells <= result.diagnosticsBefore.localNoiseCells)
+    assert.ok(result.diagnosticsAfter.ditherPatterns <= result.diagnosticsBefore.ditherPatterns)
   })
 })

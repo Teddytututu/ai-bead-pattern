@@ -656,6 +656,135 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(candidate(structural).pattern.cells.find((cell) => cell.x === 0 && cell.y === 0)?.colorId, 'blue')
   })
 
+  it('validates palette inventory and substitute contracts at the product boundary', async () => {
+    const algorithm = createPatternAlgorithm()
+    const source = image(1, 1, [[255, 0, 0]])
+    const unknownInventory = fixedRequest(source)
+    unknownInventory.palette = {
+      ...palette,
+      inventory: { missing: 1 },
+    }
+    await assert.rejects(() => algorithm.generate(unknownInventory), /inventory/i)
+
+    const fractionalInventory = fixedRequest(source)
+    fractionalInventory.palette = {
+      ...palette,
+      inventory: { red: 1.5 },
+    }
+    await assert.rejects(() => algorithm.generate(fractionalInventory), /inventory/i)
+
+    const unknownSubstitute = fixedRequest(source)
+    unknownSubstitute.palette = {
+      ...palette,
+      substituteColorIds: { red: ['missing'] },
+    }
+    await assert.rejects(() => algorithm.generate(unknownSubstitute), /substitute/i)
+
+    const selfSubstitute = fixedRequest(source)
+    selfSubstitute.palette = {
+      ...palette,
+      substituteColorIds: { red: ['red'] },
+    }
+    await assert.rejects(() => algorithm.generate(selfSubstitute), /substitute/i)
+  })
+
+  it('keeps a sparse transparent outline through the complete MVP pipeline', async () => {
+    const size = 128
+    const data = new Uint8ClampedArray(size * size * 4)
+    const maskValues = new Float32Array(size * size)
+    const draw = (x: number, y: number): void => {
+      const index = y * size + x
+      data[index * 4 + 3] = 255
+      maskValues[index] = 1
+    }
+    for (let x = 16; x <= 111; x += 1) {
+      draw(x, 16)
+      draw(x, 111)
+    }
+    for (let y = 16; y <= 111; y += 1) {
+      draw(16, y)
+      draw(111, y)
+    }
+    const source: PixelImage = { width: size, height: size, data }
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: source,
+      palette,
+      analysis: {
+        subjectMaskEvidence: {
+          mask: { width: size, height: size, values: maskValues },
+          confidence: 1,
+          source: 'ai',
+          revision: 'test-alpha-outline-1',
+        },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 32, height: 32 } },
+        maxColors: 2,
+        maxCandidates: 1,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'subject-shape' },
+        optimization: { minRegionSize: 1 },
+      },
+    })
+
+    const output = candidate(result)
+    assert.ok(output.pattern.cells.length >= 80)
+    assert.ok(output.pattern.cells.filter((cell) => cell.colorId === 'black').length >= 80)
+    assert.equal(output.metrics.targetShapeComponents, 1)
+  })
+
+  it('keeps internal ink lines inside a white subject on a transparent background', async () => {
+    const size = 128
+    const data = new Uint8ClampedArray(size * size * 4)
+    const maskValues = new Float32Array(size * size)
+    for (let y = 16; y <= 111; y += 1) {
+      for (let x = 16; x <= 111; x += 1) {
+        const index = y * size + x
+        data[index * 4] = 255
+        data[index * 4 + 1] = 255
+        data[index * 4 + 2] = 255
+        data[index * 4 + 3] = 255
+        maskValues[index] = 1
+      }
+    }
+    for (let x = 24; x <= 103; x += 1) {
+      const index = 48 * size + x
+      data[index * 4] = 0
+      data[index * 4 + 1] = 0
+      data[index * 4 + 2] = 0
+    }
+    for (let y = 56; y <= 95; y += 1) {
+      const index = y * size + 64
+      data[index * 4] = 0
+      data[index * 4 + 1] = 0
+      data[index * 4 + 2] = 0
+    }
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: { width: size, height: size, data },
+      palette,
+      analysis: {
+        subjectMaskEvidence: {
+          mask: { width: size, height: size, values: maskValues },
+          confidence: 1,
+          source: 'ai',
+          revision: 'test-transparent-line-art-1',
+        },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 32, height: 32 } },
+        maxColors: 2,
+        maxCandidates: 1,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'subject-shape' },
+        optimization: { minRegionSize: 1 },
+      },
+    })
+
+    const output = candidate(result)
+    const inkCells = output.pattern.cells.filter((cell) => cell.colorId === 'black').length
+    assert.ok(inkCells >= 20, `Expected preserved ink lines, received ${inkCells} black cells from ${output.pattern.palette.map((color) => color.id).join(',')}`)
+  })
+
   it('uses a confident subject mask as MVP bead occupancy', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const red = [255, 0, 0] as const

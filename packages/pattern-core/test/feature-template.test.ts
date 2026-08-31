@@ -8,7 +8,7 @@ import {
 } from '../src/experimental.js'
 
 describe('feature template library', () => {
-  it('provides the planned eye, mouth, and nose templates with semantic roles', () => {
+  it('provides facial, ear-tip, identity-mark, and endpoint templates with semantic roles', () => {
     assert.deepEqual(featureTemplateLibrary.map((template) => template.id), [
       'eye-e1',
       'eye-e2-h',
@@ -22,6 +22,13 @@ describe('feature template library', () => {
       'mouth-open',
       'nose-n1',
       'nose-n2',
+      'ear-tip-e1',
+      'ear-tip-stair',
+      'mark-i1',
+      'mark-i2',
+      'mark-i4',
+      'endpoint-c1',
+      'endpoint-c2',
     ])
     for (const template of featureTemplateLibrary) {
       assert.doesNotThrow(() => validateFeatureTemplate(template))
@@ -34,6 +41,12 @@ describe('feature template library', () => {
       .map((template) => template.id), ['eye-e1'])
     assert.deepEqual(selectFeatureTemplates({ kind: 'nose', minimumCells: 2, maximumCells: 2 })
       .map((template) => template.id), ['nose-n2'])
+    assert.deepEqual(selectFeatureTemplates({ kind: 'ear', minimumCells: 3, maximumCells: 3 })
+      .map((template) => template.id), ['ear-tip-stair'])
+    assert.deepEqual(selectFeatureTemplates({ kind: 'identity-mark', maximumCells: 1 })
+      .map((template) => template.id), ['mark-i1'])
+    assert.deepEqual(selectFeatureTemplates({ kind: 'custom', maximumCells: 2 })
+      .map((template) => template.id), ['endpoint-c1', 'endpoint-c2'])
   })
 
   it('rejects a semantic role that belongs to another feature kind', () => {

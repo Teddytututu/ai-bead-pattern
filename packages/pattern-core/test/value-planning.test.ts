@@ -29,6 +29,26 @@ function structurePlan(): StructurePlan {
   }
 }
 
+function semanticStructurePlan(): StructurePlan {
+  return {
+    width: 5,
+    height: 1,
+    occupancy: { width: 5, height: 1, values: new Float32Array([1, 1, 1, 1, 1]) },
+    sourceMapping: new Float32Array([0, 0, 1, 0, 2, 0, 3, 0, 4, 0]),
+    regionIds: new Int32Array([0, 1, 2, 3, 4]),
+    boundaryStrength: new Float32Array([0, 0, 0, 0, 0]),
+    regions: [
+      { id: 0, sourceRegionId: 'face-skin', label: 'face skin', importance: 1, cellIndices: [0], adjacentRegionIds: [1, 2] },
+      { id: 1, sourceRegionId: 'hair', label: 'hair', importance: 0.9, cellIndices: [1], adjacentRegionIds: [0] },
+      { id: 2, sourceRegionId: 'eye', label: 'eye', importance: 1, cellIndices: [2], adjacentRegionIds: [0] },
+      { id: 3, sourceRegionId: 'subject-body', label: 'subject body', importance: 0.9, cellIndices: [3], adjacentRegionIds: [4] },
+      { id: 4, sourceRegionId: 'background', label: 'background', importance: 0.3, cellIndices: [4], adjacentRegionIds: [3] },
+    ],
+    featureConstraints: [],
+    confidence: 1,
+  }
+}
+
 describe('ValuePlan', () => {
   it('turns a region lightness range into ordered shadow, base, and light roles', () => {
     const result = buildValuePlan({
@@ -71,5 +91,134 @@ describe('ValuePlan', () => {
 
     assert.equal(result.roleIdsByCell[2], undefined)
     assert.equal(result.roleIdsByCell[3], undefined)
+  })
+
+  it('shares one value-role family across disconnected regions from the same source region', () => {
+    const structure = structurePlan()
+    structure.regionIds = new Int32Array([0, 0, 1, 1])
+    structure.regions = [
+      {
+        ...structure.regions[0]!,
+        id: 0,
+        cellIndices: [0, 1],
+        adjacentRegionIds: [1],
+      },
+      {
+        ...structure.regions[0]!,
+        id: 1,
+        cellIndices: [2, 3],
+        adjacentRegionIds: [0],
+      },
+    ]
+    const result = buildValuePlan({
+      structurePlan: structure,
+      pixelLabs: [
+        [20, 15, 12],
+        [40, 15, 12],
+        [60, 15, 12],
+        [80, 15, 12],
+      ] as readonly Lab[],
+      activeMask: new Uint8Array([1, 1, 1, 1]),
+      levels: 3,
+    })
+
+    assert.equal(result.plan.roles.length, 3)
+    assert.equal(new Set(result.plan.roles.map((role) => role.regionId)).size, 1)
+    assert.ok(new Set(result.roleIdsByCell.filter((role) => role !== undefined)).size <= 3)
+  })
+
+  it('keeps outline, deep shadow, shadow, base, and light in strict order at four levels', () => {
+    const result = buildValuePlan({
+      structurePlan: structurePlan(),
+      pixelLabs: [
+        [18, 0, 0],
+        [42, 0, 0],
+        [64, 0, 0],
+        [86, 0, 0],
+      ],
+      activeMask: new Uint8Array([1, 1, 1, 1]),
+      levels: 4,
+    })
+
+    const ordered = [...result.plan.roles].sort((first, second) =>
+      first.targetLightness - second.targetLightness)
+    assert.deepEqual(ordered.map((role) => role.kind), [
+      'outline',
+      'deep-shadow',
+      'shadow',
+      'base',
+      'light',
+    ])
+    for (let index = 1; index < ordered.length; index += 1) {
+      assert.ok(ordered[index]!.targetLightness - ordered[index - 1]!.targetLightness
+        >= ordered[index]!.minimumSeparation)
+    }
+    assert.equal(result.diagnostics.roleOrderAccuracy, 1)
+  })
+
+  it('enforces semantic lightness gaps for eyes, hair, skin, subject, and background', () => {
+    const result = buildValuePlan({
+      structurePlan: semanticStructurePlan(),
+      pixelLabs: Array.from({ length: 5 }, () => [52, 0, 0] as Lab),
+      activeMask: new Uint8Array([1, 1, 1, 1, 1]),
+      levels: 3,
+      minimumSemanticGaps: {
+        eyeSkin: 18,
+        faceHair: 12,
+        subjectBackground: 14,
+      },
+    })
+    const baseBySource = new Map(result.diagnostics.groups.map((group) => [
+      group.sourceRegionId,
+      result.plan.roles.find((role) => role.regionId === group.groupId && role.kind === 'base')!.targetLightness,
+    ]))
+
+    assert.ok(baseBySource.get('face-skin')! - baseBySource.get('eye')! >= 18)
+    assert.ok(Math.abs(baseBySource.get('face-skin')! - baseBySource.get('hair')!) >= 12)
+    assert.ok(Math.abs(baseBySource.get('subject-body')! - baseBySource.get('background')!) >= 14)
+    assert.equal(result.diagnostics.semanticGapAccuracy, 1)
+  })
+
+  it('applies bounded light direction, ambient light, and material reflection adjustments', () => {
+    const structure: StructurePlan = {
+      width: 2,
+      height: 1,
+      occupancy: { width: 2, height: 1, values: new Float32Array([1, 1]) },
+      sourceMapping: new Float32Array([0, 0, 1, 0]),
+      regionIds: new Int32Array([0, 1]),
+      boundaryStrength: new Float32Array([0, 0]),
+      regions: [
+        { id: 0, sourceRegionId: 'metal', label: 'metal', importance: 1, cellIndices: [0], adjacentRegionIds: [1] },
+        { id: 1, sourceRegionId: 'fabric', label: 'fabric', importance: 1, cellIndices: [1], adjacentRegionIds: [0] },
+      ],
+      featureConstraints: [],
+      confidence: 1,
+    }
+    const baseline = buildValuePlan({
+      structurePlan: structure,
+      pixelLabs: [[50, 0, 0], [50, 0, 0]],
+      activeMask: new Uint8Array([1, 1]),
+      levels: 3,
+    })
+    const planned = buildValuePlan({
+      structurePlan: structure,
+      pixelLabs: [[50, 0, 0], [50, 0, 0]],
+      activeMask: new Uint8Array([1, 1]),
+      levels: 3,
+      lighting: { direction: [-1, 0], intensity: 1, ambientLight: 1 },
+      materialByRegionId: { metal: 'metal', fabric: 'fabric' },
+    })
+    const role = (result: typeof planned, source: string, kind: 'light' | 'shadow') => {
+      const group = result.diagnostics.groups.find((entry) => entry.sourceRegionId === source)!
+      return result.plan.roles.find((entry) => entry.regionId === group.groupId && entry.kind === kind)!
+    }
+
+    assert.ok(role(planned, 'metal', 'light').targetLightness
+      > role(planned, 'fabric', 'light').targetLightness)
+    assert.ok(role(planned, 'metal', 'shadow').targetLightness
+      > role(baseline, 'metal', 'shadow').targetLightness)
+    assert.ok(planned.diagnostics.maximumLightingAdjustment <= 4)
+    assert.ok(planned.diagnostics.maximumMaterialAdjustment <= 5)
+    assert.equal(planned.diagnostics.roleOrderAccuracy, 1)
   })
 })

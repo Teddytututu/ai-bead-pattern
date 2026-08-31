@@ -167,4 +167,19 @@ describe('rembg HTTP segmentation provider', () => {
       /cancelled by caller/,
     )
   })
+
+  it('probes the real rembg API documentation endpoint with bounded health metadata', async () => {
+    const provider = new RembgHttpSegmentationProvider({
+      fetch: async (input, init) => {
+        assert.equal(String(input), 'http://127.0.0.1:7000/api')
+        assert.equal(init?.method, 'GET')
+        return new Response('<html>rembg api</html>', { status: 200 })
+      },
+    })
+
+    const health = await provider.probe()
+
+    assert.equal(health.status, 'ready')
+    assert.ok(health.latencyMs >= 0)
+  })
 })

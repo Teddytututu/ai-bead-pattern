@@ -5,6 +5,10 @@ import type {
   ValuePlan,
 } from './contracts.js'
 import type { ResolvedFeaturePlacement } from './planning/feature-placement.js'
+import type {
+  ArtDirectionExecutionSummary,
+  PixelArtDirectionPlan,
+} from './art-direction.js'
 
 export type RGB = readonly [red: number, green: number, blue: number]
 
@@ -25,10 +29,17 @@ export interface MaterialColor {
   lab?: Lab
 }
 
+export type MaterialInventory = Readonly<Record<string, number>>
+export type MaterialSubstitutionMap = Readonly<Record<string, readonly string[]>>
+
 export interface MaterialPalette {
   id: string
   name: string
   colors: readonly MaterialColor[]
+  /** Missing color ids represent unrestricted stock; supplied values are bead counts. */
+  inventory?: MaterialInventory
+  /** Ordered physical substitutes keyed by the preferred color id. */
+  substituteColorIds?: MaterialSubstitutionMap
 }
 
 export type ImageType = 'portrait' | 'pet' | 'illustration' | 'landscape' | 'general'
@@ -67,6 +78,20 @@ export interface StructureOptions {
   shapeRefinementIterations?: number
 }
 
+export interface ArtDirectionOptions {
+  focus?: readonly [number, number]
+  lightDirection?: readonly [number, number]
+  depthRange?: readonly [number, number]
+  mode?: 'single' | 'tile' | 'animation-frame'
+  tileEdges?: Readonly<Record<'top' | 'right' | 'bottom' | 'left', string>>
+  frame?: {
+    poseVisibility: number
+    actionArc: number
+    sharedPaletteId: string
+    sharedGridId?: string
+  }
+}
+
 export interface PatternOptions {
   /** Legacy fixed-size fields. Prefer canvas for new integrations. */
   width?: number
@@ -82,6 +107,7 @@ export interface PatternOptions {
   backgroundRgb?: RGB
   aiEnhancement?: boolean
   structure?: StructureOptions
+  artDirection?: ArtDirectionOptions
   optimization?: OptimizationOptions
   beadDiameterMm?: number
 }
@@ -238,7 +264,7 @@ export interface GridEditRecord {
   fromColorId: string
   toColorId: string
   reason: 'small-region' | 'isolated-cell' | 'stripe' | 'topology' | 'palette-coherence'
-    | 'feature-placement' | 'cluster-refinement' | 'symmetry'
+    | 'feature-placement' | 'cluster-refinement' | 'symmetry' | 'tile-seam'
 }
 
 export interface GenerationMetrics {
@@ -258,6 +284,9 @@ export interface GenerationMetrics {
   featurePurity: number
   featureConnectivity: number
   featureLocalContrast: number
+  hardFeatureCompleteness: number
+  featureCollisionCount: number
+  featureSymmetryError: number
   sourceBoundaryAgreement: number
   planBoundaryAgreement: number
   referenceMeanColorDistance: number
@@ -278,6 +307,30 @@ export interface GenerationMetrics {
   referenceShapeHoles: number
   targetShapeHoles: number
   shapeEdits: number
+  artDirectionImportanceChanges: number
+  artDirectionBackgroundCompressedCells: number
+  artDirectionBudgetViolations: number
+  transitionCells: number
+  colorSwitches: number
+  localNoiseCells: number
+  ditherPatterns: number
+  tileSeamMismatches: number
+  tileSeamEdits: number
+}
+
+export interface GridRefinementBudgets {
+  transitionCells: number
+  ditherPatterns: number
+  maximumColorSwitches: number
+  localNoiseCells: number
+}
+
+export interface GridBudgetViolations {
+  transitionCells: number
+  ditherPatterns: number
+  colorSwitches: number
+  localNoiseCells: number
+  total: number
 }
 
 export interface GridRefinementSummary {
@@ -286,6 +339,21 @@ export interface GridRefinementSummary {
   energyBefore: number
   energyAfter: number
   iterations: number
+  diagnosticsBefore: GridClusterDiagnostics
+  diagnosticsAfter: GridClusterDiagnostics
+  budgets?: GridRefinementBudgets
+  budgetViolationsBefore: GridBudgetViolations
+  budgetViolationsAfter: GridBudgetViolations
+}
+
+export interface GridClusterDiagnostics {
+  fragmentedArcSegments: number
+  smallComponents: number
+  singleCellBands: number
+  transitionCells: number
+  colorSwitches: number
+  localNoiseCells: number
+  ditherPatterns: number
 }
 
 export interface GenerationTiming {
@@ -299,6 +367,11 @@ export interface GenerationTiming {
 
 export interface CandidateScore {
   total: number
+  silhouette: number
+  identity: number
+  valueHierarchy: number
+  pixelClusters: number
+  craftCost: number
   colorFidelity: number
   sourceFidelity: number
   planFidelity: number
@@ -333,12 +406,90 @@ export interface PatternCandidate {
   palettePlan?: PalettePlan
   /** @experimental Unified cluster cleanup diagnostics. */
   gridRefinement?: GridRefinementSummary
+  /** @experimental Executable scale, style, scene, material, outline, tile, animation, and craft budgets. */
+  artDirection?: PixelArtDirectionPlan
+  /** @experimental Summary of explicit art-direction changes applied to this candidate. */
+  artDirectionExecution?: ArtDirectionExecutionSummary
   edits: readonly GridEditRecord[]
 }
 
 export interface CandidateEvaluation {
   rankedCandidateIds: readonly string[]
   scores: Readonly<Record<string, CandidateScore>>
+  /** Present when rule, neural, and learned-preference evidence has been fused. */
+  version?: 2
+  ruleRankedCandidateIds?: readonly string[]
+  learnedRankedCandidateIds?: readonly string[]
+  finalRankedCandidateIds?: readonly string[]
+  candidateScores?: Readonly<Record<string, CandidateEvaluationScoreV2>>
+  neuralPreferenceFeatures?: readonly CandidateNeuralPreferenceFeatures[]
+  providerContributions?: readonly CandidateProviderContribution[]
+  sourceWeights?: CandidateEvaluationSourceWeights
+  appliedSourceWeights?: CandidateEvaluationSourceWeights
+  selectedModel?: CandidateEvaluationModelIdentity
+}
+
+export interface CandidateEvaluationSourceWeights {
+  rule: number
+  neural: number
+  humanPreference: number
+}
+
+export interface CandidateEvaluationModelIdentity {
+  name: string
+  version: string
+}
+
+export interface CandidateEvaluationScoreV2 {
+  rule: number
+  neural: number
+  humanPreference: number
+  final: number
+}
+
+export interface CandidateNeuralPreferenceFeatures {
+  providerId: string
+  modelId: string
+  candidateId?: string
+  names: readonly string[]
+  values: readonly number[]
+  confidence: number
+}
+
+export interface CandidateProviderContribution {
+  providerId: string
+  modelId: string
+  capabilities: readonly string[]
+  status: 'used' | 'failed'
+  confidence?: number
+  elapsedMs: number
+  message?: string
+}
+
+export interface SelectedPreferenceRankingInput {
+  rankedCandidateIds: readonly string[]
+  scores: Readonly<Record<string, number>>
+  model: CandidateEvaluationModelIdentity
+}
+
+export interface CandidateEvaluationV2 extends CandidateEvaluation {
+  version: 2
+  ruleRankedCandidateIds: readonly string[]
+  learnedRankedCandidateIds: readonly string[]
+  finalRankedCandidateIds: readonly string[]
+  candidateScores: Readonly<Record<string, CandidateEvaluationScoreV2>>
+  neuralPreferenceFeatures: readonly CandidateNeuralPreferenceFeatures[]
+  providerContributions: readonly CandidateProviderContribution[]
+  sourceWeights: CandidateEvaluationSourceWeights
+  appliedSourceWeights: CandidateEvaluationSourceWeights
+}
+
+export interface CandidateEvaluationV2Input {
+  scores: Readonly<Record<string, CandidateScore>>
+  selectedPreferenceRanking?: SelectedPreferenceRankingInput
+  neuralPreferenceFeatures?: readonly CandidateNeuralPreferenceFeatures[]
+  providerContributions?: readonly CandidateProviderContribution[]
+  sourceWeights?: CandidateEvaluationSourceWeights
 }
 
 export interface PatternGenerationRequest {

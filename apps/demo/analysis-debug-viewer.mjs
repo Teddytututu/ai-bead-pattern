@@ -6,6 +6,9 @@ export const analysisDebugLayers = Object.freeze([
   { id: 'hair', label: '头发' },
   { id: 'skin', label: '皮肤' },
   { id: 'clothes', label: '衣服' },
+  { id: 'edges', label: '边缘' },
+  { id: 'depth', label: '深度' },
+  { id: 'embedding', label: '嵌入' },
   { id: 'landmarks', label: '关键点' },
   { id: 'features', label: '五官落格' },
 ])
@@ -17,6 +20,8 @@ const colors = Object.freeze({
   hair: [174, 71, 63],
   skin: [219, 126, 92],
   clothes: [83, 105, 151],
+  edges: [214, 91, 65],
+  depth: [74, 118, 167],
 })
 
 const featureColors = Object.freeze({
@@ -72,6 +77,37 @@ function semanticLayer(id, semanticRegion, modelVersion) {
   }
 }
 
+function importanceLayer(analysis) {
+  const map = analysis?.importanceMap
+  if (map?.weights === undefined) return unavailable('edges')
+  return {
+    id: 'edges',
+    available: true,
+    mask: { width: map.width, height: map.height, values: map.weights },
+    confidence: analysis.confidence,
+    modelVersion: analysis.modelVersions?.segmentation,
+    provenance: analysis.provenance ?? [],
+    landmarks: [],
+    placements: [],
+  }
+}
+
+function embeddingLayer(preferenceFeatures) {
+  if (preferenceFeatures.length === 0) return unavailable('embedding')
+  return {
+    id: 'embedding',
+    available: true,
+    confidence: preferenceFeatures.reduce((sum, entry) => sum + entry.confidence, 0)
+      / preferenceFeatures.length,
+    modelVersion: preferenceFeatures.map((entry) => entry.modelId).join(' · '),
+    provenance: [],
+    landmarks: [],
+    placements: [],
+    detail: preferenceFeatures.flatMap((entry) => entry.names.map((name, index) =>
+      `${name} ${Number(entry.values[index] ?? 0).toFixed(3)}`)).join(' · '),
+  }
+}
+
 function combinedSkinLayer(analysis) {
   const face = region(analysis, 'face-skin')
   const body = region(analysis, 'body-skin')
@@ -116,7 +152,12 @@ function featureLayer(candidate) {
   }
 }
 
-export function resolveAnalysisDebugLayer(id, { analysis, originalSubjectEvidence, candidate }) {
+export function resolveAnalysisDebugLayer(id, {
+  analysis,
+  originalSubjectEvidence,
+  candidate,
+  preferenceFeatures = [],
+}) {
   if (analysisDebugLayers.some((layer) => layer.id === id) === false) {
     throw new RangeError(`Unknown analysis debug layer: ${id}`)
   }
@@ -150,6 +191,12 @@ export function resolveAnalysisDebugLayer(id, { analysis, originalSubjectEvidenc
   if (id === 'clothes') {
     return semanticLayer(id, region(analysis, 'clothes'), analysis?.modelVersions?.portraitSemantics)
   }
+  if (id === 'edges') return importanceLayer(analysis)
+  if (id === 'depth') {
+    return semanticLayer(id, (analysis?.semanticRegions ?? []).find((entry) =>
+      entry.id === 'depth' || entry.label === 'depth'), analysis?.modelVersions?.depth)
+  }
+  if (id === 'embedding') return embeddingLayer(preferenceFeatures)
   if (id === 'features') return featureLayer(candidate)
   const landmarks = analysis?.landmarks ?? []
   return {
@@ -247,13 +294,22 @@ export function createAnalysisDebugViewer({ elements }) {
   let analysis = {}
   let originalSubjectEvidence
   let candidate
+  let route = 'deterministic'
+  let providers = []
+  let contributions = []
+  let preferenceFeatures = []
   let activeLayer = 'original'
   let selectedLandmarkId
   const sourceBuffer = document.createElement('canvas')
   const overlayBuffer = document.createElement('canvas')
 
   function state(id = activeLayer) {
-    return resolveAnalysisDebugLayer(id, { analysis, originalSubjectEvidence, candidate })
+    return resolveAnalysisDebugLayer(id, {
+      analysis,
+      originalSubjectEvidence,
+      candidate,
+      preferenceFeatures,
+    })
   }
 
   function resize() {
@@ -338,6 +394,18 @@ export function createAnalysisDebugViewer({ elements }) {
     elements.confidence.textContent = formatConfidence(layer.confidence)
     elements.model.textContent = layer.modelVersion ?? '--'
     elements.provenance.textContent = provenanceText(layer.provenance)
+    elements.provider.textContent = providers.length === 0
+      ? route === 'deterministic' ? 'deterministic' : '--'
+      : providers.join(' · ')
+    elements.contributions.textContent = contributions.length === 0
+      ? '--'
+      : contributions.map((entry) => {
+        const capabilities = entry.capabilities?.join(', ') ?? '--'
+        return `${entry.providerId}: ${capabilities} · ${entry.status}`
+      }).join(' · ')
+    if (layer.detail !== undefined) {
+      elements.status.textContent = layer.detail
+    }
     const landmark = selectedLandmark(layer)
     elements.landmarkDetail.hidden = landmark === undefined
     if (landmark !== undefined) {
@@ -406,6 +474,10 @@ export function createAnalysisDebugViewer({ elements }) {
       analysis = next.analysis ?? {}
       originalSubjectEvidence = next.originalSubjectEvidence
       candidate = next.candidate
+      route = next.route ?? 'deterministic'
+      providers = next.providers ?? []
+      contributions = next.contributions ?? []
+      preferenceFeatures = next.preferenceFeatures ?? []
       activeLayer = preferredLayer()
       selectedLandmarkId = undefined
       prepareSource()

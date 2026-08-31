@@ -29,6 +29,12 @@ function pixelAt(image: PixelImage, x: number, y: number, backgroundRgb: RGB): R
   )) as unknown as RGB
 }
 
+function alphaAt(image: PixelImage, x: number, y: number): number {
+  const safeX = clamp(x, 0, image.width - 1)
+  const safeY = clamp(y, 0, image.height - 1)
+  return (image.data[(safeY * image.width + safeX) * 4 + 3] ?? 255) / 255
+}
+
 function nearestSample(image: PixelImage, sourceX: number, sourceY: number, backgroundRgb: RGB): RGB {
   return pixelAt(image, Math.round(sourceX), Math.round(sourceY), backgroundRgb)
 }
@@ -83,6 +89,7 @@ export interface SamplingGuidance {
   source: SourceGuidance
   importanceStrength: number
   edgeStrength: number
+  preserveThinStructures?: boolean
 }
 
 function guidedAreaSample(
@@ -101,6 +108,9 @@ function guidedAreaSample(
   let peakScore = -1
   let peakImportance = 0
   let peakPixel: RGB | undefined
+  let peakForegroundScore = -1
+  let peakForegroundAlpha = 0
+  let peakForegroundPixel: RGB | undefined
   for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
     const overlapY = Math.max(0, Math.min(sourceBottom, sourceY + 1) - Math.max(sourceTop, sourceY))
     for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
@@ -125,7 +135,25 @@ function guidedAreaSample(
         peakImportance = importance
         peakPixel = pixel
       }
+      if (guidance.preserveThinStructures === true) {
+        const alpha = alphaAt(image, sourceX, sourceY)
+        const contrast = Math.hypot(
+          pixel[0] - backgroundRgb[0],
+          pixel[1] - backgroundRgb[1],
+          pixel[2] - backgroundRgb[2],
+        )
+        const foregroundScore = alpha * (contrast + score * 64)
+        if (foregroundScore > peakForegroundScore) {
+          peakForegroundScore = foregroundScore
+          peakForegroundAlpha = alpha
+          peakForegroundPixel = pixel
+        }
+      }
     }
+  }
+  if (peakForegroundPixel !== undefined && peakForegroundAlpha >= 0.2
+    && peakForegroundScore >= 12) {
+    return peakForegroundPixel
   }
   const averageImportance = importanceTotal / Math.max(1, sampleCount)
   if (peakPixel !== undefined && peakImportance >= 0.85 && peakImportance - averageImportance >= 0.25) {

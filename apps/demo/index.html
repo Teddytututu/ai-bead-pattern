@@ -160,6 +160,27 @@
     .file-actions { display: flex; flex-wrap: wrap; gap: 6px; }
     button.file-button { color: var(--text); }
 
+    .model-route-control {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px 10px;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .model-route-control label { font-size: 12px; font-weight: 650; }
+    .model-route-control select {
+      width: 100%;
+      min-width: 0;
+      height: 34px;
+      padding: 0 28px 0 9px;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+    }
+    .model-route-status { margin: 0; color: var(--muted); font-size: 11px; text-align: right; }
+
     .control-group { display: grid; gap: 8px; margin-top: 15px; }
     .control-group:first-child { margin-top: 0; }
     .control-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 650; }
@@ -514,6 +535,61 @@
     .preference-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
     .preference-status { min-height: 18px; margin: 0; color: var(--muted); font-size: 11px; }
 
+    .preference-workbench-dialog {
+      width: min(1480px, calc(100vw - 24px)); height: min(900px, calc(100dvh - 24px));
+      max-width: none; max-height: none; padding: 0; border: 1px solid var(--border-strong);
+      border-radius: var(--radius); background: var(--surface); color: var(--text); box-shadow: var(--shadow);
+    }
+    .preference-workbench-dialog::backdrop { background: rgba(25, 30, 29, .52); }
+    .preference-workbench-layout { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+    .preference-workbench-header, .preference-workbench-footer {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface-alt);
+    }
+    .preference-workbench-footer { border-top: 1px solid var(--border); border-bottom: 0; }
+    .preference-workbench-title { margin: 0; font-size: 15px; }
+    .preference-workbench-body { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 330px; }
+    .preference-review-area { min-width: 0; min-height: 0; overflow: auto; padding: 12px; background: #e5e8e4; }
+    .preference-source-strip { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: center; margin-bottom: 10px; }
+    .preference-source-strip canvas { width: 112px; height: 112px; object-fit: contain; background: #fff; border: 1px solid var(--border); }
+    .preference-source-identity { margin: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .preference-layer-control { display: flex; flex-wrap: wrap; gap: 1px; margin-bottom: 10px; }
+    .preference-layer-control button { min-height: 32px; padding: 0 10px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
+    .preference-layer-control button[aria-pressed="true"] { background: var(--text); color: #fff; }
+    .preference-candidate-grid { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 10px; align-items: start; }
+    .preference-candidate-card { min-width: 0; display: grid; gap: 6px; padding: 8px; border: 1px solid var(--border); background: var(--surface); }
+    .preference-candidate-card[data-selected="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .preference-candidate-header { min-height: 32px; border: 0; background: transparent; text-align: left; font-weight: 700; cursor: pointer; }
+    .preference-candidate-canvas { display: block; max-width: none; height: auto; image-rendering: pixelated; background: #fff; cursor: crosshair; transform-origin: top left; }
+    .preference-candidate-meta { margin: 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+    .preference-inspector { min-height: 0; overflow: auto; border-left: 1px solid var(--border); background: var(--surface); }
+    .preference-pane { padding: 12px; border-bottom: 1px solid var(--border); }
+    .preference-pane h3 { margin: 0 0 9px; font-size: 12px; color: var(--muted); }
+    .preference-axis-scores { display: grid; gap: 5px; }
+    .preference-axis-row { display: grid; grid-template-columns: 78px minmax(0, 1fr) 30px; gap: 7px; align-items: center; font-size: 11px; }
+    .preference-axis-row output { text-align: right; font-variant-numeric: tabular-nums; }
+    .preference-issue-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .preference-tag { min-height: 30px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--muted); cursor: pointer; }
+    .preference-tag[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+    .preference-issue-settings { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+    .preference-issue-settings label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
+    .preference-issue-settings textarea { grid-column: 1 / -1; min-height: 58px; resize: vertical; padding: 7px; border: 1px solid var(--border); font: inherit; }
+    .preference-issue-list { display: grid; gap: 4px; margin-top: 8px; }
+    .preference-issue-row { min-height: 30px; padding: 5px 7px; border: 1px solid var(--border); background: var(--surface-alt); text-align: left; cursor: pointer; }
+    .preference-empty { margin: 0; color: var(--muted); font-size: 11px; }
+    .preference-composite { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .preference-composite label { display: inline-flex; gap: 4px; align-items: center; }
+    .preference-full-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }
+    .preference-learning-list { margin: 0; display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); }
+    .preference-learning-list div { min-width: 0; display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 8px; padding: 6px 7px; background: var(--surface-alt); }
+    .preference-learning-list dt { color: var(--muted); font-size: 10px; }
+    .preference-learning-list dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: 10px; font-variant-numeric: tabular-nums; }
+    .preference-learning-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+    .preference-progress-wrap { min-width: 220px; display: grid; grid-template-columns: minmax(100px, 1fr) auto; gap: 8px; align-items: center; }
+    .preference-progress-wrap progress { width: 100%; accent-color: var(--teal); }
+    .preference-progress-text, .preference-workbench-status { color: var(--muted); font-size: 11px; }
+    .preference-footer-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
     .material-list { display: grid; gap: 1px; max-height: 330px; overflow: auto; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
     .material-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 9px; align-items: center; min-height: 34px; padding: 5px 2px; border-bottom: 1px solid var(--border); }
     .material-row:last-child { border-bottom: 0; }
@@ -546,6 +622,14 @@
       .inspector .section:first-child { grid-column: auto; }
       .inspector .section { border-right: 0; border-bottom: 1px solid var(--border); }
       .candidate-list { grid-template-columns: repeat(4, minmax(72px, 1fr)); overflow-x: auto; }
+      .preference-workbench-dialog { width: 100vw; height: 100dvh; border: 0; border-radius: 0; }
+      .preference-workbench-body { display: block; overflow: auto; }
+      .preference-review-area { overflow: visible; }
+      .preference-candidate-grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }
+      .preference-candidate-card { flex: 0 0 min(84vw, 390px); scroll-snap-align: start; }
+      .preference-inspector { border-left: 0; border-top: 1px solid var(--border); overflow: visible; }
+      .preference-workbench-footer { align-items: flex-start; flex-direction: column; }
+      .preference-progress-wrap { width: 100%; }
       .mask-editor-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border: 0; border-radius: 0; }
       .mask-editor-tools { align-items: flex-start; }
       .mask-editor-workspace { padding: 8px; }
@@ -607,6 +691,16 @@
               </button>
             </div>
           </div>
+        </div>
+        <div class="model-route-control">
+          <label for="modelRouteSelect">模型路线</label>
+          <p class="model-route-status" id="modelRouteStatus" aria-live="polite">检查中</p>
+          <select id="modelRouteSelect" aria-describedby="modelRouteStatus">
+            <option value="deterministic">确定性基线</option>
+            <option value="neural-analysis">BiRefNet 神经分析</option>
+            <option value="learned-pixelization" disabled>学习像素化 · 未接入</option>
+            <option value="generative-proposal" disabled>生成式提案 · 未接入</option>
+          </select>
         </div>
       </section>
 
@@ -756,14 +850,14 @@
       </section>
 
       <section class="section" id="preferencePanel">
-        <h2 class="section-title">偏好比较</h2>
+        <h2 class="section-title">偏好标注</h2>
         <div class="preference-controls">
-          <button class="text-button" id="preferenceStartButton" type="button" disabled>比较当前与下一方案</button>
-          <div class="preference-comparison" id="preferenceComparison" hidden>
+          <button class="text-button" id="preferenceStartButton" type="button" disabled>打开标注工作台</button>
+          <div class="preference-comparison" id="preferenceComparison" hidden aria-hidden="true">
             <figure class="preference-variant"><canvas id="preferenceCanvasA" width="160" height="160"></canvas><figcaption>方案 A</figcaption></figure>
             <figure class="preference-variant"><canvas id="preferenceCanvasB" width="160" height="160"></canvas><figcaption>方案 B</figcaption></figure>
           </div>
-          <div class="preference-actions" id="preferenceActions" hidden>
+          <div class="preference-actions" id="preferenceActions" hidden aria-hidden="true">
             <button class="text-button" type="button" data-preference-choice="left">A</button>
             <button class="text-button" type="button" data-preference-choice="right">B</button>
             <button class="text-button" type="button" data-preference-choice="tie">相近</button>
@@ -780,7 +874,7 @@
           <div class="summary-item"><span class="summary-value" id="qualityScore">0</span><span class="summary-label">评分</span></div>
           <div class="summary-item"><span class="summary-value" id="paletteChanges">0</span><span class="summary-label">配色调整</span></div>
           <div class="summary-item"><span class="summary-value" id="gridEdits">0</span><span class="summary-label">网格整理</span></div>
-          <div class="summary-item"><span class="summary-value" id="gridRefinementChanges">0</span><span class="summary-label">聚类精修</span></div>
+          <div class="summary-item"><span class="summary-value" id="gridRefinementChanges">--</span><span class="summary-label">精修改动</span></div>
           <div class="summary-item"><span class="summary-value" id="symmetryQuality">--</span><span class="summary-label">对称质量</span></div>
           <div class="summary-item"><span class="summary-value" id="valueOrderAccuracy">--</span><span class="summary-label">明暗顺序</span></div>
           <div class="summary-item"><span class="summary-value" id="shapeScore">--</span><span class="summary-label">轮廓吻合</span></div>
@@ -794,10 +888,13 @@
         <h2 class="section-title">算法诊断</h2>
         <dl class="diagnostic-list">
           <div><dt>精修能量</dt><dd id="gridRefinementEnergy">--</dd></div>
-          <div><dt>结构区域</dt><dd id="structureRegionCount">--</dd></div>
+          <div><dt>结构重绘区域</dt><dd id="structureRegionCount">--</dd></div>
           <div><dt>五官格</dt><dd id="featurePlacementCount">--</dd></div>
           <div><dt>明暗角色</dt><dd id="valueRoleCount">--</dd></div>
           <div><dt>色板角色</dt><dd id="paletteRoleCount">--</dd></div>
+          <div><dt>碎裂环段</dt><dd id="clusterFragmentChange">--</dd></div>
+          <div><dt>小连通域</dt><dd id="smallComponentChange">--</dd></div>
+          <div><dt>单格色带</dt><dd id="singleCellBandChange">--</dd></div>
         </dl>
       </section>
 
@@ -809,6 +906,90 @@
       </section>
     </aside>
   </main>
+
+  <dialog class="preference-workbench-dialog" id="preferenceWorkbenchDialog" aria-labelledby="preferenceWorkbenchTitle">
+    <div class="preference-workbench-layout">
+      <header class="preference-workbench-header">
+        <div>
+          <h2 class="preference-workbench-title" id="preferenceWorkbenchTitle">候选标注工作台</h2>
+          <span class="preference-workbench-status" id="preferenceWorkbenchStatus">等待候选</span>
+        </div>
+        <button class="text-button" id="preferenceWorkbenchCloseButton" type="button">关闭</button>
+      </header>
+      <div class="preference-workbench-body">
+        <section class="preference-review-area" aria-label="候选对照">
+          <div class="preference-source-strip">
+            <canvas id="preferenceSourceCanvas" width="320" height="320" aria-label="原图"></canvas>
+            <p class="preference-source-identity" id="preferenceSourceIdentity"></p>
+          </div>
+          <div class="preference-layer-control" id="preferenceLayerControl" aria-label="候选图层">
+            <button type="button" data-preference-layer="pattern" aria-pressed="false">图纸</button>
+            <button type="button" data-preference-layer="grid" aria-pressed="true">网格</button>
+            <button type="button" data-preference-layer="features" aria-pressed="false">关键点</button>
+            <button type="button" data-preference-layer="structure" aria-pressed="false">结构区</button>
+            <button type="button" data-preference-layer="value" aria-pressed="false">明度区</button>
+            <button type="button" data-preference-layer="refinement" aria-pressed="false">精修差异</button>
+          </div>
+          <div class="preference-candidate-grid" id="preferenceCandidateGrid"></div>
+        </section>
+        <aside class="preference-inspector" aria-label="标注详情">
+          <section class="preference-pane">
+            <h3>多维评分</h3>
+            <div class="preference-axis-scores" id="preferenceAxisScores"></div>
+          </section>
+          <section class="preference-pane">
+            <h3>问题位置</h3>
+            <div class="preference-issue-tags" id="preferenceIssueTags"></div>
+            <div class="preference-issue-settings">
+              <label>严重度<select id="preferenceSeverity"><option value="1">轻</option><option value="2" selected>中</option><option value="3">重</option></select></label>
+              <label>置信度<input id="preferenceConfidence" type="range" min="0" max="1" step="0.05" value="0.8"></label>
+              <textarea id="preferenceNote" maxlength="500" placeholder="备注"></textarea>
+            </div>
+            <div class="preference-issue-list" id="preferenceIssueList"></div>
+          </section>
+          <section class="preference-pane">
+            <h3>整体选择</h3>
+            <label>最佳候选 <select id="preferenceBestCandidate"></select></label>
+            <div class="preference-composite" id="preferenceCompositeCandidates" aria-label="各有优点组合"></div>
+            <div class="preference-full-actions" id="preferenceComparisonActions">
+              <button class="text-button" type="button" data-comparison-choice="first">当前</button>
+              <button class="text-button" type="button" data-comparison-choice="second">下一张</button>
+              <button class="text-button" type="button" data-comparison-choice="tie">相近</button>
+              <button class="text-button" type="button" data-comparison-choice="composite">各有优点</button>
+            </div>
+          </section>
+          <section class="preference-pane" id="preferenceLearningPanel">
+            <h3>本地训练与回放</h3>
+            <dl class="preference-learning-list">
+              <div><dt>版本状态</dt><dd id="preferenceLearningStatus">等待标注</dd></div>
+              <div><dt>样本</dt><dd id="preferenceLearningSampleCount">0</dd></div>
+              <div><dt>留出集</dt><dd id="preferenceHoldoutComparison">等待样本</dd></div>
+              <div><dt>排序变化</dt><dd id="preferenceRankingDifference">等待候选</dd></div>
+              <div><dt>下一对</dt><dd id="preferenceActivePair">等待候选</dd></div>
+              <div><dt>参数反馈</dt><dd id="preferenceGenerationFeedback">等待标签</dd></div>
+              <div><dt>学习权重</dt><dd id="preferenceLearnedWeights">等待评分</dd></div>
+            </dl>
+            <div class="preference-learning-actions">
+              <button class="text-button" id="preferenceTrainReplayButton" type="button">训练并回放</button>
+            </div>
+          </section>
+        </aside>
+      </div>
+      <footer class="preference-workbench-footer">
+        <div class="preference-progress-wrap">
+          <progress id="preferenceProgress" max="100" value="0"></progress>
+          <span class="preference-progress-text" id="preferenceProgressText">0%</span>
+        </div>
+        <label>缩放 <input id="preferenceZoom" type="range" min="0.75" max="2" step="0.25" value="1"></label>
+        <div class="preference-footer-actions">
+          <button class="icon-button" id="preferenceUndoButton" type="button" title="撤销" aria-label="撤销">↶</button>
+          <button class="icon-button" id="preferenceRedoButton" type="button" title="重做" aria-label="重做">↷</button>
+          <button class="text-button" id="preferenceExportJsonButton" type="button">导出 JSON</button>
+          <button class="text-button" id="preferenceExportJsonlButton" type="button">导出 JSONL</button>
+        </div>
+      </footer>
+    </div>
+  </dialog>
 
   <dialog class="mask-editor-dialog" id="maskEditorDialog" aria-labelledby="maskEditorTitle">
     <div class="mask-editor-layout">
@@ -873,6 +1054,9 @@
             <button class="analysis-debug-layer" type="button" data-analysis-layer="hair" aria-pressed="false">头发</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="skin" aria-pressed="false">皮肤</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="clothes" aria-pressed="false">衣服</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="edges" aria-pressed="false">边缘</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="depth" aria-pressed="false">深度</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="embedding" aria-pressed="false">嵌入</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="landmarks" aria-pressed="false">关键点</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="features" aria-pressed="false">五官落格</button>
           </div>
@@ -889,6 +1073,8 @@
             <div><dt>置信度</dt><dd id="analysisDebugConfidence">--</dd></div>
             <div><dt>模型</dt><dd id="analysisDebugModel">--</dd></div>
             <div><dt>来源</dt><dd id="analysisDebugProvenance">--</dd></div>
+            <div><dt>Provider</dt><dd id="analysisDebugProvider">deterministic</dd></div>
+            <div><dt>贡献</dt><dd id="analysisDebugContributions">--</dd></div>
           </dl>
           <section class="analysis-debug-landmark" id="analysisDebugLandmarkDetail" hidden>
             <h4 id="analysisDebugLandmarkName">landmark</h4>
@@ -907,8 +1093,18 @@
       createMaskCorrectionDraftFromSession,
       createMaskEditSession,
       createPatternAlgorithm,
+      comparePreferenceModels,
+      composeCandidateEvaluationV2,
+      createFrozenPreferenceSplit,
+      deduplicatePreferenceRecords,
+      derivePreferenceGenerationParameters,
       fitBradleyTerry,
+      fitPreferenceModelV2,
+      preferenceRecordFromWorkbenchSession,
+      rankPreferenceCandidates,
       redoMaskEdit,
+      selectActivePreferencePair,
+      selectPreferenceModelVersion,
       undoMaskEdit,
     } from '/packages/pattern-core/dist/index.js'
     import { createMaskEditorController } from './mask-editor.mjs'
@@ -931,6 +1127,13 @@
       resolveCandidatePreference,
       savePreferenceRecords,
     } from './preference-lab.mjs'
+    import { createPreferenceWorkbenchController } from './preference-workbench-ui.mjs'
+    import {
+      fetchAiHealth,
+      routeAvailability,
+      runAiRoute,
+    } from './ai-runtime.mjs'
+    import { createPreferenceRuntime } from './preference-runtime.mjs'
 
     const palette = await fetch('/assets/palettes/generic-24.json').then((response) => {
       if (response.ok === false) throw new Error('色板读取失败')
@@ -938,12 +1141,28 @@
     })
     const colorsById = new Map(palette.colors.map((color) => [color.id, color]))
     const algorithm = createPatternAlgorithm()
+    const preferenceRuntime = createPreferenceRuntime({
+      core: {
+        comparePreferenceModels,
+        composeCandidateEvaluationV2,
+        createFrozenPreferenceSplit,
+        deduplicatePreferenceRecords,
+        derivePreferenceGenerationParameters,
+        fitPreferenceModelV2,
+        preferenceRecordFromWorkbenchSession,
+        rankPreferenceCandidates,
+        selectActivePreferencePair,
+        selectPreferenceModelVersion,
+      },
+    })
     const elements = {
       status: document.querySelector('#status'),
       statusText: document.querySelector('#statusText'),
       fileInput: document.querySelector('#fileInput'),
       fileName: document.querySelector('#fileName'),
       analysisSource: document.querySelector('#analysisSource'),
+      modelRouteSelect: document.querySelector('#modelRouteSelect'),
+      modelRouteStatus: document.querySelector('#modelRouteStatus'),
       sourcePreview: document.querySelector('#sourcePreview'),
       openMaskEditorButton: document.querySelector('#openMaskEditorButton'),
       sizeControl: document.querySelector('#sizeControl'),
@@ -987,12 +1206,47 @@
       featurePlacementCount: document.querySelector('#featurePlacementCount'),
       valueRoleCount: document.querySelector('#valueRoleCount'),
       paletteRoleCount: document.querySelector('#paletteRoleCount'),
+      clusterFragmentChange: document.querySelector('#clusterFragmentChange'),
+      smallComponentChange: document.querySelector('#smallComponentChange'),
+      singleCellBandChange: document.querySelector('#singleCellBandChange'),
       preferenceStartButton: document.querySelector('#preferenceStartButton'),
       preferenceComparison: document.querySelector('#preferenceComparison'),
       preferenceCanvasA: document.querySelector('#preferenceCanvasA'),
       preferenceCanvasB: document.querySelector('#preferenceCanvasB'),
       preferenceActions: document.querySelector('#preferenceActions'),
       preferenceStatus: document.querySelector('#preferenceStatus'),
+      preferenceWorkbenchDialog: document.querySelector('#preferenceWorkbenchDialog'),
+      preferenceWorkbenchCloseButton: document.querySelector('#preferenceWorkbenchCloseButton'),
+      preferenceWorkbenchStatus: document.querySelector('#preferenceWorkbenchStatus'),
+      preferenceSourceCanvas: document.querySelector('#preferenceSourceCanvas'),
+      preferenceSourceIdentity: document.querySelector('#preferenceSourceIdentity'),
+      preferenceLayerControl: document.querySelector('#preferenceLayerControl'),
+      preferenceCandidateGrid: document.querySelector('#preferenceCandidateGrid'),
+      preferenceAxisScores: document.querySelector('#preferenceAxisScores'),
+      preferenceIssueTags: document.querySelector('#preferenceIssueTags'),
+      preferenceSeverity: document.querySelector('#preferenceSeverity'),
+      preferenceConfidence: document.querySelector('#preferenceConfidence'),
+      preferenceNote: document.querySelector('#preferenceNote'),
+      preferenceIssueList: document.querySelector('#preferenceIssueList'),
+      preferenceBestCandidate: document.querySelector('#preferenceBestCandidate'),
+      preferenceCompositeCandidates: document.querySelector('#preferenceCompositeCandidates'),
+      preferenceComparisonActions: document.querySelector('#preferenceComparisonActions'),
+      preferenceProgress: document.querySelector('#preferenceProgress'),
+      preferenceProgressText: document.querySelector('#preferenceProgressText'),
+      preferenceZoom: document.querySelector('#preferenceZoom'),
+      preferenceUndoButton: document.querySelector('#preferenceUndoButton'),
+      preferenceRedoButton: document.querySelector('#preferenceRedoButton'),
+      preferenceExportJsonButton: document.querySelector('#preferenceExportJsonButton'),
+      preferenceExportJsonlButton: document.querySelector('#preferenceExportJsonlButton'),
+      preferenceLearningPanel: document.querySelector('#preferenceLearningPanel'),
+      preferenceLearningStatus: document.querySelector('#preferenceLearningStatus'),
+      preferenceLearningSampleCount: document.querySelector('#preferenceLearningSampleCount'),
+      preferenceHoldoutComparison: document.querySelector('#preferenceHoldoutComparison'),
+      preferenceRankingDifference: document.querySelector('#preferenceRankingDifference'),
+      preferenceActivePair: document.querySelector('#preferenceActivePair'),
+      preferenceGenerationFeedback: document.querySelector('#preferenceGenerationFeedback'),
+      preferenceLearnedWeights: document.querySelector('#preferenceLearnedWeights'),
+      preferenceTrainReplayButton: document.querySelector('#preferenceTrainReplayButton'),
       maskEditorDialog: document.querySelector('#maskEditorDialog'),
       maskEditorCanvas: document.querySelector('#maskEditorCanvas'),
       maskEditorDetail: document.querySelector('#maskEditorDetail'),
@@ -1027,6 +1281,8 @@
       analysisDebugConfidence: document.querySelector('#analysisDebugConfidence'),
       analysisDebugModel: document.querySelector('#analysisDebugModel'),
       analysisDebugProvenance: document.querySelector('#analysisDebugProvenance'),
+      analysisDebugProvider: document.querySelector('#analysisDebugProvider'),
+      analysisDebugContributions: document.querySelector('#analysisDebugContributions'),
       analysisDebugLandmarkDetail: document.querySelector('#analysisDebugLandmarkDetail'),
       analysisDebugLandmarkName: document.querySelector('#analysisDebugLandmarkName'),
       analysisDebugLandmarkMeta: document.querySelector('#analysisDebugLandmarkMeta'),
@@ -1036,6 +1292,11 @@
     let sourceImage = createSampleImage()
     let sourceAnalysis = createSampleAnalysis(sourceImage)
     let originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
+    let selectedModelRoute = 'deterministic'
+    let aiHealth
+    let analysisByRoute = new Map([['deterministic', sourceAnalysis]])
+    let originalEvidenceByRoute = new Map([['deterministic', originalSubjectEvidence]])
+    let aiResultByRoute = new Map()
     let savedMaskEditSession
     let candidates = []
     let selectedCandidate = null
@@ -1059,6 +1320,44 @@
     let maskGateBlindComparison
     let maskGatePointerType
 
+    const preferenceWorkbench = createPreferenceWorkbenchController({
+      elements: {
+        dialog: elements.preferenceWorkbenchDialog,
+        close: elements.preferenceWorkbenchCloseButton,
+        status: elements.preferenceWorkbenchStatus,
+        sourceCanvas: elements.preferenceSourceCanvas,
+        sourceIdentity: elements.preferenceSourceIdentity,
+        layerControl: elements.preferenceLayerControl,
+        candidateGrid: elements.preferenceCandidateGrid,
+        axisScores: elements.preferenceAxisScores,
+        issueTags: elements.preferenceIssueTags,
+        severity: elements.preferenceSeverity,
+        confidence: elements.preferenceConfidence,
+        note: elements.preferenceNote,
+        issueList: elements.preferenceIssueList,
+        bestCandidate: elements.preferenceBestCandidate,
+        composite: elements.preferenceCompositeCandidates,
+        compare: elements.preferenceComparisonActions,
+        progress: elements.preferenceProgress,
+        progressText: elements.preferenceProgressText,
+        zoom: elements.preferenceZoom,
+        undo: elements.preferenceUndoButton,
+        redo: elements.preferenceRedoButton,
+        exportJson: elements.preferenceExportJsonButton,
+        exportJsonl: elements.preferenceExportJsonlButton,
+        learningStatus: elements.preferenceLearningStatus,
+        learningSampleCount: elements.preferenceLearningSampleCount,
+        holdoutComparison: elements.preferenceHoldoutComparison,
+        rankingDifference: elements.preferenceRankingDifference,
+        activePair: elements.preferenceActivePair,
+        generationFeedback: elements.preferenceGenerationFeedback,
+        learnedWeights: elements.preferenceLearnedWeights,
+        trainReplay: elements.preferenceTrainReplayButton,
+      },
+      drawPattern,
+      preferenceRuntime,
+    })
+
     const analysisDebugViewer = createAnalysisDebugViewer({
       elements: {
         dialog: elements.analysisDebugDialog,
@@ -1070,6 +1369,8 @@
         confidence: elements.analysisDebugConfidence,
         model: elements.analysisDebugModel,
         provenance: elements.analysisDebugProvenance,
+        provider: elements.analysisDebugProvider,
+        contributions: elements.analysisDebugContributions,
         landmarkDetail: elements.analysisDebugLandmarkDetail,
         landmarkName: elements.analysisDebugLandmarkName,
         landmarkMeta: elements.analysisDebugLandmarkMeta,
@@ -1102,12 +1403,8 @@
         const correctionEndedAt = Date.now()
         savedMaskEditSession = session
         sourceAnalysis = applyCorrectedSubjectEvidence(sourceAnalysis, evidence)
-        analysisDebugViewer.update({
-          image: sourceImage,
-          analysis: sourceAnalysis,
-          originalSubjectEvidence,
-          candidate: selectedCandidate,
-        })
+        analysisByRoute.set(selectedModelRoute, sourceAnalysis)
+        refreshAnalysisDebugViewer()
         renderAnalysisSource()
         setStatus('主体已确认', 'ready')
         const result = await generate()
@@ -1159,6 +1456,7 @@
 
     function setBusy(busy) {
       elements.generateButton.disabled = busy
+      elements.modelRouteSelect.disabled = busy
       elements.preferenceStartButton.disabled = busy || candidates.length < 2
       elements.openMaskEditorButton.disabled = busy || (maskGateContext !== undefined
         && (maskGateInitialRating?.acceptable !== false || maskGateRun !== undefined))
@@ -1170,11 +1468,87 @@
       const segmentationVersion = sourceAnalysis.modelVersions?.segmentation
       elements.analysisSource.textContent = sourceAnalysis.subjectMaskEvidence?.userConfirmed === true
         ? '人工确认主体'
+        : selectedModelRoute === 'neural-analysis' && segmentationVersion?.includes('birefnet')
+          ? 'BiRefNet · AI 主体'
         : sourceAnalysis.source === 'alpha'
         ? '透明通道'
         : segmentationVersion?.startsWith('rembg/')
           ? 'AI 分割'
           : '本地粗分割'
+    }
+
+    function refreshAnalysisDebugViewer() {
+      const aiResult = aiResultByRoute.get(selectedModelRoute)
+      const providers = [...new Set((aiResult?.contributions ?? [])
+        .filter((entry) => entry.status === 'used')
+        .map((entry) => entry.providerId))]
+      analysisDebugViewer.update({
+        image: sourceImage,
+        analysis: sourceAnalysis,
+        originalSubjectEvidence,
+        candidate: selectedCandidate,
+        route: selectedModelRoute,
+        providers,
+        contributions: aiResult?.contributions ?? [],
+        preferenceFeatures: aiResult?.preferenceFeatures ?? [],
+      })
+    }
+
+    function renderModelRouteStatus() {
+      const state = routeAvailability(aiHealth, selectedModelRoute)
+      if (state.status === 'checking') {
+        elements.modelRouteStatus.textContent = '检查中'
+        return
+      }
+      if (state.available === false) {
+        elements.modelRouteStatus.textContent = '当前环境未接入'
+        return
+      }
+      const aiResult = aiResultByRoute.get(selectedModelRoute)
+      const model = aiResult?.contributions?.find((entry) => entry.status === 'used')?.modelId
+      elements.modelRouteStatus.textContent = selectedModelRoute === 'deterministic'
+        ? '已连接 · 本地确定性'
+        : model?.includes('birefnet') ? '已连接 · BiRefNet' : '已连接'
+    }
+
+    async function initializeAiRoutes() {
+      try {
+        aiHealth = await fetchAiHealth()
+      } catch (error) {
+        console.warn('AI health check failed', error)
+        aiHealth = { routes: {} }
+      }
+      for (const option of elements.modelRouteSelect.options) {
+        const availability = routeAvailability(aiHealth, option.value)
+        option.disabled = availability.available === false
+      }
+      elements.modelRouteSelect.querySelector('option[value="deterministic"]').disabled = false
+      renderModelRouteStatus()
+    }
+
+    async function prepareSelectedAnalysis() {
+      const cached = analysisByRoute.get(selectedModelRoute)
+      if (cached !== undefined) {
+        sourceAnalysis = cached
+        originalSubjectEvidence = originalEvidenceByRoute.get(selectedModelRoute)
+          ?? cached.subjectMaskEvidence
+        renderAnalysisSource()
+        renderModelRouteStatus()
+        return
+      }
+      const availability = routeAvailability(aiHealth, selectedModelRoute)
+      if (availability.available === false) throw new Error('当前模型路线尚未接入运行环境')
+      elements.modelRouteStatus.textContent = '分析中'
+      const result = await runAiRoute(sourceImage, selectedModelRoute)
+      if (result.status === 'unavailable') throw new Error('模型服务当前未提供分析结果')
+      sourceAnalysis = result.analysis
+      originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
+      analysisByRoute.set(selectedModelRoute, sourceAnalysis)
+      originalEvidenceByRoute.set(selectedModelRoute, originalSubjectEvidence)
+      aiResultByRoute.set(selectedModelRoute, result)
+      renderAnalysisSource()
+      renderModelRouteStatus()
+      refreshAnalysisDebugViewer()
     }
 
     function selectedGateValue(name) {
@@ -1288,6 +1662,11 @@
       sourceImage = loaded.image
       sourceAnalysis = loaded.analysis
       originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
+      selectedModelRoute = 'deterministic'
+      elements.modelRouteSelect.value = selectedModelRoute
+      analysisByRoute = new Map([['deterministic', sourceAnalysis]])
+      originalEvidenceByRoute = new Map([['deterministic', originalSubjectEvidence]])
+      aiResultByRoute = new Map()
       savedMaskEditSession = undefined
       elements.maskGatePanel.hidden = false
       const raterId = params.get('rater') ?? localStorage.getItem('maskGateRaterId')
@@ -1499,7 +1878,7 @@
     }
 
     function generationOptions() {
-      return {
+      const options = {
         canvas: canvasOptions(),
         maxColors: Number(elements.maxColors.value),
         maxCandidates: 10,
@@ -1534,12 +1913,14 @@
             refinementMode: selectedRefinementMode,
           },
       }
+      return preferenceRuntime.applyGenerationOptions(options)
     }
 
     async function generate() {
       setBusy(true)
       await new Promise((resolve) => requestAnimationFrame(resolve))
       try {
+        await prepareSelectedAnalysis()
         const result = await algorithm.generate({
           image: sourceImage,
           palette,
@@ -1586,12 +1967,7 @@
       if (selectedCandidate === null) return
       renderPattern(selectedCandidate)
       renderMaterials(selectedCandidate)
-      analysisDebugViewer.update({
-        image: sourceImage,
-        analysis: sourceAnalysis,
-        originalSubjectEvidence,
-        candidate: selectedCandidate,
-      })
+      refreshAnalysisDebugViewer()
       for (const button of elements.candidateList.querySelectorAll('.candidate')) {
         button.setAttribute('aria-pressed', String(button.dataset.id === selectedCandidate.id))
       }
@@ -1619,7 +1995,9 @@
       elements.qualityScore.textContent = String(Math.round(candidate.score.total * 100))
       elements.paletteChanges.textContent = String(candidate.metrics.paletteOptimizationChanges)
       elements.gridEdits.textContent = String(candidate.edits.length)
-      elements.gridRefinementChanges.textContent = String(candidate.metrics.gridRefinementChanges)
+      elements.gridRefinementChanges.textContent = candidate.gridRefinement === undefined
+        ? '--'
+        : String(candidate.metrics.gridRefinementChanges)
       elements.symmetryQuality.textContent = `${Math.round(candidate.metrics.symmetryQuality * 100)}%`
       elements.valueOrderAccuracy.textContent = `${Math.round(candidate.metrics.valueOrderAccuracy * 100)}%`
       elements.shapeScore.textContent = candidate.metrics.shapeApplied
@@ -1649,6 +2027,15 @@
       elements.paletteRoleCount.textContent = candidate.palettePlan === undefined
         ? '--'
         : String(Object.keys(candidate.palettePlan.assignments).length)
+      elements.clusterFragmentChange.textContent = candidate.gridRefinement === undefined
+        ? '--'
+        : `${candidate.gridRefinement.diagnosticsBefore.fragmentedArcSegments} → ${candidate.gridRefinement.diagnosticsAfter.fragmentedArcSegments}`
+      elements.smallComponentChange.textContent = candidate.gridRefinement === undefined
+        ? '--'
+        : `${candidate.gridRefinement.diagnosticsBefore.smallComponents} → ${candidate.gridRefinement.diagnosticsAfter.smallComponents}`
+      elements.singleCellBandChange.textContent = candidate.gridRefinement === undefined
+        ? '--'
+        : `${candidate.gridRefinement.diagnosticsBefore.singleCellBands} → ${candidate.gridRefinement.diagnosticsAfter.singleCellBands}`
     }
 
     function drawPattern(canvas, pattern, options = {}) {
@@ -1741,21 +2128,21 @@
 
     async function startPreferenceComparison() {
       if (currentGenerationId === undefined || selectedCandidate === null) return
-      const selectedIndex = candidates.findIndex((candidate) => candidate.id === selectedCandidate.id)
-      const opponent = candidates[(selectedIndex + 1) % candidates.length]
-      if (opponent === undefined) return
-      activePreferencePair = await createBlindCandidatePair({
+      const currentAiResult = aiResultByRoute.get(selectedModelRoute)
+      preferenceWorkbench.open({
         generationId: currentGenerationId,
-        candidateAId: selectedCandidate.id,
-        candidateBId: opponent.id,
-        raterId: elements.maskGateRaterId.value.trim() || 'local-rater',
+        source: {
+          id: elements.fileName.textContent || currentGenerationId,
+          kind: sourceAnalysis.imageType ?? 'general',
+        },
+        image: sourceImage,
+        candidates,
+        annotatorId: elements.maskGateRaterId.value.trim() || 'local-rater',
+        evaluationEvidence: {
+          neuralPreferenceFeatures: currentAiResult?.preferenceFeatures ?? [],
+          providerContributions: currentAiResult?.contributions ?? [],
+        },
       })
-      const left = candidates.find((candidate) => candidate.id === activePreferencePair.leftCandidateId)
-      const right = candidates.find((candidate) => candidate.id === activePreferencePair.rightCandidateId)
-      if (left === undefined || right === undefined) throw new Error('偏好候选已失效')
-      drawPattern(elements.preferenceCanvasA, left.pattern, { maximum: 240 })
-      drawPattern(elements.preferenceCanvasB, right.pattern, { maximum: 240 })
-      renderPreferencePanel()
     }
 
     function recordPreference(choice) {
@@ -1836,18 +2223,16 @@
       sourceImage = canvasToPixelImage(canvas)
       sourceAnalysis = inferSubjectAnalysis(sourceImage)
       originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
+      analysisByRoute = new Map([['deterministic', sourceAnalysis]])
+      originalEvidenceByRoute = new Map([['deterministic', originalSubjectEvidence]])
+      aiResultByRoute = new Map()
       savedMaskEditSession = undefined
       candidates = []
       selectedCandidate = null
       activePreferencePair = undefined
       preferenceRanking = undefined
       maskEditor.close()
-      analysisDebugViewer.update({
-        image: sourceImage,
-        analysis: sourceAnalysis,
-        originalSubjectEvidence,
-        candidate: selectedCandidate,
-      })
+      refreshAnalysisDebugViewer()
       elements.fileName.textContent = file.name
       renderAnalysisSource()
       renderSourcePreview()
@@ -1936,6 +2321,17 @@
         setStatus('图片读取失败', 'error')
       }
     })
+    elements.modelRouteSelect.addEventListener('change', async () => {
+      selectedModelRoute = elements.modelRouteSelect.value
+      const cached = analysisByRoute.get(selectedModelRoute)
+      if (cached !== undefined) {
+        sourceAnalysis = cached
+        originalSubjectEvidence = originalEvidenceByRoute.get(selectedModelRoute)
+          ?? cached.subjectMaskEvidence
+      }
+      renderModelRouteStatus()
+      await generate()
+    })
     elements.generateButton.addEventListener('click', generate)
     elements.preferenceStartButton.addEventListener('click', async () => {
       try {
@@ -1989,13 +2385,8 @@
     })
     elements.downloadButton.addEventListener('click', downloadPattern)
 
-    await initializeMaskGate()
-    analysisDebugViewer.update({
-      image: sourceImage,
-      analysis: sourceAnalysis,
-      originalSubjectEvidence,
-      candidate: selectedCandidate,
-    })
+    await Promise.all([initializeMaskGate(), initializeAiRoutes()])
+    refreshAnalysisDebugViewer()
     renderSourcePreview()
     renderAnalysisSource()
     await generate()

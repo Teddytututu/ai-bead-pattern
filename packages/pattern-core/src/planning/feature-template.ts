@@ -1,6 +1,7 @@
 import type { LandmarkKind } from '../types.js'
 
-export type FeatureTemplateKind = Extract<LandmarkKind, 'eye' | 'mouth' | 'nose'>
+export type FeatureTemplateKind = Extract<LandmarkKind,
+  'eye' | 'mouth' | 'nose' | 'ear' | 'identity-mark' | 'custom'>
 
 export type FeatureCellRole =
   | 'eye-dark'
@@ -8,6 +9,9 @@ export type FeatureCellRole =
   | 'mouth-dark'
   | 'mouth-inner'
   | 'nose-base'
+  | 'ear-tip'
+  | 'identity-dark'
+  | 'endpoint-dark'
 
 export interface FeatureTemplateCell {
   x: number
@@ -24,18 +28,24 @@ export interface FeatureTemplate {
   cells: readonly FeatureTemplateCell[]
 }
 
-const kinds = new Set<FeatureTemplateKind>(['eye', 'mouth', 'nose'])
+const kinds = new Set<FeatureTemplateKind>(['eye', 'mouth', 'nose', 'ear', 'identity-mark', 'custom'])
 const roles = new Set<FeatureCellRole>([
   'eye-dark',
   'eye-highlight',
   'mouth-dark',
   'mouth-inner',
   'nose-base',
+  'ear-tip',
+  'identity-dark',
+  'endpoint-dark',
 ])
 const rolesByKind: Readonly<Record<FeatureTemplateKind, ReadonlySet<FeatureCellRole>>> = {
   eye: new Set(['eye-dark', 'eye-highlight']),
   mouth: new Set(['mouth-dark', 'mouth-inner']),
   nose: new Set(['nose-base']),
+  ear: new Set(['ear-tip']),
+  'identity-mark': new Set(['identity-dark']),
+  custom: new Set(['endpoint-dark']),
 }
 
 export function validateFeatureTemplate(template: FeatureTemplate): void {

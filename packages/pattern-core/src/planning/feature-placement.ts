@@ -43,7 +43,8 @@ function validateMask(mask: BinaryMask | undefined, size: GridSize, label: strin
 }
 
 function featureKind(kind: ImageLandmark['kind']): FeatureTemplateKind {
-  if (kind !== 'eye' && kind !== 'mouth' && kind !== 'nose') {
+  if (kind !== 'eye' && kind !== 'mouth' && kind !== 'nose'
+    && kind !== 'ear' && kind !== 'identity-mark' && kind !== 'custom') {
     throw new RangeError(`Feature placement has no template library for ${kind}`)
   }
   return kind

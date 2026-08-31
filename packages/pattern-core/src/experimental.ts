@@ -62,16 +62,59 @@ export type {
 export { buildStructurePlan } from './planning/structure-planner.js'
 export type { StructurePlanningInput } from './planning/structure-planner.js'
 export { buildValuePlan } from './planning/value-planner.js'
-export type { ValuePlanningInput, ValuePlanningResult } from './planning/value-planner.js'
+export type {
+  MaterialValueKind,
+  SemanticGapDiagnostic,
+  SemanticValueGaps,
+  ValueGroupDiagnostic,
+  ValueLighting,
+  ValuePlanningDiagnostics,
+  ValuePlanningInput,
+  ValuePlanningResult,
+} from './planning/value-planner.js'
 export { buildPalettePlan } from './planning/palette-planner.js'
-export type { PalettePlanningInput, PalettePlanningResult } from './planning/palette-planner.js'
+export type {
+  PalettePlanningDiagnostics,
+  PalettePlanningInput,
+  PalettePlanningResult,
+  PaletteSubstitutionDiagnostic,
+} from './planning/palette-planner.js'
 export { refineGridClusters } from './grid-refinement.js'
 export type {
   GridRefinementInput,
   GridRefinementResult,
 } from './grid-refinement.js'
-export type { GridRefinementMode, GridRefinementSummary } from './types.js'
+export type {
+  GridBudgetViolations,
+  GridClusterDiagnostics,
+  GridRefinementBudgets,
+  GridRefinementMode,
+  GridRefinementSummary,
+} from './types.js'
 export { fitBradleyTerry, predictPairwisePreference } from './preference.js'
+export {
+  applyArtDirectionImportance,
+  enforceTileSeams,
+  planPixelArtDirection,
+  selectAnimationKeyFrame,
+} from './art-direction.js'
+export type {
+  AnimationFrameCandidate,
+  AnimationKeyFrameSelection,
+  ArtDirectionExecutionSummary,
+  ArtDirectionImportanceInput,
+  ArtDirectionImportanceResult,
+  ArtDirectionImportanceSummary,
+  MaterialDirectionProfile,
+  PixelArtDirectionInput,
+  PixelArtDirectionPlan,
+  PixelArtMode,
+  SceneLayerId,
+  TileSeamInput,
+  TileSeamResult,
+  TileSeamSummary,
+  TextureDirection,
+} from './art-direction.js'
 export type {
   BradleyTerryOptions,
   BradleyTerryResult,
@@ -79,6 +122,67 @@ export type {
   PairwisePreferenceChoice,
   PairwisePreferenceRecord,
 } from './preference.js'
+export {
+  BASELINE_PREFERENCE_WEIGHTS,
+  PREFERENCE_AXES,
+  PREFERENCE_FEATURES,
+  PREFERENCE_ISSUES,
+  PREFERENCE_RECORD_SCHEMA_VERSION,
+  comparePreferenceModels,
+  createFrozenPreferenceSplit,
+  deduplicatePreferenceRecords,
+  derivePreferenceGenerationParameters,
+  fitPreferenceModelV2,
+  migratePairwisePreferenceRecord,
+  normalizePreferenceRecordV2,
+  preferenceRecordFromWorkbenchSession,
+  preferenceRecordFingerprint,
+  rankPreferenceCandidates,
+  replayPreferenceRecord,
+  selectActivePreferencePair,
+  selectPreferenceModelVersion,
+  validatePreferenceRecordV2,
+} from './preference-v2.js'
+export type {
+  ActivePreferencePairOptions,
+  ActivePreferencePair,
+  ComparedPreferencePair,
+  FrozenPreferenceSplit,
+  FrozenPreferenceSplitOptions,
+  PreferenceAxis,
+  PreferenceAxisScores,
+  PreferenceAnnotatorIdentity,
+  PreferenceCandidateRankScore,
+  PreferenceCandidateRoute,
+  PreferenceCandidateV2,
+  PreferenceCellSelection,
+  PreferenceCompositeChoice,
+  PreferenceComparisonV2,
+  PreferenceElimination,
+  PreferenceEvaluationMetrics,
+  PreferenceFeatureName,
+  PreferenceFeatureVector,
+  PreferenceGenerationAdjustments,
+  PreferenceGenerationParameters,
+  PreferenceIssue,
+  PreferenceIssueAnnotation,
+  PreferenceModelComparison,
+  PreferenceModelContext,
+  PreferenceModelIdentity,
+  PreferenceModelOptions,
+  PreferenceModelSelection,
+  PreferenceModelSelectionOptions,
+  PreferenceModelV2,
+  PreferenceRankingResult,
+  PreferenceRecordV2,
+  PreferenceRegionSelection,
+  PreferenceReplayResult,
+  PreferenceSourceIdentity,
+  PreferenceStratumModel,
+  PreferenceSubjectKind,
+  PreferenceV1MigrationContext,
+  PreferenceWorkbenchConversionOptions,
+} from './preference-v2.js'
 export type {
   LandmarkAllocation,
   ShapeAnchor,

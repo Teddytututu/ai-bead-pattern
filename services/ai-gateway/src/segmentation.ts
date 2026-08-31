@@ -31,6 +31,11 @@ export interface SegmentationResult {
 
 export interface SegmentationProvider {
   segment(request: SegmentationRequest): Promise<SegmentationResult>
+  probe?(signal?: AbortSignal): Promise<{
+    status: 'ready' | 'degraded' | 'unavailable'
+    latencyMs: number
+    message?: string
+  }>
 }
 
 export interface RembgHttpSegmentationProviderOptions {
@@ -366,6 +371,44 @@ export class RembgHttpSegmentationProvider implements SegmentationProvider {
     } finally {
       clearTimeout(timeout)
       request.signal?.removeEventListener('abort', forwardAbort)
+    }
+  }
+
+  async probe(signal?: AbortSignal): Promise<{
+    status: 'ready' | 'degraded' | 'unavailable'
+    latencyMs: number
+    message?: string
+  }> {
+    signal?.throwIfAborted()
+    const controller = new AbortController()
+    const forwardAbort = () => controller.abort(signal?.reason)
+    signal?.addEventListener('abort', forwardAbort, { once: true })
+    const timeout = setTimeout(
+      () => controller.abort(new Error('rembg health probe timed out')),
+      Math.min(this.#timeoutMs, 5_000),
+    )
+    const startedAt = performance.now()
+    try {
+      const response = await this.#fetch(`${this.#endpoint}/api`, {
+        method: 'GET',
+        signal: controller.signal,
+      })
+      if (response.body !== null) await response.body.cancel()
+      return {
+        status: response.ok ? 'ready' : 'unavailable',
+        latencyMs: Math.max(0, performance.now() - startedAt),
+        ...(response.ok ? {} : { message: `rembg returned ${response.status}` }),
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return {
+        status: 'unavailable',
+        latencyMs: Math.max(0, performance.now() - startedAt),
+        message: message.replace(/\s+/g, ' ').trim().slice(0, 500),
+      }
+    } finally {
+      clearTimeout(timeout)
+      signal?.removeEventListener('abort', forwardAbort)
     }
   }
 }

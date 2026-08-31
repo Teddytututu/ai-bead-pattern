@@ -2,6 +2,8 @@ import { createReadStream, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, resolve, sep } from 'node:path'
 
+import { createDemoAiApiHandler } from './demo-ai-api.mjs'
+
 const root = resolve(process.cwd())
 const port = Number.parseInt(process.env.PORT ?? '4173', 10)
 const mimeTypes = {
@@ -12,13 +14,15 @@ const mimeTypes = {
   '.json': 'application/json; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
 }
+const aiApiHandler = createDemoAiApiHandler()
 
 function sendText(response, statusCode, body) {
   response.writeHead(statusCode, { 'Content-Type': 'text/plain; charset=utf-8' })
   response.end(body)
 }
 
-createServer((request, response) => {
+createServer(async (request, response) => {
+  if (await aiApiHandler(request, response)) return
   const requestUrl = new URL(request.url ?? '/', 'http://127.0.0.1')
   if (requestUrl.pathname === '/') {
     response.writeHead(302, { Location: '/apps/demo/' })

@@ -11,6 +11,7 @@ export interface ShapeVariantRequest {
   crop: CropRect
   size: GridSize
   refinementIterations: number
+  preserveThinStructures?: boolean
 }
 
 function variantKey(request: ShapeVariantRequest): string {
@@ -19,6 +20,7 @@ function variantKey(request: ShapeVariantRequest): string {
     size: request.size,
     threshold: shapeRasterizationThreshold,
     refinementIterations: request.refinementIterations,
+    preserveThinStructures: request.preserveThinStructures === true,
   })
 }
 
@@ -46,6 +48,10 @@ export class ShapeVariantCache {
       || request.refinementIterations < 0 || request.refinementIterations > 32) {
       throw new RangeError('Shape variant refinement iterations must stay within 0..32')
     }
+    if (request.preserveThinStructures !== undefined
+      && typeof request.preserveThinStructures !== 'boolean') {
+      throw new TypeError('Shape variant thin-structure protection must be boolean')
+    }
     if (this.#sourceShape.foregroundArea === 0) return undefined
     const key = variantKey(request)
     const cached = this.#variants.get(key)
@@ -57,7 +63,10 @@ export class ShapeVariantCache {
       request.size.width,
       request.size.height,
       this.#landmarks,
-      { refinementIterations: request.refinementIterations },
+      {
+        refinementIterations: request.refinementIterations,
+        preserveThinStructures: request.preserveThinStructures === true,
+      },
     )
     this.#variants.set(key, rasterization)
     return rasterization

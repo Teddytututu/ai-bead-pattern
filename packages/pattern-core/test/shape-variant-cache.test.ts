@@ -31,12 +31,14 @@ describe('shape variant cache', () => {
       crop: { x: 1, y: 0, width: 15, height: 16 },
     })
     const changedSize = cache.get({ ...request, size: { width: 9, height: 8 } })
+    const thinStructures = cache.get({ ...request, preserveThinStructures: true })
 
     assert.equal(first, repeated)
     assert.notEqual(first, changedRefinement)
     assert.notEqual(first, changedCrop)
     assert.notEqual(first, changedSize)
-    assert.equal(cache.size, 4)
+    assert.notEqual(first, thinStructures)
+    assert.equal(cache.size, 5)
   })
 
   it('validates variant keys before reading the cache', () => {
@@ -56,5 +58,11 @@ describe('shape variant cache', () => {
       size: { width: 1, height: 1 },
       refinementIterations: 33,
     }), /refinement/i)
+    assert.throws(() => cache.get({
+      crop: { x: 0, y: 0, width: 1, height: 1 },
+      size: { width: 1, height: 1 },
+      refinementIterations: 2,
+      preserveThinStructures: 'yes' as never,
+    }), /thin-structure/i)
   })
 })

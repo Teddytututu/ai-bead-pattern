@@ -90,6 +90,7 @@ export interface ShapeRasterization {
   activeMask: Uint8Array
   signedDistance: Float32Array
   boundaryBand: Uint8Array
+  boundaryAnchors: ReadonlySet<number>
   protectedCells: ReadonlySet<number>
   landmarkAllocations: readonly LandmarkAllocation[]
   diagnostics: ShapeDiagnostics
@@ -97,6 +98,7 @@ export interface ShapeRasterization {
 
 export interface ShapeRasterizationOptions {
   refinementIterations?: number
+  preserveThinStructures?: boolean
 }
 
 export const shapeRasterizationThreshold = 0.5
@@ -133,6 +135,7 @@ function labelComponents(
   values: Uint8Array,
   width: number,
   height: number,
+  connectivity: readonly (readonly [number, number])[] = orthogonalOffsets,
 ): LabeledComponents {
   const labels = new Int32Array(values.length)
   labels.fill(-1)
@@ -161,7 +164,7 @@ function labelComponents(
       maximumX = Math.max(maximumX, x)
       maximumY = Math.max(maximumY, y)
       touchesBorder ||= x === 0 || y === 0 || x === width - 1 || y === height - 1
-      for (const [offsetX, offsetY] of orthogonalOffsets) {
+      for (const [offsetX, offsetY] of connectivity) {
         const nextX = x + offsetX
         const nextY = y + offsetY
         if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue
@@ -451,6 +454,165 @@ function maskAreaSample(
   return totalArea > 0 ? clamp(weightedTotal / totalArea, 0, 1) : 0
 }
 
+function maskPeakSample(
+  mask: BinaryMask,
+  sourceLeft: number,
+  sourceTop: number,
+  sourceRight: number,
+  sourceBottom: number,
+): number {
+  let peak = 0
+  for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
+    const overlapY = Math.max(0, Math.min(sourceBottom, sourceY + 1) - Math.max(sourceTop, sourceY))
+    for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
+      const overlapX = Math.max(0, Math.min(sourceRight, sourceX + 1) - Math.max(sourceLeft, sourceX))
+      if (overlapX * overlapY <= 0) continue
+      const x = clamp(sourceX, 0, mask.width - 1)
+      const y = clamp(sourceY, 0, mask.height - 1)
+      peak = Math.max(peak, clamp(mask.values[y * mask.width + x] ?? 0, 0, 1))
+    }
+  }
+  return peak
+}
+
+interface ThinStructureProjection {
+  protectedCells: ReadonlySet<number>
+  edits: number
+}
+
+function connectProjectedCells(
+  start: number,
+  end: number,
+  width: number,
+  height: number,
+  componentId: number,
+  owners: Int32Array,
+  activeMask: Uint8Array,
+  protectedCells: Set<number>,
+): number {
+  let x = start % width
+  let y = Math.floor(start / width)
+  const endX = end % width
+  const endY = Math.floor(end / width)
+  const deltaX = Math.abs(endX - x)
+  const deltaY = Math.abs(endY - y)
+  const stepX = x < endX ? 1 : -1
+  const stepY = y < endY ? 1 : -1
+  let horizontalSteps = 0
+  let verticalSteps = 0
+  let edits = 0
+
+  const claim = (): boolean => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return false
+    const cell = y * width + x
+    const owner = owners[cell] ?? -1
+    if (owner >= 0 && owner !== componentId) return false
+    owners[cell] = componentId
+    if (activeMask[cell] === 0) {
+      activeMask[cell] = 1
+      edits += 1
+    }
+    protectedCells.add(cell)
+    return true
+  }
+
+  claim()
+  while (x !== endX || y !== endY) {
+    const canStepX = x !== endX
+    const canStepY = y !== endY
+    const horizontalProgress = deltaX === 0 ? 1 : horizontalSteps / deltaX
+    const verticalProgress = deltaY === 0 ? 1 : verticalSteps / deltaY
+    if (canStepX && (canStepY === false || horizontalProgress <= verticalProgress)) {
+      x += stepX
+      horizontalSteps += 1
+    } else {
+      y += stepY
+      verticalSteps += 1
+    }
+    if (claim() === false) break
+  }
+  return edits
+}
+
+function projectThinStructures(
+  model: SourceShapeModel,
+  crop: CropRect,
+  fit: CanvasFit,
+  width: number,
+  height: number,
+  activeMask: Uint8Array,
+): ThinStructureProjection {
+  const sourceBoundary = boundaryMask(model.binaryMask, model.width, model.height)
+  const sourceTopology = labelComponents(
+    sourceBoundary,
+    model.width,
+    model.height,
+    surroundingOffsets,
+  )
+  const projectedCells = new Int32Array(sourceBoundary.length)
+  projectedCells.fill(-1)
+  const owners = new Int32Array(activeMask.length)
+  owners.fill(-1)
+  const protectedCells = new Set<number>()
+  let edits = 0
+
+  for (let sourceIndex = 0; sourceIndex < sourceBoundary.length; sourceIndex += 1) {
+    if (sourceBoundary[sourceIndex] !== 1) continue
+    const sourceX = sourceIndex % model.width
+    const sourceY = Math.floor(sourceIndex / model.width)
+    const centerX = sourceX + 0.5
+    const centerY = sourceY + 0.5
+    if (centerX < crop.x || centerY < crop.y
+      || centerX >= crop.x + crop.width || centerY >= crop.y + crop.height) continue
+    const [targetX, targetY] = gridCellForSourcePoint(crop, fit, centerX, centerY)
+    if (targetX < 0 || targetY < 0 || targetX >= width || targetY >= height) continue
+    const targetCell = targetY * width + targetX
+    const componentId = sourceTopology.labels[sourceIndex] ?? -1
+    if (componentId < 0) continue
+    const owner = owners[targetCell] ?? -1
+    if (owner >= 0 && owner !== componentId) continue
+    owners[targetCell] = componentId
+    projectedCells[sourceIndex] = targetCell
+    if (activeMask[targetCell] === 0) {
+      activeMask[targetCell] = 1
+      edits += 1
+    }
+    protectedCells.add(targetCell)
+  }
+
+  const forwardNeighbors = [
+    [1, 0],
+    [-1, 1], [0, 1], [1, 1],
+  ] as const
+  for (let sourceIndex = 0; sourceIndex < sourceBoundary.length; sourceIndex += 1) {
+    const start = projectedCells[sourceIndex] ?? -1
+    if (start < 0) continue
+    const sourceX = sourceIndex % model.width
+    const sourceY = Math.floor(sourceIndex / model.width)
+    const componentId = sourceTopology.labels[sourceIndex] ?? -1
+    for (const [offsetX, offsetY] of forwardNeighbors) {
+      const nextX = sourceX + offsetX
+      const nextY = sourceY + offsetY
+      if (nextX < 0 || nextY < 0 || nextX >= model.width || nextY >= model.height) continue
+      const nextSource = nextY * model.width + nextX
+      const end = projectedCells[nextSource] ?? -1
+      if (end < 0 || sourceTopology.labels[nextSource] !== componentId) continue
+      edits += connectProjectedCells(
+        start,
+        end,
+        width,
+        height,
+        componentId,
+        owners,
+        activeMask,
+        protectedCells,
+      )
+    }
+  }
+
+  return { protectedCells, edits }
+}
+
 function boundaryMask(values: Uint8Array, width: number, height: number): Uint8Array {
   const boundary = new Uint8Array(values.length)
   for (let y = 0; y < height; y += 1) {
@@ -529,6 +691,48 @@ function projectSignedDistance(
   return projected
 }
 
+function tracedContourAnchors(
+  model: SourceShapeModel,
+  crop: CropRect,
+  fit: CanvasFit,
+  width: number,
+  height: number,
+  activeMask: Uint8Array,
+): ReadonlySet<number> {
+  const anchors = new Set<number>()
+  for (const contour of model.contours) {
+    if (contour.points.length === 0) continue
+    const sampleCount = Math.max(4, Math.min(16, Math.ceil(contour.points.length / 24)))
+    const step = Math.max(1, Math.floor(contour.points.length / sampleCount))
+    for (let pointIndex = 0; pointIndex < contour.points.length; pointIndex += step) {
+      const point = contour.points[pointIndex]!
+      const sourceX = clamp(point.x, 0, model.width - 1)
+      const sourceY = clamp(point.y, 0, model.height - 1)
+      if (sourceX < crop.x || sourceY < crop.y
+        || sourceX >= crop.x + crop.width || sourceY >= crop.y + crop.height) continue
+      const [centerX, centerY] = gridCellForSourcePoint(crop, fit, sourceX, sourceY)
+      let nearestCell = -1
+      let nearestDistance = Number.POSITIVE_INFINITY
+      for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+          const x = centerX + offsetX
+          const y = centerY + offsetY
+          if (x < 0 || y < 0 || x >= width || y >= height) continue
+          const cell = y * width + x
+          if (activeMask[cell] !== 1) continue
+          const distance = offsetX * offsetX + offsetY * offsetY
+          if (distance < nearestDistance) {
+            nearestCell = cell
+            nearestDistance = distance
+          }
+        }
+      }
+      if (nearestCell >= 0) anchors.add(nearestCell)
+    }
+  }
+  return anchors
+}
+
 function sdfBoundaryIoU(
   values: Uint8Array,
   projectedSdf: Float32Array,
@@ -582,6 +786,7 @@ function shapeEnergy(
   height: number,
   referenceComponents: number,
   referenceHoles: number,
+  contourAnchors: ReadonlySet<number>,
 ): number {
   const boundary = boundaryMask(values, width, height)
   let energy = 0
@@ -592,6 +797,7 @@ function shapeEnergy(
       const cellCoverage = coverage[index] ?? 0
       const sdf = projectedSdf[index] ?? 0
       energy += Math.abs(active - cellCoverage)
+      if (contourAnchors.has(index) && active === 0) energy += 0.05
       if (active === 1 && sdf < 0) energy += Math.min(2, -sdf) * 0.35
       if (active === 0 && sdf > 0) energy += Math.min(2, sdf) * 0.35
       if (boundary[index] === 1) energy += Math.min(2, Math.abs(sdf)) * 0.25
@@ -622,6 +828,7 @@ function optimizeBoundaryEnergy(
   referenceComponents: number,
   referenceHoles: number,
   protectedCells: ReadonlySet<number>,
+  contourAnchors: ReadonlySet<number>,
   iterations: number,
 ): { edits: number; before: number; after: number } {
   const referenceBand = dilate(boundaryMask(activeMask, width, height), width, height)
@@ -639,6 +846,7 @@ function optimizeBoundaryEnergy(
     height,
     referenceComponents,
     referenceHoles,
+    contourAnchors,
   )
   const before = current
   let edits = 0
@@ -655,6 +863,7 @@ function optimizeBoundaryEnergy(
         height,
         referenceComponents,
         referenceHoles,
+        contourAnchors,
       )
       if (next + 1e-9 < current) {
         current = next
@@ -744,7 +953,10 @@ export function rasterizeSourceShape(
       const sourceBottom = crop.y + (localY + 1) * scaleY
       const index = y * width + x
       coverage[index] = maskAreaSample(model.mask, sourceLeft, sourceTop, sourceRight, sourceBottom)
-      activeMask[index] = coverage[index]! >= threshold ? 1 : 0
+      const preservesThinStructure = options.preserveThinStructures === true
+        && coverage[index]! > 0
+        && maskPeakSample(model.mask, sourceLeft, sourceTop, sourceRight, sourceBottom) >= 0.2
+      activeMask[index] = coverage[index]! >= threshold || preservesThinStructure ? 1 : 0
     }
   }
 
@@ -756,10 +968,14 @@ export function rasterizeSourceShape(
     if (coverage[strongest]! > 0) activeMask[strongest] = 1
   }
 
+  const thinProjection = options.preserveThinStructures === true
+    ? projectThinStructures(model, crop, fit, width, height, activeMask)
+    : { protectedCells: new Set<number>(), edits: 0 }
   const referenceMask = activeMask.slice()
   const referenceTopology = labelComponents(referenceMask, width, height)
   const referenceHoles = countHoles(referenceMask, width, height)
   const projectedSdf = projectSignedDistance(model, crop, fit, width, height)
+  const contourAnchors = tracedContourAnchors(model, crop, fit, width, height, activeMask)
   const allocation = allocateLandmarks(
     landmarks,
     crop,
@@ -768,7 +984,12 @@ export function rasterizeSourceShape(
     height,
     activeMask,
   )
-  let shapeEdits = allocation.edits
+  const protectedCells = new Set([
+    ...thinProjection.protectedCells,
+    ...(options.preserveThinStructures === true ? contourAnchors : []),
+    ...allocation.protectedCells,
+  ])
+  let shapeEdits = allocation.edits + thinProjection.edits
   const energy = optimizeBoundaryEnergy(
     activeMask,
     coverage,
@@ -777,7 +998,8 @@ export function rasterizeSourceShape(
     height,
     referenceTopology.components.length,
     referenceHoles,
-    allocation.protectedCells,
+    protectedCells,
+    contourAnchors,
     Math.max(0, Math.floor(options.refinementIterations ?? 2)),
   )
   shapeEdits += energy.edits
@@ -792,7 +1014,8 @@ export function rasterizeSourceShape(
     activeMask,
     signedDistance: projectedSdf,
     boundaryBand,
-    protectedCells: allocation.protectedCells,
+    boundaryAnchors: contourAnchors,
+    protectedCells,
     landmarkAllocations: allocation.allocations,
     diagnostics: {
       referenceComponents: referenceTopology.components.length,

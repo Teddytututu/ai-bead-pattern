@@ -118,6 +118,34 @@ describe('Analysis Debug Viewer layers', () => {
     assert.equal(features.modelVersion, 'feature-planning-v1')
   })
 
+  it('maps edge, depth, and embedding outputs into inspectable layers', () => {
+    const learnedAnalysis = {
+      ...analysis,
+      confidence: 0.88,
+      importanceMap: { width: 2, height: 2, weights: new Float32Array([0.1, 0.9, 0.4, 0]) },
+      semanticRegions: [
+        ...analysis.semanticRegions,
+        { id: 'depth', label: 'depth', mask: { width: 2, height: 2, values: new Float32Array([0, 0.3, 0.7, 1]) }, confidence: 0.75 },
+      ],
+      modelVersions: { ...analysis.modelVersions, segmentation: 'birefnet-v1', depth: 'depth-v2' },
+    }
+    const preferenceFeatures = [{
+      modelId: 'dinov2-v1',
+      names: ['embedding-similarity'],
+      values: new Float32Array([0.82]),
+      confidence: 0.9,
+    }]
+
+    const edges = resolveAnalysisDebugLayer('edges', { analysis: learnedAnalysis })
+    const depth = resolveAnalysisDebugLayer('depth', { analysis: learnedAnalysis })
+    const embedding = resolveAnalysisDebugLayer('embedding', { analysis: learnedAnalysis, preferenceFeatures })
+
+    assert.deepEqual([...edges.mask.values], [0.1, 0.9, 0.4, 0].map(Math.fround))
+    assert.equal(edges.modelVersion, 'birefnet-v1')
+    assert.equal(depth.modelVersion, 'depth-v2')
+    assert.match(embedding.detail, /embedding-similarity 0\.820/)
+  })
+
   it('projects a grid cell through fitted square margins without stretching', () => {
     assert.deepEqual(featureCellSourceRect(featureCandidate, 24 * 48 + 18), {
       x: 1.5,

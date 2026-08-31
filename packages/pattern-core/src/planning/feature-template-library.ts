@@ -32,6 +32,9 @@ function template(
 const eyeDark = 'eye-dark' as const
 const mouthDark = 'mouth-dark' as const
 const noseBase = 'nose-base' as const
+const earTip = 'ear-tip' as const
+const identityDark = 'identity-dark' as const
+const endpointDark = 'endpoint-dark' as const
 
 export const featureTemplateLibrary: readonly FeatureTemplate[] = Object.freeze([
   template('eye-e1', 'eye', [[eyeDark]], [0, 0]),
@@ -49,6 +52,13 @@ export const featureTemplateLibrary: readonly FeatureTemplate[] = Object.freeze(
   ], [1, 0]),
   template('nose-n1', 'nose', [[noseBase]], [0, 0]),
   template('nose-n2', 'nose', [[noseBase, noseBase]], [0, 0]),
+  template('ear-tip-e1', 'ear', [[earTip]], [0, 0]),
+  template('ear-tip-stair', 'ear', [[earTip, earTip], [undefined, earTip]], [1, 1]),
+  template('mark-i1', 'identity-mark', [[identityDark]], [0, 0]),
+  template('mark-i2', 'identity-mark', [[identityDark, identityDark]], [0, 0]),
+  template('mark-i4', 'identity-mark', [[identityDark, identityDark], [identityDark, identityDark]], [0, 0]),
+  template('endpoint-c1', 'custom', [[endpointDark]], [0, 0]),
+  template('endpoint-c2', 'custom', [[endpointDark, endpointDark]], [0, 0]),
 ])
 
 export interface FeatureTemplateSelection {

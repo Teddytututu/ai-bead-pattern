@@ -34,6 +34,9 @@ const roleOrder: readonly FeatureCellRole[] = [
   'mouth-dark',
   'mouth-inner',
   'nose-base',
+  'ear-tip',
+  'identity-dark',
+  'endpoint-dark',
 ]
 
 function validateInput(input: FeatureColorResolutionInput, colors: readonly PreparedColor[]): void {
