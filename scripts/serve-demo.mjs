@@ -11,6 +11,7 @@ const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
+  '.png': 'image/png',
   '.json': 'application/json; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
 }
