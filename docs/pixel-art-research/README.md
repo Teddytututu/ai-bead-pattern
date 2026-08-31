@@ -6,6 +6,7 @@
 
 | 文件 | 内容 |
 |---|---|
+| `implementation-brief.md` | 直接面向代码的优先级、模块位置和验收条件 |
 | `pixel-art-techniques-handbook.md` | 中文像素画技巧手册 |
 | `bead-product-rules.md` | 拼豆生成算法与产品规则 |
 | `close-readings.jsonl` | 511 条逐篇结构化记录 |
