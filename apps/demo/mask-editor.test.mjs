@@ -8,6 +8,7 @@ import {
   fitContainRect,
   maskEditSessionIsDirty,
   normalizePointerPoint,
+  prepareSubjectLasso,
   resolveStrokePoints,
   snapStrokeToBoundary,
 } from './mask-editor.mjs'
@@ -126,6 +127,36 @@ describe('demo mask editor helpers', () => {
     })
   })
 
+  it('closes and simplifies a rough subject lasso for automatic selection', () => {
+    const points = [
+      { x: 0.1, y: 0.1 },
+      { x: 0.5, y: 0.08 },
+      { x: 0.9, y: 0.1 },
+      { x: 0.92, y: 0.5 },
+      { x: 0.9, y: 0.9 },
+      { x: 0.5, y: 0.92 },
+      { x: 0.1, y: 0.9 },
+      { x: 0.08, y: 0.5 },
+    ]
+
+    const result = prepareSubjectLasso(points)
+
+    assert.deepEqual(result.points[0], result.points.at(-1))
+    assert.ok(result.area > 0.5)
+    assert.equal(result.valid, true)
+  })
+
+  it('rejects a collapsed subject lasso after boundary snapping', () => {
+    const result = prepareSubjectLasso([
+      { x: 0.1, y: 0.5 },
+      { x: 0.5, y: 0.5 },
+      { x: 0.9, y: 0.5 },
+    ])
+
+    assert.equal(result.valid, false)
+    assert.equal(result.area, 0)
+  })
+
   it('snaps a hand-drawn path toward a strong source boundary while keeping endpoints', () => {
     const width = 9
     const height = 9
@@ -191,11 +222,13 @@ describe('demo mask editor helpers', () => {
     assert.ok(Math.abs(result.points[2].x - 0.5) < 0.06)
   })
 
-  it('wires the editor to the original evidence and saved edit session', async () => {
+  it('wires the editor to automatic subject evidence and the saved edit session', async () => {
     const html = await readFile(new URL('./index.html', import.meta.url), 'utf8')
 
     assert.match(html, /import \{ createMaskEditorController \} from '\.\/mask-editor\.mjs'/)
-    assert.match(html, /evidence: originalSubjectEvidence/)
+    assert.match(html, /async function automaticSubjectEvidence/)
+    assert.match(html, /evidence = await automaticSubjectEvidence\(\)/)
+    assert.match(html, /evidence,/)
     assert.match(html, /editSession: savedMaskEditSession/)
   })
 

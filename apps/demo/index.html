@@ -355,6 +355,7 @@
     .mask-editor-footer { border-top: 1px solid var(--border); }
     .mask-editor-title { margin: 0; font-size: 16px; }
     .mask-editor-detail { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .mask-editor-header p { margin: 2px 0 0; }
 
     .mask-editor-tools {
       display: flex;
@@ -371,12 +372,15 @@
     .mask-tool-label { color: var(--muted); font-size: 11px; font-weight: 700; }
     .mask-snap-toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); font-size: 12px; font-weight: 700; cursor: pointer; }
     .mask-snap-toggle input { width: 16px; height: 16px; accent-color: #177eff; }
+    .mask-snap-toggle:has(input:disabled) { cursor: default; color: var(--teal); }
     .mask-segmented { display: grid; grid-auto-flow: column; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
     .mask-segmented button { min-width: 58px; height: 32px; padding: 0 10px; border: 0; border-right: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
     .mask-segmented button:last-child { border-right: 0; }
     .mask-segmented button[aria-pressed="true"] { background: var(--text); color: #fff; font-weight: 700; }
+    #maskModeControl button[data-mask-mode="select"][aria-pressed="true"] { background: #9b7410; }
     #maskModeControl button[data-mask-mode="add"][aria-pressed="true"] { background: #177eff; }
     #maskModeControl button[data-mask-mode="erase"][aria-pressed="true"] { background: #e23643; }
+    .mask-editor-dialog[data-mask-mode="select"] #maskEditorCanvas { cursor: crosshair; }
     .mask-editor-dialog[data-mask-mode="add"] #maskEditorCanvas { cursor: crosshair; }
     .mask-editor-dialog[data-mask-mode="erase"] #maskEditorCanvas { cursor: cell; }
 
@@ -697,7 +701,7 @@
               </label>
               <button class="file-button" id="openMaskEditorButton" type="button">
                 <span aria-hidden="true">◉</span>
-                修正主体
+                圈选主体
               </button>
             </div>
           </div>
@@ -707,9 +711,9 @@
           <p class="model-route-status" id="modelRouteStatus" aria-live="polite">检查中</p>
           <select id="modelRouteSelect" aria-describedby="modelRouteStatus">
             <option value="deterministic">确定性基线</option>
-            <option value="neural-analysis">BiRefNet 神经分析</option>
-            <option value="learned-pixelization">学习像素化</option>
-            <option value="generative-proposal">生成式提案</option>
+            <option value="neural-analysis" disabled>BiRefNet 神经分析</option>
+            <option value="learned-pixelization" disabled>学习像素化</option>
+            <option value="generative-proposal" disabled>生成式提案</option>
           </select>
         </div>
       </section>
@@ -860,7 +864,7 @@
         </div>
       </section>
 
-      <section class="section" id="preferencePanel">
+      <section class="section" id="preferencePanel" hidden>
         <h2 class="section-title">偏好标注</h2>
         <div class="preference-controls">
           <button class="text-button" id="preferenceStartButton" type="button" disabled>打开标注工作台</button>
@@ -918,7 +922,7 @@
     </aside>
   </main>
 
-  <dialog class="preference-workbench-dialog" id="preferenceWorkbenchDialog" aria-labelledby="preferenceWorkbenchTitle">
+  <dialog class="preference-workbench-dialog" id="preferenceWorkbenchDialog" aria-labelledby="preferenceWorkbenchTitle" hidden>
     <div class="preference-workbench-layout">
       <header class="preference-workbench-header">
         <div>
@@ -1007,8 +1011,9 @@
     <div class="mask-editor-layout">
       <header class="mask-editor-header">
         <div>
-          <h2 class="mask-editor-title" id="maskEditorTitle">修正主体</h2>
-          <span class="mask-editor-detail" id="maskEditorDetail">0 笔</span>
+          <h2 class="mask-editor-title" id="maskEditorTitle">圈选主体</h2>
+          <span class="mask-editor-detail" id="maskEditorDetail">沿主体外侧圈一圈</span>
+          <p class="mask-editor-detail">松手后自动识别并填充，补充和擦除用于局部微调</p>
         </div>
         <button class="text-button" id="maskEditorCloseButton" type="button" aria-label="取消并关闭主体编辑器" title="取消本次修改">取消</button>
       </header>
@@ -1016,11 +1021,12 @@
         <div class="mask-tool-group">
           <span class="mask-tool-label">模式</span>
           <div class="mask-segmented" id="maskModeControl">
-            <button type="button" data-mask-mode="add" aria-pressed="true">添加</button>
+            <button type="button" data-mask-mode="select" aria-pressed="true">圈选</button>
+            <button type="button" data-mask-mode="add" aria-pressed="false">补充</button>
             <button type="button" data-mask-mode="erase" aria-pressed="false">擦除</button>
           </div>
         </div>
-        <div class="mask-tool-group">
+        <div class="mask-tool-group" hidden>
           <span class="mask-tool-label">笔刷</span>
           <div class="mask-segmented" id="maskRadiusControl">
             <button type="button" data-mask-radius="0.01" aria-pressed="false">小</button>
@@ -1028,9 +1034,9 @@
             <button type="button" data-mask-radius="0.04" aria-pressed="false">大</button>
           </div>
         </div>
-        <label class="mask-snap-toggle" title="沿主体蒙版边缘吸附当前笔画">
+        <label class="mask-snap-toggle" title="结合视觉模型与主体边缘完成自动识别">
           <input id="maskSnapToggle" type="checkbox" checked>
-          自动贴边
+          自动识别
         </label>
         <div class="mask-tool-group">
           <button class="icon-button" id="maskUndoButton" type="button" aria-label="撤销" title="撤销">↶</button>
@@ -1040,15 +1046,15 @@
       </div>
       <div class="mask-editor-workspace">
         <div class="mask-editor-canvas-frame">
-          <canvas id="maskEditorCanvas" width="512" height="512" tabindex="0" aria-label="主体修正画布"></canvas>
+          <canvas id="maskEditorCanvas" width="512" height="512" tabindex="0" aria-label="主体圈选画布"></canvas>
         </div>
       </div>
       <footer class="mask-editor-footer">
-        <div class="mask-legend" aria-label="主体修正颜色图例">
-          <span class="mask-legend-item"><span class="mask-legend-swatch base"></span>原始主体</span>
-          <span class="mask-legend-item"><span class="mask-legend-swatch add"></span>本次添加</span>
-          <span class="mask-legend-item"><span class="mask-legend-swatch erase"></span>本次擦除</span>
-          <span class="mask-legend-item"><span class="mask-legend-swatch live"></span>当前笔画</span>
+        <div class="mask-legend" aria-label="主体圈选颜色图例">
+          <span class="mask-legend-item"><span class="mask-legend-swatch base"></span>识别结果</span>
+          <span class="mask-legend-item"><span class="mask-legend-swatch add"></span>局部补充</span>
+          <span class="mask-legend-item"><span class="mask-legend-swatch erase"></span>局部擦除</span>
+          <span class="mask-legend-item"><span class="mask-legend-swatch live"></span>圈选范围</span>
         </div>
         <button class="text-button primary" id="maskConfirmButton" type="button">确认主体并重新生成</button>
       </footer>
@@ -1208,6 +1214,7 @@
       toggleGridButton: document.querySelector('#toggleGridButton'),
       downloadButton: document.querySelector('#downloadButton'),
       candidateList: document.querySelector('#candidateList'),
+      preferencePanel: document.querySelector('#preferencePanel'),
       materialList: document.querySelector('#materialList'),
       beadCount: document.querySelector('#beadCount'),
       uniqueColors: document.querySelector('#uniqueColors'),
@@ -1310,6 +1317,10 @@
       analysisDebugLandmarkProvenance: document.querySelector('#analysisDebugLandmarkProvenance'),
     }
 
+    const internalToolsEnabled = new URLSearchParams(location.search).get('internal') === '1'
+    elements.preferencePanel.hidden = internalToolsEnabled === false
+    elements.preferenceWorkbenchDialog.hidden = internalToolsEnabled === false
+
     let sourceImage = createSampleImage()
     let sourceAnalysis = createSampleAnalysis(sourceImage)
     let originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
@@ -1319,6 +1330,7 @@
     let originalEvidenceByRoute = new Map([['deterministic', originalSubjectEvidence]])
     let aiResultByRoute = new Map()
     let savedMaskEditSession
+    let maskEditorBaseEvidence
     let candidates = []
     let selectedCandidate = null
     let selectedSize = 'auto'
@@ -1725,6 +1737,7 @@
       originalEvidenceByRoute = new Map([['deterministic', originalSubjectEvidence]])
       aiResultByRoute = new Map()
       savedMaskEditSession = undefined
+      maskEditorBaseEvidence = undefined
       elements.maskGatePanel.hidden = false
       const raterId = params.get('rater') ?? localStorage.getItem('maskGateRaterId')
       if (raterId !== null && raterId.trim().length > 0) elements.maskGateRaterId.value = raterId
@@ -2404,6 +2417,7 @@
       originalEvidenceByRoute = new Map([['deterministic', originalSubjectEvidence]])
       aiResultByRoute = new Map()
       savedMaskEditSession = undefined
+      maskEditorBaseEvidence = undefined
       candidates = []
       selectedCandidate = null
       activePreferencePair = undefined
@@ -2534,7 +2548,41 @@
         elements.preferenceStatus.textContent = error instanceof Error ? error.message : '偏好记录失败'
       }
     })
-    function openMaskEditor() {
+    async function automaticSubjectEvidence() {
+      if (maskGateContext !== undefined) return originalSubjectEvidence
+      if (maskEditorBaseEvidence !== undefined) return maskEditorBaseEvidence
+      const cached = originalEvidenceByRoute.get('neural-analysis')
+      if (cached !== undefined) {
+        maskEditorBaseEvidence = cached
+        return cached
+      }
+      if (routeAvailability(aiHealth, 'neural-analysis').available === false) {
+        maskEditorBaseEvidence = originalSubjectEvidence
+        return originalSubjectEvidence
+      }
+      setStatus('视觉模型正在识别主体', 'busy')
+      let result
+      try {
+        result = await runAiRoute(sourceImage, 'neural-analysis', {
+          request: { imageTypeHint: sourceAnalysis.imageType },
+        })
+      } catch (error) {
+        console.warn('Automatic subject analysis failed; using current evidence', error)
+        maskEditorBaseEvidence = originalSubjectEvidence
+        return originalSubjectEvidence
+      }
+      if (result.status === 'unavailable' || result.analysis.subjectMaskEvidence === undefined) {
+        maskEditorBaseEvidence = originalSubjectEvidence
+        return originalSubjectEvidence
+      }
+      analysisByRoute.set('neural-analysis', result.analysis)
+      originalEvidenceByRoute.set('neural-analysis', result.analysis.subjectMaskEvidence)
+      aiResultByRoute.set('neural-analysis', result)
+      maskEditorBaseEvidence = result.analysis.subjectMaskEvidence
+      return maskEditorBaseEvidence
+    }
+
+    async function openMaskEditor() {
       if (maskGateContext !== undefined) {
         if (maskGateInitialRating?.acceptable !== false || maskGateRun !== undefined) return
         for (const input of document.querySelectorAll(
@@ -2546,18 +2594,32 @@
         }
         updateMaskGatePanel()
       }
+      elements.openMaskEditorButton.disabled = true
+      let evidence
+      try {
+        evidence = await automaticSubjectEvidence()
+      } finally {
+        elements.openMaskEditorButton.disabled = false
+      }
+      if (savedMaskEditSession?.baseRevision !== evidence.revision) savedMaskEditSession = undefined
       maskEditor.open({
         image: sourceImage,
-        evidence: originalSubjectEvidence,
+        evidence,
         editSession: savedMaskEditSession,
       })
+      setStatus('圈住主体后松手', 'ready')
     }
-    elements.openMaskEditorButton.addEventListener('click', openMaskEditor)
+    elements.openMaskEditorButton.addEventListener('click', () => openMaskEditor().catch((error) => {
+      console.error(error)
+      setStatus(error instanceof Error ? error.message : '主体识别失败', 'error')
+    }))
     elements.maskGatePanel.addEventListener('change', updateMaskGatePanel)
     elements.maskGateRaterId.addEventListener('input', updateMaskGatePanel)
     elements.maskGateLockInitialButton.addEventListener('click', lockMaskGateInitialRating)
     elements.maskGateAcceptButton.addEventListener('click', acceptMaskGateOriginal)
-    elements.maskGateEditButton.addEventListener('click', openMaskEditor)
+    elements.maskGateEditButton.addEventListener('click', () => openMaskEditor().catch((error) => {
+      recordMaskGateError(error)
+    }))
     elements.maskGateErrorButton.addEventListener('click', () => recordMaskGateError())
     elements.maskGateExportButton.addEventListener('click', exportMaskGateAttempt)
     elements.openAnalysisDebugButton.addEventListener('click', () => analysisDebugViewer.open())

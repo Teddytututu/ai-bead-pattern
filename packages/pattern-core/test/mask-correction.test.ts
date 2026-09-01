@@ -65,6 +65,46 @@ describe('mask correction engine', () => {
     assert.equal(erased.values[11], 0)
   })
 
+  it('turns a rough lasso into the complete connected subject component', () => {
+    const values = new Float32Array(12 * 8)
+    for (let y = 2; y <= 5; y += 1) {
+      for (let x = 2; x <= 5; x += 1) values[y * 12 + x] = 1
+      for (let x = 8; x <= 9; x += 1) values[y * 12 + x] = 1
+    }
+    const selected = applyMaskStrokes({ width: 12, height: 8, values }, [{
+      id: 'rough-subject-lasso',
+      mode: 'select',
+      points: [
+        { x: 0.08, y: 0.1 },
+        { x: 0.58, y: 0.1 },
+        { x: 0.58, y: 0.9 },
+        { x: 0.08, y: 0.9 },
+      ],
+      radiusNormalized: 0.01,
+    }])
+
+    assert.equal(selected.values[3 * 12 + 3], 1)
+    assert.equal(selected.values[3 * 12 + 8], 0)
+    assert.equal([...selected.values].filter((value) => value === 1).length, 16)
+  })
+
+  it('fills the lasso interior when the automatic mask has no matching component', () => {
+    const selected = applyMaskStrokes(mask(10, 10, 0), [{
+      id: 'fallback-lasso',
+      mode: 'select',
+      points: [
+        { x: 0.2, y: 0.2 },
+        { x: 0.8, y: 0.2 },
+        { x: 0.8, y: 0.8 },
+        { x: 0.2, y: 0.8 },
+      ],
+      radiusNormalized: 0.01,
+    }])
+
+    assert.equal(selected.values[5 * 10 + 5], 1)
+    assert.equal(selected.values[0], 0)
+  })
+
   it('stores a binary mask after confirmation', () => {
     const base = aiEvidence()
     base.mask.values[0] = 0.49

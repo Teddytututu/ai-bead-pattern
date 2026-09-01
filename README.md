@@ -20,11 +20,11 @@ docs/                  架构、隐私与路线说明
 
 v0.3.3.1 Evidence Performance Hardening 使用流式数值指纹处理大型 mask 和 importance map，并在 `pattern-core` 内规范化 landmark、semantic region 与 provenance 顺序，语义相同的分析输入会生成相同 identity。
 
-Mask Correction Engine 已加入原图归一化坐标笔迹、添加/擦除软笔刷、连续路径插值、草稿与确认分离，以及稳定 revision。`MaskEditSession` 使用完整笔迹历史和 cursor 支持撤销、重做与分支编辑。确认后的证据保留模型置信度和 provenance，并追加 `mask-editor` 人工来源。修正作用域限定为 subject occupancy，语义区域继续由独立视觉证据管理。
+Mask Correction Engine 已加入粗略圈选、连通主体选择、空蒙版实心填充、添加/擦除软笔刷、草稿与确认分离，以及稳定 revision。`MaskEditSession` 使用完整操作历史和 cursor 支持撤销、重做与分支编辑。确认后的证据保留模型置信度和 provenance，并追加 `mask-editor` 人工来源。修正作用域限定为 subject occupancy，语义区域继续由独立视觉证据管理。
 
-Demo 已加入主体修正编辑器，支持添加、擦除、三档笔刷、撤销、重做、重置和确认生成。原始主体、用户添加与用户擦除使用独立覆盖色显示；画布按原图比例 contain 显示，横图与竖图在桌面和手机宽度下保持比例。拖动阶段使用增量 Canvas 2D 预览，松手后由 Core 精确重建一次；待确认状态会提示取消操作将放弃本次修改。完整生成只在确认后触发一次，已确认笔迹在再次打开时继续保留。
+Demo 的主体流程以“沿主体外侧粗略圈一圈”为默认操作。页面先调用 BiRefNet 获取基础主体，再用圈选区域选择完整连通组件并显示实心蒙版；补充和擦除保留为局部微调。识别结果、局部补充、局部擦除和圈选范围使用独立覆盖色显示；画布按原图比例 contain 显示，横图与竖图在桌面和手机宽度下保持比例。完整生成只在确认后触发一次，已确认操作在再次打开时继续保留。
 
-工作台同时展示 Structure / Value / Palette / Grid Refinement 诊断、材料统计和通用候选盲评。偏好记录保存在浏览器本地，可对当前候选运行 Bradley–Terry 排序。
+标准页面展示 Structure / Value / Palette / Grid Refinement 诊断、材料统计和候选结果。偏好标注工具收进内部入口 `?internal=1`，供自动评测与开发回放使用；偏好记录保存在浏览器本地，可对当前候选运行 Bradley–Terry 排序。
 
 ## 文档
 
@@ -85,7 +85,7 @@ Demo 已加入主体修正编辑器，支持添加、擦除、三档笔刷、撤
 - Fast / Quality 统一网格精修、能量单调检查与对称质量指标
 - A/B/Tie 本地采集与 Bradley–Terry 偏好聚合
 
-下一阶段使用独立图片和人工标签建立真实偏好集，按来源图片切分训练与评测，并扩展宠物关键点和身份花纹规划。
+内部评测使用独立图片、视觉模型标签和开发回放记录建立偏好集，按来源图片切分训练与评测，并扩展宠物关键点和身份花纹规划。
 
 浏览器体验页：`apps/demo/index.html`
 

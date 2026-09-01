@@ -46,6 +46,24 @@ async function downloadAttempt(page) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'))
 }
 
+async function roughLasso(page, canvas) {
+  const box = await canvas.boundingBox()
+  expect(box).not.toBeNull()
+  const corners = [
+    [0.1, 0.1],
+    [0.9, 0.1],
+    [0.9, 0.9],
+    [0.1, 0.9],
+    [0.1, 0.1],
+  ]
+  await page.mouse.move(box.x + box.width * corners[0][0], box.y + box.height * corners[0][1])
+  await page.mouse.down()
+  for (const [x, y] of corners.slice(1)) {
+    await page.mouse.move(box.x + box.width * x, box.y + box.height * y, { steps: 6 })
+  }
+  await page.mouse.up()
+}
+
 test.beforeAll(async () => {
   await mkdir(fixtureDirectory, { recursive: true })
   const sourcePixels = Buffer.alloc(8 * 4 * 4, 255)
@@ -179,11 +197,7 @@ test('exports a confirmed V2 interaction with blind A/B evidence', async ({ page
   await expect(page.locator('#maskEditorCanvas')).toHaveJSProperty('height', 4)
 
   const canvas = page.locator('#maskEditorCanvas')
-  const box = await canvas.boundingBox()
-  await page.mouse.move(box.x + box.width * 0.75, box.y + box.height * 0.5)
-  await page.mouse.down()
-  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.5)
-  await page.mouse.up()
+  await roughLasso(page, canvas)
   await page.locator('#maskConfirmButton').click()
   await expect(page.locator('#maskEditorDialog')).toBeHidden()
 
@@ -209,8 +223,7 @@ test('exports a cancelled V2 interaction', async ({ page }) => {
   await lockInitial(page, 'false')
   await page.locator('#maskGateEditButton').click()
   const canvas = page.locator('#maskEditorCanvas')
-  const box = await canvas.boundingBox()
-  await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5)
+  await roughLasso(page, canvas)
   await page.locator('#maskEditorCloseButton').click()
   await expect(page.locator('#maskGateExportButton')).toBeEnabled()
 

@@ -26,17 +26,23 @@ async function uploadWideImage(page) {
   await waitForGeneration(page)
 }
 
-test('edits, confirms once, and restores the confirmed session', async ({ page }) => {
+test('roughly circles a subject, confirms once, and restores the solid selection', async ({ page }) => {
   await page.goto('/apps/demo/')
   await waitForGeneration(page)
-  await page.getByRole('button', { name: '修正主体' }).click()
+  await page.getByRole('button', { name: '圈选主体' }).click()
 
-  const canvas = page.getByLabel('主体修正画布')
+  const canvas = page.getByLabel('主体圈选画布')
   await expect(canvas).toBeVisible()
   const bounds = await canvas.boundingBox()
   expect(bounds).not.toBeNull()
-  await page.mouse.click(bounds.x + bounds.width * 0.75, bounds.y + bounds.height * 0.25)
+  await page.mouse.move(bounds.x + bounds.width * 0.08, bounds.y + bounds.height * 0.08)
+  await page.mouse.down()
+  for (const [x, y] of [[0.92, 0.08], [0.92, 0.92], [0.08, 0.92], [0.08, 0.08]]) {
+    await page.mouse.move(bounds.x + bounds.width * x, bounds.y + bounds.height * y, { steps: 8 })
+  }
+  await page.mouse.up()
   await expect(page.locator('#maskEditorDetail')).toContainText('待确认')
+  await expect(page.locator('#maskEditorDetail')).toContainText('自动识别')
 
   await page.getByRole('button', { name: '撤销' }).click()
   await expect(page.getByRole('button', { name: '重做' })).toBeEnabled()
@@ -60,19 +66,17 @@ test('edits, confirms once, and restores the confirmed session', async ({ page }
   })
   expect(generationStarts).toBe(1)
 
-  await page.getByRole('button', { name: '修正主体' }).click()
-  await expect(page.locator('#maskEditorDetail')).toHaveText('1 / 1 笔 · 已确认')
+  await page.getByRole('button', { name: '圈选主体' }).click()
+  await expect(page.locator('#maskEditorDetail')).toContainText('1 / 1 次调整 · 已确认')
   await expect(canvas).toBeVisible()
   const reopenedBounds = await canvas.boundingBox()
   expect(reopenedBounds).not.toBeNull()
-  await page.mouse.click(
-    reopenedBounds.x + reopenedBounds.width * 0.25,
-    reopenedBounds.y + reopenedBounds.height * 0.75,
-  )
+  await page.getByRole('button', { name: '补充' }).click()
+  await page.mouse.click(reopenedBounds.x + reopenedBounds.width * 0.25, reopenedBounds.y + reopenedBounds.height * 0.75)
   await expect(page.locator('#maskEditorDetail')).toContainText('取消将放弃')
   await page.getByRole('button', { name: '取消并关闭主体编辑器' }).click()
-  await page.getByRole('button', { name: '修正主体' }).click()
-  await expect(page.locator('#maskEditorDetail')).toHaveText('1 / 1 笔 · 已确认')
+  await page.getByRole('button', { name: '圈选主体' }).click()
+  await expect(page.locator('#maskEditorDetail')).toContainText('1 / 1 次调整 · 已确认')
 })
 
 test('keeps a wide source proportional in the mobile editor', async ({ page }) => {
@@ -80,13 +84,18 @@ test('keeps a wide source proportional in the mobile editor', async ({ page }) =
   await page.goto('/apps/demo/')
   await waitForGeneration(page)
   await uploadWideImage(page)
-  await page.getByRole('button', { name: '修正主体' }).click()
+  await page.getByRole('button', { name: '圈选主体' }).click()
 
-  const dimensions = await page.getByLabel('主体修正画布').evaluate((canvas) => {
-    const bounds = canvas.getBoundingClientRect()
+  const canvas = page.getByLabel('主体圈选画布')
+  await expect.poll(async () => canvas.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
+    return bounds.width > 0 && bounds.height > 0
+  })).toBe(true)
+  const dimensions = await canvas.evaluate((element) => {
+    const bounds = element.getBoundingClientRect()
     return {
       displayRatio: bounds.width / bounds.height,
-      sourceRatio: canvas.width / canvas.height,
+      sourceRatio: element.width / element.height,
     }
   })
   expect(dimensions.displayRatio).toBeCloseTo(2, 5)

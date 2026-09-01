@@ -148,6 +148,39 @@ export function resolveStrokePoints(points, image, automaticSnap, options = {}) 
   return snapStrokeToBoundary(points, image, options)
 }
 
+export function prepareSubjectLasso(points, maximumPoints = 256) {
+  if (!Array.isArray(points) || points.length < 3) {
+    return { points: [], area: 0, valid: false }
+  }
+  const stride = Math.max(1, Math.ceil(points.length / maximumPoints))
+  const simplified = points.filter((_, index) => index % stride === 0)
+    .map((point) => ({ x: point.x, y: point.y }))
+  const lastInput = points.at(-1)
+  if (lastInput !== undefined) {
+    const last = simplified.at(-1)
+    if (last === undefined || last.x !== lastInput.x || last.y !== lastInput.y) {
+      simplified.push({ x: lastInput.x, y: lastInput.y })
+    }
+  }
+  const first = simplified[0]
+  const last = simplified.at(-1)
+  if (first !== undefined && last !== undefined && (first.x !== last.x || first.y !== last.y)) {
+    simplified.push({ ...first })
+  }
+  let twiceArea = 0
+  for (let index = 0; index + 1 < simplified.length; index += 1) {
+    const start = simplified[index]
+    const end = simplified[index + 1]
+    twiceArea += start.x * end.y - end.x * start.y
+  }
+  const area = Math.abs(twiceArea) / 2
+  return {
+    points: simplified,
+    area,
+    valid: simplified.length >= 4 && area >= 0.0025,
+  }
+}
+
 function writePixel(target, index, color, alpha) {
   const offset = index * 4
   target[offset] = color[0]
@@ -209,6 +242,21 @@ export function createLiveStrokePreview(canvas) {
       const context = canvas.getContext('2d')
       const shortEdge = Math.min(canvas.width, canvas.height)
       const radius = Math.max(0.5, radiusNormalized * shortEdge)
+      if (mode === 'select') {
+        context.beginPath()
+        context.moveTo(points[0].x * canvas.width, points[0].y * canvas.height)
+        for (let index = 1; index < points.length; index += 1) {
+          context.lineTo(points[index].x * canvas.width, points[index].y * canvas.height)
+        }
+        context.closePath()
+        context.fillStyle = 'rgba(255, 206, 64, 0.28)'
+        context.fill()
+        context.lineWidth = Math.max(2, shortEdge * 0.006)
+        context.strokeStyle = 'rgba(139, 107, 8, 0.96)'
+        context.stroke()
+        renderedPointCount = points.length
+        return
+      }
       const color = mode === 'erase'
         ? 'rgba(255, 74, 82, 0.9)'
         : 'rgba(255, 206, 64, 0.94)'
@@ -253,7 +301,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
   let session
   let confirmedSession
   let draft
-  let mode = 'add'
+  let mode = 'select'
   let radiusNormalized = 0.02
   let pointerId
   let pointerPoints = []
@@ -305,16 +353,28 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     const dirty = maskEditSessionIsDirty(session, confirmedSession)
     elements.undoButton.disabled = session?.cursor === 0
     elements.redoButton.disabled = session === undefined || session.cursor === session.strokes.length
-    const snapText = snapSummary === undefined || elements.snapToggle?.checked !== true
+    const snapText = snapSummary === undefined
       ? ''
-      : ` · 自动贴边 ${snapSummary.snappedCount} 点`
+      : mode === 'select'
+        ? ' · 自动识别主体'
+        : elements.snapToggle?.checked === true
+          ? ` · 自动贴边 ${snapSummary.snappedCount} 点`
+          : ''
     elements.detail.textContent = session === undefined
-      ? '0 笔'
-      : `${session.cursor} / ${session.strokes.length} 笔 · ${dirty ? '待确认，取消将放弃' : '已确认'}${snapText}`
+      ? '沿主体外侧圈一圈'
+      : session.strokes.length === 0
+        ? '沿主体外侧圈一圈，松手后自动识别'
+        : `${session.cursor} / ${session.strokes.length} 次调整 · ${dirty ? '待确认，取消将放弃' : '已确认'}${snapText}`
     elements.detail.dataset.dirty = String(dirty)
     elements.dialog.dataset.maskMode = mode
     setPressed(elements.modeControl, 'data-mask-mode', mode)
     setPressed(elements.radiusControl, 'data-mask-radius', radiusNormalized)
+    const radiusGroup = elements.radiusControl.closest('.mask-tool-group')
+    if (radiusGroup !== null) radiusGroup.hidden = mode === 'select'
+    if (elements.snapToggle !== undefined) {
+      elements.snapToggle.disabled = mode === 'select'
+      elements.snapToggle.checked = true
+    }
   }
 
   function drawMask(mask) {
@@ -360,6 +420,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     if (previewFrame !== undefined || pointerPoints.length === 0) return
     previewFrame = requestAnimationFrame(() => {
       previewFrame = undefined
+      if (mode === 'select' && draft !== undefined) drawMask(draft.mask)
       livePreview.draw(pointerPoints, mode, radiusNormalized)
     })
   }
@@ -386,15 +447,32 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     livePreview.reset()
     if (commit) {
       appendPoint(event)
-      snapSummary = resolveStrokePoints(pointerPoints, sourceImage, elements.snapToggle?.checked === true, {
-        maxDistanceNormalized: 0.045,
-        endpointLock: 0.02,
-        referenceMask: draft?.mask ?? baseEvidence.mask,
-      })
+      const prepared = mode === 'select' ? prepareSubjectLasso(pointerPoints) : undefined
+      if (mode === 'select' && prepared.valid === false) {
+        drawMask(draft.mask)
+        pointerId = undefined
+        pointerPoints = []
+        return
+      }
+      const inputPoints = prepared?.points ?? pointerPoints
+      snapSummary = resolveStrokePoints(
+        inputPoints,
+        sourceImage,
+        mode === 'select' || elements.snapToggle?.checked === true,
+        {
+          maxDistanceNormalized: mode === 'select' ? 0.08 : 0.045,
+          endpointLock: mode === 'select' ? 0 : 0.02,
+          referenceMask: draft?.mask ?? baseEvidence.mask,
+        },
+      )
+      const snappedLasso = mode === 'select' ? prepareSubjectLasso(snapSummary.points) : undefined
+      const resolvedPoints = mode === 'select'
+        ? snappedLasso.valid ? snappedLasso.points : prepared.points
+        : snapSummary.points
       session = core.appendMaskEditStroke(session, {
         ...currentPointerStroke(),
         id: uniqueStrokeId(),
-        points: snapSummary.points,
+        points: resolvedPoints,
       })
       rebuildDraft()
     } else {
@@ -499,6 +577,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
       closeOutcome = 'cancelled'
       firstPointerType = undefined
       snapSummary = undefined
+      mode = 'select'
       strokeSequence = session.strokes.length + 1
       prepareImageBuffers()
       elements.dialog.showModal()

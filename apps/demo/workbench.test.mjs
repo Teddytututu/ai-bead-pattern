@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 
 describe('workbench product controls', () => {
-  it('exposes grid refinement, planning diagnostics, and daily preference capture', async () => {
+  it('keeps preference annotation as an internal tool while exposing product controls', async () => {
     const html = await readFile(new URL('./index.html', import.meta.url), 'utf8')
 
     assert.match(html, /id="refinementModeControl"/)
@@ -16,6 +16,8 @@ describe('workbench product controls', () => {
     assert.match(html, /id="singleCellBandChange"/)
     assert.match(html, /elements\.structureRegionCount\.textContent = candidate\.structurePlan === undefined/)
     assert.match(html, /id="preferencePanel"/)
+    assert.match(html, /id="preferencePanel"[^>]*hidden/)
+    assert.match(html, /internalToolsEnabled/)
     assert.match(html, /id="preferenceWorkbenchDialog"/)
     assert.match(html, /id="preferenceCandidateGrid"/)
     assert.match(html, /id="preferenceLayerControl"/)
@@ -51,6 +53,8 @@ describe('workbench product controls', () => {
     assert.match(html, /data-analysis-layer="embedding"/)
     assert.match(html, /id="analysisDebugProvider"/)
     assert.match(html, /id="analysisDebugContributions"/)
+    assert.match(html, /data-mask-mode="select"/)
+    assert.match(html, /圈选主体/)
   })
 
   it('fits rectangular uploads into square previews with their aspect ratio intact', async () => {

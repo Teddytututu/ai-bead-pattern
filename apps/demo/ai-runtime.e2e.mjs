@@ -4,6 +4,8 @@ test('runs neural analysis and exposes model contributions', async ({ page }) =>
   test.setTimeout(60_000)
   await page.goto('/apps/demo/')
   await expect(page.locator('#modelRouteSelect')).toBeVisible()
+  await expect(page.locator('#modelRouteSelect option[value="neural-analysis"]'))
+    .toBeEnabled({ timeout: 20_000 })
   await expect(page.locator('#modelRouteSelect option[value="learned-pixelization"]')).toBeDisabled()
   await expect(page.locator('#modelRouteSelect option[value="generative-proposal"]')).toBeDisabled()
 

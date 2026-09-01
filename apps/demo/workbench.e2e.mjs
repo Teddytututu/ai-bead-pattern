@@ -6,12 +6,13 @@ test('generates a refined pattern with planning diagnostics', async ({ page }) =
     if (message.type() === 'error') errors.push(message.text())
   })
   await page.goto('/apps/demo/')
-  await expect(page.locator('#preferenceStartButton')).toBeEnabled({ timeout: 20_000 })
+  await expect(page.locator('#patternCanvas')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('#preferencePanel')).toBeHidden()
 
   await expect(page.locator('#refinementModeControl [data-refinement="quality"]'))
     .toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('#patternCanvas')).toBeVisible()
-  await expect(page.locator('#structureRegionCount')).not.toHaveText('--')
+  await expect(page.locator('#structureRegionCount')).not.toHaveText('--', { timeout: 20_000 })
   await expect(page.locator('#valueRoleCount')).not.toHaveText('--')
   await expect(page.locator('#paletteRoleCount')).not.toHaveText('--')
   await expect(page.locator('#gridRefinementEnergy')).toContainText('→')
@@ -23,8 +24,9 @@ test('generates a refined pattern with planning diagnostics', async ({ page }) =
 })
 
 test('records multidimensional scores, localized issues, comparison, and session restore', async ({ page }) => {
-  await page.goto('/apps/demo/')
-  await expect(page.locator('#preferenceStartButton')).toBeEnabled({ timeout: 20_000 })
+  await page.goto('/apps/demo/?internal=1')
+  await expect(page.locator('#patternCanvas')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('#preferencePanel')).toBeVisible()
 
   await page.locator('#preferenceStartButton').click()
   await expect(page.locator('#preferenceWorkbenchDialog')).toBeVisible()
@@ -64,7 +66,7 @@ test('records multidimensional scores, localized issues, comparison, and session
 test('keeps the workbench contained on a 390px mobile viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/apps/demo/')
-  await expect(page.locator('#preferenceStartButton')).toBeEnabled({ timeout: 20_000 })
+  await expect(page.locator('#preferencePanel')).toBeHidden()
 
   const layout = await page.evaluate(() => ({
     viewportWidth: window.innerWidth,
@@ -76,15 +78,4 @@ test('keeps the workbench contained on a 390px mobile viewport', async ({ page }
   expect(layout.canvas.width).toBeLessThanOrEqual(layout.frame.width)
   expect(layout.canvas.height).toBeLessThanOrEqual(layout.frame.height)
 
-  await page.locator('#preferenceStartButton').click()
-  await expect(page.locator('#preferenceWorkbenchDialog')).toBeVisible()
-  const annotationLayout = await page.evaluate(() => ({
-    viewportWidth: window.innerWidth,
-    scrollWidth: document.documentElement.scrollWidth,
-    dialog: document.querySelector('#preferenceWorkbenchDialog').getBoundingClientRect().toJSON(),
-    card: document.querySelector('.preference-candidate-card').getBoundingClientRect().toJSON(),
-  }))
-  expect(annotationLayout.scrollWidth).toBeLessThanOrEqual(annotationLayout.viewportWidth)
-  expect(annotationLayout.dialog.width).toBeLessThanOrEqual(annotationLayout.viewportWidth)
-  expect(annotationLayout.card.width).toBeLessThan(annotationLayout.viewportWidth)
 })

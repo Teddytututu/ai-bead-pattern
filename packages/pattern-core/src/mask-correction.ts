@@ -24,7 +24,7 @@ export interface MaskPoint {
   y: number
 }
 
-export type MaskStrokeMode = 'add' | 'erase'
+export type MaskStrokeMode = 'select' | 'add' | 'erase'
 
 export interface MaskStroke {
   id: string
@@ -127,8 +127,8 @@ function validateStrokeLog(strokes: readonly MaskStroke[]): void {
     if (id.length === 0) throw new RangeError('Mask stroke id must be non-empty')
     if (ids.has(id)) throw new RangeError(`Duplicate stroke id: ${id}`)
     ids.add(id)
-    if (stroke.mode !== 'add' && stroke.mode !== 'erase') {
-      throw new RangeError('Mask stroke mode must be add or erase')
+    if (stroke.mode !== 'select' && stroke.mode !== 'add' && stroke.mode !== 'erase') {
+      throw new RangeError('Mask stroke mode must be select, add, or erase')
     }
     assertFiniteRange(stroke.radiusNormalized, 'Mask stroke radiusNormalized', Number.EPSILON, 1)
     if (!Array.isArray(stroke.points)) {
@@ -136,6 +136,9 @@ function validateStrokeLog(strokes: readonly MaskStroke[]): void {
     }
     if (stroke.points.length < 1 || stroke.points.length > MAX_POINTS_PER_STROKE) {
       throw new RangeError(`Mask stroke points must contain 1..${MAX_POINTS_PER_STROKE} entries`)
+    }
+    if (stroke.mode === 'select' && stroke.points.length < 3) {
+      throw new RangeError('Mask selection must contain at least three points')
     }
     totalPoints += stroke.points.length
     if (totalPoints > MAX_TOTAL_POINTS) {
@@ -239,7 +242,7 @@ function paintBrush(
   centerX: number,
   centerY: number,
   radius: number,
-  mode: MaskStrokeMode,
+  mode: Exclude<MaskStrokeMode, 'select'>,
 ): void {
   const radiusSquared = radius * radius
   const minimumX = Math.max(0, Math.floor(centerX - radius))
@@ -258,6 +261,101 @@ function paintBrush(
   }
 }
 
+function rasterizePolygon(
+  width: number,
+  height: number,
+  points: readonly MaskPoint[],
+): Uint8Array {
+  const inside = new Uint8Array(width * height)
+  const pixelPoints = points.map((point) => ({
+    x: point.x * Math.max(0, width - 1),
+    y: point.y * Math.max(0, height - 1),
+  }))
+  for (let y = 0; y < height; y += 1) {
+    const sampleY = y + 0.5
+    const intersections: number[] = []
+    for (let index = 0; index < pixelPoints.length; index += 1) {
+      const start = pixelPoints[index]!
+      const end = pixelPoints[(index + 1) % pixelPoints.length]!
+      if ((start.y > sampleY) === (end.y > sampleY)) continue
+      const progress = (sampleY - start.y) / (end.y - start.y)
+      intersections.push(start.x + (end.x - start.x) * progress)
+    }
+    intersections.sort((first, second) => first - second)
+    for (let index = 0; index + 1 < intersections.length; index += 2) {
+      const startX = Math.max(0, Math.ceil(intersections[index]! - 0.5))
+      const endX = Math.min(width - 1, Math.floor(intersections[index + 1]! - 0.5))
+      for (let x = startX; x <= endX; x += 1) inside[y * width + x] = 1
+    }
+  }
+  return inside
+}
+
+function selectMaskComponents(
+  values: Float32Array,
+  width: number,
+  height: number,
+  points: readonly MaskPoint[],
+): void {
+  const inside = rasterizePolygon(width, height, points)
+  const labels = new Int32Array(values.length)
+  const queue = new Int32Array(values.length)
+  const components: Array<{ id: number; size: number; overlap: number }> = []
+  let nextId = 1
+
+  for (let start = 0; start < values.length; start += 1) {
+    if (values[start]! < 0.5 || labels[start] !== 0) continue
+    const id = nextId
+    nextId += 1
+    let head = 0
+    let tail = 0
+    let size = 0
+    let overlap = 0
+    queue[tail] = start
+    tail += 1
+    labels[start] = id
+    while (head < tail) {
+      const current = queue[head]!
+      head += 1
+      size += 1
+      overlap += inside[current] ?? 0
+      const x = current % width
+      const y = Math.floor(current / width)
+      const neighbors = [
+        x > 0 ? current - 1 : -1,
+        x + 1 < width ? current + 1 : -1,
+        y > 0 ? current - width : -1,
+        y + 1 < height ? current + width : -1,
+      ]
+      for (const neighbor of neighbors) {
+        if (neighbor < 0 || values[neighbor]! < 0.5 || labels[neighbor] !== 0) continue
+        labels[neighbor] = id
+        queue[tail] = neighbor
+        tail += 1
+      }
+    }
+    components.push({ id, size, overlap })
+  }
+
+  const selected = new Set(components
+    .filter((component) => component.overlap > 0
+      && (component.overlap / component.size >= 0.08 || component.overlap >= 16))
+    .map((component) => component.id))
+  if (selected.size === 0) {
+    const best = [...components].sort((first, second) => second.overlap - first.overlap)[0]
+    if (best !== undefined && best.overlap > 0) selected.add(best.id)
+  }
+
+  values.fill(0)
+  if (selected.size === 0) {
+    for (let index = 0; index < values.length; index += 1) values[index] = inside[index] ?? 0
+    return
+  }
+  for (let index = 0; index < values.length; index += 1) {
+    if (selected.has(labels[index]!)) values[index] = 1
+  }
+}
+
 function binaryMask(mask: BinaryMask): BinaryMask {
   return {
     width: mask.width,
@@ -267,6 +365,10 @@ function binaryMask(mask: BinaryMask): BinaryMask {
 }
 
 function paintStroke(values: Float32Array, width: number, height: number, stroke: MaskStroke): number {
+  if (stroke.mode === 'select') {
+    selectMaskComponents(values, width, height, stroke.points)
+    return stroke.points.length
+  }
   const radius = Math.max(0.5, stroke.radiusNormalized * Math.min(width, height))
   const maximumSpacing = Math.max(0.25, radius * 0.5)
   const toPixel = (point: MaskPoint): readonly [number, number] => [
