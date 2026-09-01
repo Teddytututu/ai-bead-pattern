@@ -32,7 +32,9 @@ test('edits, confirms once, and restores the confirmed session', async ({ page }
   await page.getByRole('button', { name: '修正主体' }).click()
 
   const canvas = page.getByLabel('主体修正画布')
+  await expect(canvas).toBeVisible()
   const bounds = await canvas.boundingBox()
+  expect(bounds).not.toBeNull()
   await page.mouse.click(bounds.x + bounds.width * 0.75, bounds.y + bounds.height * 0.25)
   await expect(page.locator('#maskEditorDetail')).toContainText('待确认')
 
@@ -60,7 +62,9 @@ test('edits, confirms once, and restores the confirmed session', async ({ page }
 
   await page.getByRole('button', { name: '修正主体' }).click()
   await expect(page.locator('#maskEditorDetail')).toHaveText('1 / 1 笔 · 已确认')
+  await expect(canvas).toBeVisible()
   const reopenedBounds = await canvas.boundingBox()
+  expect(reopenedBounds).not.toBeNull()
   await page.mouse.click(
     reopenedBounds.x + reopenedBounds.width * 0.25,
     reopenedBounds.y + reopenedBounds.height * 0.75,
