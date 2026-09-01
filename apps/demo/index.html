@@ -708,8 +708,8 @@
           <select id="modelRouteSelect" aria-describedby="modelRouteStatus">
             <option value="deterministic">确定性基线</option>
             <option value="neural-analysis">BiRefNet 神经分析</option>
-            <option value="learned-pixelization" disabled>学习像素化 · 未接入</option>
-            <option value="generative-proposal" disabled>生成式提案 · 未接入</option>
+            <option value="learned-pixelization">学习像素化</option>
+            <option value="generative-proposal">生成式提案</option>
           </select>
         </div>
       </section>
@@ -1528,10 +1528,18 @@
         return
       }
       const aiResult = aiResultByRoute.get(selectedModelRoute)
+      if (state.status === 'degraded' && aiResult === undefined) {
+        elements.modelRouteStatus.textContent = '已连接 · 首次加载模型'
+        return
+      }
       const model = aiResult?.contributions?.find((entry) => entry.status === 'used')?.modelId
       elements.modelRouteStatus.textContent = selectedModelRoute === 'deterministic'
         ? '已连接 · 本地确定性'
-        : model?.includes('birefnet') ? '已连接 · BiRefNet' : '已连接'
+          : model?.includes('birefnet')
+          ? '已连接 · BiRefNet'
+          : model?.toLowerCase().includes('pixel')
+            ? '已连接 · Pixel Art LCM'
+            : '已连接'
     }
 
     async function initializeAiRoutes() {
@@ -1544,6 +1552,15 @@
       for (const option of elements.modelRouteSelect.options) {
         const availability = routeAvailability(aiHealth, option.value)
         option.disabled = availability.available === false
+        const label = {
+          deterministic: '确定性基线',
+          'neural-analysis': 'BiRefNet 神经分析',
+          'learned-pixelization': '学习像素化',
+          'generative-proposal': '生成式提案',
+        }[option.value]
+        option.textContent = availability.available === false && option.value !== 'deterministic'
+          ? `${label} · 服务离线`
+          : label
       }
       elements.modelRouteSelect.querySelector('option[value="deterministic"]').disabled = false
       renderModelRouteStatus()
@@ -1562,11 +1579,26 @@
       const availability = routeAvailability(aiHealth, selectedModelRoute)
       if (availability.available === false) throw new Error('当前模型路线尚未接入运行环境')
       elements.modelRouteStatus.textContent = '分析中'
+      const proposalSize = selectedSize === 'auto' ? 48 : Number(selectedSize)
       const result = await runAiRoute(sourceImage, selectedModelRoute, {
-        request: { imageTypeHint: sourceAnalysis.imageType },
+        request: {
+          imageTypeHint: sourceAnalysis.imageType,
+          ...(selectedModelRoute === 'learned-pixelization'
+            || selectedModelRoute === 'generative-proposal'
+            ? {
+              targetGrid: { width: proposalSize, height: proposalSize },
+              styleId: selectedStyles()[0],
+              prompt: sourceAnalysis.imageType === 'pet'
+                ? 'preserve the animal face, both eyes, nose, ear tips, markings, and body silhouette'
+                : 'preserve subject identity, silhouette, pose, and focal details',
+            }
+            : {}),
+        },
       })
       if (result.status === 'unavailable') throw new Error('模型服务当前未提供分析结果')
-      sourceAnalysis = result.analysis
+      const proposalRoute = selectedModelRoute === 'learned-pixelization'
+        || selectedModelRoute === 'generative-proposal'
+      sourceAnalysis = proposalRoute ? sourceAnalysis : result.analysis
       originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
       analysisByRoute.set(selectedModelRoute, sourceAnalysis)
       originalEvidenceByRoute.set(selectedModelRoute, originalSubjectEvidence)
@@ -2019,21 +2051,32 @@
         )
         const proposalGrid = learnedProposal?.targetGrid
         const options = generationOptions()
-        const result = await algorithm.generate({
-          image: learnedProposal?.image ?? sourceImage,
-          palette,
-          analysis: learnedProposal === undefined
-            ? sourceAnalysis
-            : {
-              confidence: learnedProposal.confidence,
-              imageType: sourceAnalysis.imageType,
-              modelVersions: { learnedPixelization: learnedProposal.modelId },
-              provenance: [{
+        const inferredProposalAnalysis = learnedProposal === undefined
+          ? undefined
+          : inferSubjectAnalysis(learnedProposal.image)
+        const proposalAnalysis = learnedProposal === undefined
+          ? sourceAnalysis
+          : {
+            ...inferredProposalAnalysis,
+            imageType: sourceAnalysis.imageType ?? inferredProposalAnalysis.imageType,
+            confidence: learnedProposal.confidence,
+            modelVersions: {
+              ...sourceAnalysis.modelVersions,
+              learnedPixelization: learnedProposal.modelId,
+            },
+            provenance: [
+              ...(sourceAnalysis.provenance ?? []),
+              {
                 origin: 'model',
                 provider: 'ai-gateway',
                 model: learnedProposal.modelId,
-              }],
-            },
+              },
+            ],
+          }
+        const result = await algorithm.generate({
+          image: learnedProposal?.image ?? sourceImage,
+          palette,
+          analysis: proposalAnalysis,
           options: learnedProposal === undefined || proposalGrid === undefined
             ? options
             : {
@@ -2390,6 +2433,11 @@
       elements.sizeValue.textContent = selectedSize === 'auto' ? '自动' : `${selectedSize} × ${selectedSize}`
       for (const item of elements.sizeControl.querySelectorAll('button')) {
         item.setAttribute('aria-pressed', String(item === button))
+      }
+      for (const route of ['learned-pixelization', 'generative-proposal']) {
+        analysisByRoute.delete(route)
+        originalEvidenceByRoute.delete(route)
+        aiResultByRoute.delete(route)
       }
     })
     elements.maxColors.addEventListener('input', () => {

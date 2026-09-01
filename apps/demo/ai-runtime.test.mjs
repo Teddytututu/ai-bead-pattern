@@ -37,6 +37,22 @@ describe('demo AI runtime client', () => {
     }, 'neural-analysis'), /RGBA/)
   })
 
+  it('forwards the requested target grid and proposal controls', () => {
+    const body = pixelImageRequestBody({
+      width: 1,
+      height: 1,
+      data: Uint8ClampedArray.from([20, 30, 40, 255]),
+    }, 'learned-pixelization', {
+      targetGrid: { width: 48, height: 48 },
+      styleId: 'faithful',
+      prompt: 'preserve cat eyes and ear tips',
+    })
+
+    assert.deepEqual(body.targetGrid, { width: 48, height: 48 })
+    assert.equal(body.styleId, 'faithful')
+    assert.equal(body.prompt, 'preserve cat eyes and ear tips')
+  })
+
   it('hydrates mask, region, edge, proposal, and preference arrays', () => {
     const result = hydrateAiAnalysisResult({
       route: 'neural-analysis',

@@ -103,6 +103,32 @@ describe('demo AI JSON API', () => {
     assert.equal(body.providers[0].modelId, 'rembg/birefnet-general-lite')
   })
 
+  it('registers the configured pixel proposal sidecar and exposes both routes', async () => {
+    const model = modelManifest('pixel-art-sprite-lcm-local')
+    const fetch = async (input) => {
+      assert.equal(String(input), 'http://127.0.0.1:7101/health')
+      return Response.json({
+        status: 'ready',
+        model: {
+          modelId: model.modelId,
+          modelVersion: model.modelVersion,
+          sourceRevision: model.sourceRevision,
+          weightRevision: model.weightRevision,
+        },
+      })
+    }
+    const service = createDemoAiService({
+      proposalEndpoint: 'http://127.0.0.1:7101',
+      proposalFetch: fetch,
+    })
+
+    const health = await service.health()
+
+    assert.equal(health.routes['learned-pixelization'].available, true)
+    assert.equal(health.routes['generative-proposal'].available, true)
+    assert.equal(health.providers.find((entry) => entry.providerId === model.providerId)?.status, 'ready')
+  })
+
   it('runs analysis and serializes typed model output as bounded JSON arrays', async () => {
     const service = createDemoAiService({ registry: fakeRegistry() })
     const baseUrl = await start(createDemoAiApiHandler({ service }))

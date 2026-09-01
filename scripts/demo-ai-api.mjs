@@ -1,7 +1,9 @@
 import {
   AIProviderRegistry,
   CompositeImageAnalyzer,
+  HttpVisionProvider,
   RembgVisionProvider,
+  modelManifest,
 } from '../services/ai-gateway/dist/index.js'
 
 const routeCapabilities = Object.freeze({
@@ -67,7 +69,9 @@ function requestFromPayload(payload) {
     capabilities,
     image: decodePixelImage(payload.image),
     failureMode: 'best-effort',
-    timeoutMs: 30_000,
+    timeoutMs: payload.route === 'learned-pixelization' || payload.route === 'generative-proposal'
+      ? 30 * 60_000
+      : 30_000,
     ...(payload.targetGrid === undefined ? {} : { targetGrid: payload.targetGrid }),
     ...(payload.paletteId === undefined ? {} : { paletteId: payload.paletteId }),
     ...(payload.styleId === undefined ? {} : { styleId: payload.styleId }),
@@ -106,7 +110,18 @@ function routeStatus(route, providers) {
 
 export function createDemoAiService(options = {}) {
   const registry = options.registry ?? new AIProviderRegistry()
-  if (options.registry === undefined) registry.register(new RembgVisionProvider(), 100)
+  if (options.registry === undefined) {
+    registry.register(new RembgVisionProvider(), 100)
+    const proposalEndpoint = options.proposalEndpoint ?? process.env.PIXEL_PROPOSAL_ENDPOINT
+    if (typeof proposalEndpoint === 'string' && proposalEndpoint.trim().length > 0) {
+      registry.register(new HttpVisionProvider({
+        manifest: modelManifest('pixel-art-sprite-lcm-local'),
+        endpoint: proposalEndpoint,
+        timeoutMs: options.proposalProbeTimeoutMs ?? 10_000,
+        ...(options.proposalFetch === undefined ? {} : { fetch: options.proposalFetch }),
+      }), 90)
+    }
+  }
   const analyzer = new CompositeImageAnalyzer(registry)
 
   return {

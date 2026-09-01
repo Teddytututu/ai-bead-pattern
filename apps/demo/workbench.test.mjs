@@ -43,6 +43,8 @@ describe('workbench product controls', () => {
     assert.match(html, /id="modelRouteStatus"/)
     assert.match(html, /selectLearnedProposal/)
     assert.match(html, /学习像素化/)
+    assert.match(html, /inferSubjectAnalysis\(learnedProposal\.image\)/)
+    assert.match(html, /Pixel Art LCM/)
     assert.match(html, /ai-runtime\.mjs/)
     assert.match(html, /data-analysis-layer="edges"/)
     assert.match(html, /data-analysis-layer="depth"/)

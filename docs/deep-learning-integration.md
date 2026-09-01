@@ -50,6 +50,21 @@ AI Gateway 返回的 `learned-pixelization` 或 `generative-proposal` 现在会�
 
 界面状态会标出“学习像素化”或“生成提案”，模型身份写入生成分析来源。
 
+### 本地 Pixel Art + LCM Provider
+
+生产目录加入 `pixel-art-sprite-lcm-local`，固定以下权重 revision：
+
+- PixelArt Sprite checkpoint：`8229c9b6e928103f0e657cfe6b14d902cb2101d6`
+- LCM-LoRA SDv1.5：`cf2fced511dbe7e26c8d1d397e728fbab875db4b`
+
+sidecar 使用 Diffusers 0.35.2、CUDA FP16、sequential model CPU offload、VAE tiling 和 VAE slicing。原图按比例放入推理画布；学习像素化采用较低 img2img strength，生成式提案采用较高 strength 与两个可回放 seed。输出进行最近邻缩小，随后进入 Pattern Core。
+
+API 主进程保持轻量，每个 seed 交给独立 CUDA worker。worker 写出 RGBA 结果后立即退出，临时输入和结果目录随请求清理。生成式双候选分别运行，单次原生 CUDA 故障只影响当前 seed，健康检查和后续请求仍由 API 主进程继续处理。
+
+SDXL Base + Pixel Art XL + LCM-LoRA SDXL 已保留在研究目录。本机完成权重下载后，5.14 GB UNet 在当前 Windows 进程内存预算下装载失败；这条路线适合独立高内存 GPU worker。
+
+模型提案会在自身像素空间重新执行主体、宠物脸部、双眼、鼻子、耳尖和裁剪推断，解决原图分析坐标与提案坐标错位。模型加载状态、身份和推理来源由健康检查传到浏览器。
+
 ### 模型提案合同
 
 AI Gateway 与浏览器水合层都会校验提案路线、模型身份、置信度、RGBA 数据和目标网格。异常模型输出会在进入 Pattern Core 之前终止；合法提案仍由确定性规划器完成尺寸、色板、连通性和制作成本处理。

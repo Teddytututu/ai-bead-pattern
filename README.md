@@ -10,6 +10,7 @@
 apps/wechat-miniapp/   微信小程序客户端
 packages/pattern-core/ 平台无关的图像与图纸核心
 services/ai-gateway/   AI 能力接入层
+services/pixel-proposal-sidecar/ 本地 Pixel Art + LCM 提案服务
 assets/palettes/       通用材料色卡资源
 tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
@@ -100,7 +101,11 @@ pnpm --filter @ai-bead-pattern/pattern-core example
 pnpm benchmark
 pnpm benchmark:shape
 pnpm demo
+pnpm pixel-proposal:setup
+pnpm demo:ai
 ```
+
+`pnpm demo:ai` 会同时启动本地 Pixel Art + LCM 提案服务与浏览器工作台。模型菜单包含确定性基线、BiRefNet 神经分析、学习像素化和生成式提案；学习结果继续经过主体与宠物关键点分析、实体色板映射、连通性整理和制作成本评分。
 
 ## License
 

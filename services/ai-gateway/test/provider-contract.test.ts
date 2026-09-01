@@ -92,6 +92,17 @@ describe('model manifest and catalog', () => {
       input: { ...localManifest.input, maximumWidth: 0 },
     }), /input/)
   })
+
+  it('ships a pinned local pixel proposal stack for both proposal routes', () => {
+    const proposal = MODEL_CATALOG.find((entry) => entry.providerId === 'pixel-art-sprite-lcm-local')
+
+    assert.ok(proposal)
+    assert.deepEqual(proposal.capabilities, ['learned-pixelization', 'generative-proposal'])
+    assert.equal(proposal.execution.location, 'local')
+    assert.ok(proposal.execution.devices.includes('cuda'))
+    assert.match(proposal.weightRevision, /8229c9b6e928103f0e657cfe6b14d902cb2101d6/)
+    assert.match(proposal.weightRevision, /cf2fced511dbe7e26c8d1d397e728fbab875db4b/)
+  })
 })
 
 describe('learned proposal contract', () => {
