@@ -41,6 +41,7 @@ export class RembgVisionProvider implements AIModelProvider {
     const result = await this.#segmentation.segment({
       image: request.image,
       model: 'birefnet-general-lite',
+      ...(request.imageTypeHint === undefined ? {} : { imageTypeHint: request.imageTypeHint }),
       ...(request.signal === undefined ? {} : { signal: request.signal }),
       ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
     })

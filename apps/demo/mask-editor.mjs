@@ -49,6 +49,22 @@ function edgeStrength(image, x, y) {
   return Math.min(1, Math.hypot(gx, gy) / 1_020)
 }
 
+function maskBoundaryStrength(mask, x, y) {
+  if (mask === undefined) return 0
+  const valueAt = (sampleX, sampleY) => {
+    const sx = Math.min(mask.width - 1, Math.max(0, sampleX))
+    const sy = Math.min(mask.height - 1, Math.max(0, sampleY))
+    return mask.values[sy * mask.width + sx] ?? 0
+  }
+  const center = valueAt(x, y)
+  return Math.max(
+    Math.abs(center - valueAt(x - 1, y)),
+    Math.abs(center - valueAt(x + 1, y)),
+    Math.abs(center - valueAt(x, y - 1)),
+    Math.abs(center - valueAt(x, y + 1)),
+  )
+}
+
 export function snapStrokeToBoundary(points, image, options = {}) {
   if (!Array.isArray(points) || points.length === 0) {
     return { points: [], snappedCount: 0, meanDistance: 0, confidence: 0 }
@@ -57,6 +73,12 @@ export function snapStrokeToBoundary(points, image, options = {}) {
     || !(image.data instanceof Uint8ClampedArray)
     || image.data.length !== image.width * image.height * 4) {
     throw new RangeError('Snap image must contain RGBA pixels aligned to its dimensions')
+  }
+  const referenceMask = options.referenceMask
+  if (referenceMask !== undefined
+    && (referenceMask.width !== image.width || referenceMask.height !== image.height
+      || referenceMask.values?.length !== image.width * image.height)) {
+    throw new RangeError('Snap reference mask must align with the source image')
   }
   const maxDistanceNormalized = Math.min(0.25, Math.max(0.005, options.maxDistanceNormalized ?? 0.06))
   const endpointLock = Math.min(0.25, Math.max(0, options.endpointLock ?? 0.015))
@@ -85,7 +107,11 @@ export function snapStrokeToBoundary(points, image, options = {}) {
         if (distance > maxDistance) continue
         const x = Math.min(image.width - 1, Math.max(0, Math.round(sourceX + offsetX)))
         const y = Math.min(image.height - 1, Math.max(0, Math.round(sourceY + offsetY)))
-        const edge = edgeStrength(image, x, y)
+        const imageEdge = edgeStrength(image, x, y)
+        const maskEdge = maskBoundaryStrength(referenceMask, x, y)
+        const edge = referenceMask === undefined
+          ? imageEdge
+          : maskEdge * 0.86 + imageEdge * 0.14
         const score = edge - distance / Math.max(1, maxDistance) * 0.28
         if (best === undefined || score > best.score) best = { x, y, score, edge, distance }
       }
@@ -108,6 +134,18 @@ export function snapStrokeToBoundary(points, image, options = {}) {
     meanDistance: snappedCount === 0 ? 0 : totalDistance / snappedCount,
     confidence: totalConfidence / points.length,
   }
+}
+
+export function resolveStrokePoints(points, image, automaticSnap, options = {}) {
+  if (automaticSnap === false) {
+    return {
+      points: points.map((point) => ({ x: point.x, y: point.y })),
+      snappedCount: 0,
+      meanDistance: 0,
+      confidence: 1,
+    }
+  }
+  return snapStrokeToBoundary(points, image, options)
 }
 
 function writePixel(target, index, color, alpha) {
@@ -267,7 +305,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     const dirty = maskEditSessionIsDirty(session, confirmedSession)
     elements.undoButton.disabled = session?.cursor === 0
     elements.redoButton.disabled = session === undefined || session.cursor === session.strokes.length
-    const snapText = snapSummary === undefined
+    const snapText = snapSummary === undefined || elements.snapToggle?.checked !== true
       ? ''
       : ` · 自动贴边 ${snapSummary.snappedCount} 点`
     elements.detail.textContent = session === undefined
@@ -348,9 +386,10 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     livePreview.reset()
     if (commit) {
       appendPoint(event)
-      snapSummary = snapStrokeToBoundary(pointerPoints, sourceImage, {
+      snapSummary = resolveStrokePoints(pointerPoints, sourceImage, elements.snapToggle?.checked === true, {
         maxDistanceNormalized: 0.045,
         endpointLock: 0.02,
+        referenceMask: draft?.mask ?? baseEvidence.mask,
       })
       session = core.appendMaskEditStroke(session, {
         ...currentPointerStroke(),
@@ -408,6 +447,10 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     const button = event.target.closest('button[data-mask-radius]')
     if (button === null) return
     radiusNormalized = Number(button.dataset.maskRadius)
+    syncControls()
+  })
+  elements.snapToggle?.addEventListener('change', () => {
+    snapSummary = undefined
     syncControls()
   })
   elements.undoButton.addEventListener('click', () => {

@@ -10,6 +10,8 @@ export {
   rgbToLab,
 } from './color.js'
 export { optimizeGrid } from './grid.js'
+export { identityAppearanceSimilarity } from './identity-similarity.js'
+export { inferPetAnalysis, type PetAnalysisResult } from './pet-analysis.js'
 export { adaptPattern } from './adaptation.js'
 export { composeCandidateEvaluationV2 } from './candidate-evaluation.js'
 export {

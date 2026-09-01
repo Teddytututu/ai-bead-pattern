@@ -275,6 +275,12 @@ function budgetViolations(
   }
 }
 
+function visibleClusterDefectCost(diagnostics: GridClusterDiagnostics): number {
+  return diagnostics.fragmentedArcSegments
+    + diagnostics.smallComponents * 4
+    + diagnostics.singleCellBands * 2
+}
+
 function budgetPressure(
   input: GridRefinementInput,
   key: keyof GridRefinementBudgets,
@@ -425,7 +431,9 @@ function totalEnergy(
       }
     }
   }
-  const violations = budgetViolations(gridClusterDiagnostics(input, colorIds), input.budgets)
+  const diagnostics = gridClusterDiagnostics(input, colorIds)
+  energy += diagnostics.smallComponents * 10 + diagnostics.singleCellBands * 4
+  const violations = budgetViolations(diagnostics, input.budgets)
   energy += violations.transitionCells * 3
     + violations.ditherPatterns * 8
     + violations.colorSwitches * 1.5
@@ -455,6 +463,118 @@ function candidateColors(
   return [...candidates].sort()
 }
 
+function smallComponentCells(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+): ReadonlySet<number> {
+  const visited = new Uint8Array(colorIds.length)
+  const cells = new Set<number>()
+  for (let start = 0; start < colorIds.length; start += 1) {
+    if (input.activeMask[start] !== 1 || visited[start] === 1) continue
+    const colorId = colorIds[start]
+    const queue = [start]
+    visited[start] = 1
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const cell = queue[cursor]!
+      const x = cell % input.width
+      const y = Math.floor(cell / input.width)
+      for (const [offsetX, offsetY] of orthogonal) {
+        const nextX = x + offsetX
+        const nextY = y + offsetY
+        if (isActive(input, nextX, nextY) === false) continue
+        const next = cellIndex(nextX, nextY, input.width)
+        if (visited[next] === 1 || colorIds[next] !== colorId) continue
+        visited[next] = 1
+        queue.push(next)
+      }
+    }
+    if (queue.length <= 2) for (const cell of queue) cells.add(cell)
+  }
+  return cells
+}
+
+function defectCellSeverity(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+  cell: number,
+  smallCells: ReadonlySet<number>,
+): number {
+  if (input.activeMask[cell] !== 1 || input.protectedCells.has(cell)) return 0
+  const x = cell % input.width
+  const y = Math.floor(cell / input.width)
+  let support = 0
+  let activeNeighbors = 0
+  for (const [offsetX, offsetY] of orthogonal) {
+    const nextX = x + offsetX
+    const nextY = y + offsetY
+    if (isActive(input, nextX, nextY) === false) continue
+    activeNeighbors += 1
+    if (colorIds[cellIndex(nextX, nextY, input.width)] === colorIds[cell]) support += 1
+  }
+  const horizontalBand = x > 0 && x + 1 < input.width
+    && isActive(input, x - 1, y) && isActive(input, x + 1, y)
+    && colorIds[cell - 1] === colorIds[cell + 1]
+    && colorIds[cell - 1] !== colorIds[cell]
+  const verticalBand = y > 0 && y + 1 < input.height
+    && isActive(input, x, y - 1) && isActive(input, x, y + 1)
+    && colorIds[cell - input.width] === colorIds[cell + input.width]
+    && colorIds[cell - input.width] !== colorIds[cell]
+  return neighborArcPenalty(input, colorIds, cell, cell, colorIds[cell]!) * 2
+    + Number(smallCells.has(cell)) * 6
+    + Number(horizontalBand || verticalBand) * 4
+    + (activeNeighbors > 0 && support === 0 ? 4 : support === 1 ? 2 : 0)
+}
+
+interface SingleDefectEdit {
+  cell: number
+  colorId: string
+  energy: number
+  defectCost: number
+}
+
+function bestSingleDefectEdit(
+  input: GridRefinementInput,
+  colorIds: string[],
+  colorsById: ReadonlyMap<string, PreparedColor>,
+  axis: number | undefined,
+  acceptedEnergy: number,
+  acceptedDefectCost: number,
+): SingleDefectEdit | undefined {
+  const smallCells = smallComponentCells(input, colorIds)
+  const cells = Array.from({ length: colorIds.length }, (_, cell) => ({
+    cell,
+    severity: defectCellSeverity(input, colorIds, cell, smallCells),
+  }))
+    .filter((entry) => entry.severity > 0)
+    .sort((first, second) => second.severity - first.severity
+      || input.importance[first.cell]! - input.importance[second.cell]!
+      || first.cell - second.cell)
+    .slice(0, 64)
+  let best: SingleDefectEdit | undefined
+  for (const { cell } of cells) {
+    const currentId = colorIds[cell]!
+    for (const candidateId of candidateColors(input, colorIds, cell, axis)) {
+      if (candidateId === currentId) continue
+      colorIds[cell] = candidateId
+      const diagnostics = gridClusterDiagnostics(input, colorIds)
+      const defectCost = visibleClusterDefectCost(diagnostics)
+      if (defectCost < acceptedDefectCost) {
+        const energy = totalEnergy(input, colorIds, colorsById, axis)
+        if (energy <= acceptedEnergy + 1e-6
+          && (best === undefined
+            || defectCost < best.defectCost
+            || (defectCost === best.defectCost && energy < best.energy - 1e-6)
+            || (defectCost === best.defectCost && Math.abs(energy - best.energy) <= 1e-6
+              && (cell < best.cell || (cell === best.cell && candidateId.localeCompare(best.colorId) < 0))))) {
+          best = { cell, colorId: candidateId, energy, defectCost }
+        }
+      }
+      colorIds[cell] = currentId
+    }
+  }
+  return best
+}
+
 export function refineGridClusters(input: GridRefinementInput): GridRefinementResult {
   validateInput(input)
   const preparedColors = prepareColors(input.colors)
@@ -466,6 +586,7 @@ export function refineGridClusters(input: GridRefinementInput): GridRefinementRe
   const budgetViolationsBefore = budgetViolations(diagnosticsBefore, input.budgets)
   const energyBefore = totalEnergy(input, colorIds, colorsById, axis)
   let acceptedEnergy = energyBefore
+  let acceptedDefectCost = visibleClusterDefectCost(diagnosticsBefore)
   let completedIterations = 0
   const maximumIterations = input.mode === 'quality' ? 4 : 1
   for (let iteration = 0; iteration < maximumIterations; iteration += 1) {
@@ -494,12 +615,33 @@ export function refineGridClusters(input: GridRefinementInput): GridRefinementRe
     }
     if (changes === 0) break
     const candidateEnergy = totalEnergy(input, colorIds, colorsById, axis)
-    if (candidateEnergy > acceptedEnergy + 1e-6) {
+    const candidateDiagnostics = gridClusterDiagnostics(input, colorIds)
+    const candidateDefectCost = visibleClusterDefectCost(candidateDiagnostics)
+    if (candidateEnergy > acceptedEnergy + 1e-6
+      || candidateDefectCost > acceptedDefectCost) {
       colorIds.splice(0, colorIds.length, ...snapshot)
       break
     }
     acceptedEnergy = candidateEnergy
+    acceptedDefectCost = candidateDefectCost
     completedIterations += 1
+  }
+  if (input.mode === 'quality') {
+    for (let step = 0; step < 2; step += 1) {
+      const edit = bestSingleDefectEdit(
+        input,
+        colorIds,
+        colorsById,
+        axis,
+        acceptedEnergy,
+        acceptedDefectCost,
+      )
+      if (edit === undefined) break
+      colorIds[edit.cell] = edit.colorId
+      acceptedEnergy = edit.energy
+      acceptedDefectCost = edit.defectCost
+      completedIterations += 1
+    }
   }
   const edits: GridEditRecord[] = []
   for (let cell = 0; cell < colorIds.length; cell += 1) {

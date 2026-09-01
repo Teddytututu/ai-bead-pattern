@@ -91,6 +91,26 @@ describe('Analysis Debug Viewer layers', () => {
     assert.equal(skin.modelVersion, 'mediapipe/semantic-v1')
   })
 
+  it('shows a pet-face semantic region in the face layer', () => {
+    const petAnalysis = {
+      ...analysis,
+      semanticRegions: [{
+        id: 'pet-face',
+        label: 'pet face',
+        mask: { width: 2, height: 2, values: new Float32Array([1, 0, 0, 0]) },
+        confidence: 0.88,
+        importance: 1,
+      }],
+      modelVersions: { petSemantics: 'pet-geometry-v2' },
+    }
+
+    const face = resolveAnalysisDebugLayer('face', { analysis: petAnalysis })
+
+    assert.equal(face.available, true)
+    assert.equal(face.confidence, 0.88)
+    assert.equal(face.modelVersion, 'pet-geometry-v2')
+  })
+
   it('returns landmark evidence and a clear unavailable layer state', () => {
     const landmarks = resolveAnalysisDebugLayer('landmarks', {
       analysis,

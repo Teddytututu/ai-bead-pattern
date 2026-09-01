@@ -38,8 +38,8 @@ const endpointDark = 'endpoint-dark' as const
 
 export const featureTemplateLibrary: readonly FeatureTemplate[] = Object.freeze([
   template('eye-e1', 'eye', [[eyeDark]], [0, 0]),
-  template('eye-e2-h', 'eye', [[eyeDark, eyeDark]], [0, 0]),
-  template('eye-e2-v', 'eye', [[eyeDark], [eyeDark]], [0, 0]),
+  template('eye-e2-h', 'eye', [[eyeDark, 'eye-highlight']], [0, 0]),
+  template('eye-e2-v', 'eye', [[eyeDark], ['eye-highlight']], [0, 0]),
   template('eye-e4', 'eye', [[eyeDark, eyeDark], [eyeDark, eyeDark]], [0, 0]),
   template('eye-highlight', 'eye', [[eyeDark, eyeDark], [eyeDark, 'eye-highlight']], [0, 0]),
   template('mouth-m1', 'mouth', [[mouthDark]], [0, 0]),

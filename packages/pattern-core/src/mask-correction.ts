@@ -252,12 +252,17 @@ function paintBrush(
       const dy = y - centerY
       const distanceSquared = dx * dx + dy * dy
       if (distanceSquared > radiusSquared) continue
-      const brush = 1 - Math.sqrt(distanceSquared) / radius
       const index = y * width + x
-      values[index] = mode === 'add'
-        ? Math.max(values[index]!, brush)
-        : Math.min(values[index]!, 1 - brush)
+      values[index] = mode === 'add' ? 1 : 0
     }
+  }
+}
+
+function binaryMask(mask: BinaryMask): BinaryMask {
+  return {
+    width: mask.width,
+    height: mask.height,
+    values: Float32Array.from(mask.values, (value) => value >= 0.5 ? 1 : 0),
   }
 }
 
@@ -415,7 +420,7 @@ function confirmEvidenceWithStrokes(
 ): SubjectMaskEvidence {
   validateEvidence(baseEvidence)
   validateStrokeLog(strokes)
-  const mask = applyValidatedMaskStrokes(baseEvidence.mask, strokes)
+  const mask = binaryMask(applyValidatedMaskStrokes(baseEvidence.mask, strokes))
   const baseIdentity = [
     baseEvidence.revision,
     baseEvidence.mask.width.toString(),

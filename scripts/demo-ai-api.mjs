@@ -73,6 +73,7 @@ function requestFromPayload(payload) {
     ...(payload.styleId === undefined ? {} : { styleId: payload.styleId }),
     ...(payload.prompt === undefined ? {} : { prompt: payload.prompt }),
     ...(payload.sourceId === undefined ? {} : { sourceId: payload.sourceId }),
+    ...(payload.imageTypeHint === undefined ? {} : { imageTypeHint: payload.imageTypeHint }),
   }
 }
 

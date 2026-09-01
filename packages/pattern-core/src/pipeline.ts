@@ -22,6 +22,7 @@ import {
   countThinStripes,
   optimizeGrid,
 } from './grid.js'
+import { identityAppearanceSimilarity } from './identity-similarity.js'
 import {
   applyStyle,
   gridCellForSourcePoint,
@@ -1070,14 +1071,25 @@ function selectPalette(
   colors: readonly PreparedColor[],
   maximum: number,
   distanceMethod: ColorDistanceMethod,
+  requiredColorIds: readonly string[] = [],
 ): readonly PreparedColor[] {
   const limit = Math.min(maximum, colors.length)
   if (colors.length <= limit) return colors
   const distanceMatrix = colors.map((color) => Float32Array.from(
     pixelLabs.map((pixelLab) => colorDistance(pixelLab, color.lab, distanceMethod)),
   ))
-  const selectedIndices = new Set<number>()
+  const required = new Set(requiredColorIds)
+  const selectedIndices = new Set(colors.flatMap((color, index) =>
+    required.has(color.id) ? [index] : []))
   const bestDistances = new Array<number>(pixelLabs.length).fill(Number.POSITIVE_INFINITY)
+  for (const selectedIndex of selectedIndices) {
+    for (let index = 0; index < pixelLabs.length; index += 1) {
+      bestDistances[index] = Math.min(
+        bestDistances[index]!,
+        distanceMatrix[selectedIndex]![index]!,
+      )
+    }
+  }
   while (selectedIndices.size < limit) {
     let bestColorIndex = -1
     let bestCost = Number.POSITIVE_INFINITY
@@ -1416,6 +1428,33 @@ function sourceRgbAt(
   )) as unknown as RGB
 }
 
+function preferredFeaturePaletteColorIds(
+  request: PatternGenerationRequest,
+  colors: readonly PreparedColor[],
+): ReadonlyMap<string, string> {
+  const kindOrder = new Map<LandmarkKind, number>([
+    ['eye', 0],
+    ['nose', 1],
+    ['mouth', 2],
+    ['identity-mark', 3],
+  ])
+  const landmarks = [...(request.analysis?.landmarks ?? [])]
+    .filter((landmark) => landmark.priority === 'hard'
+      && landmarkEffectiveConfidence(landmark) >= 0.5
+      && kindOrder.has(landmark.kind))
+    .sort((first, second) => kindOrder.get(first.kind)! - kindOrder.get(second.kind)!)
+  const preferred = new Map<string, string>()
+  for (const landmark of landmarks) {
+    const sourceLab = rgbToLab(sourceRgbAt(request, landmark.x, landmark.y))
+    const nearest = [...colors].sort((first, second) =>
+      colorDistance(sourceLab, first.lab, 'delta-e-2000')
+        - colorDistance(sourceLab, second.lab, 'delta-e-2000')
+      || first.id.localeCompare(second.id))[0]
+    if (nearest !== undefined) preferred.set(landmark.id, nearest.id)
+  }
+  return preferred
+}
+
 function featureVisibility(
   request: PatternGenerationRequest,
   analysis: ImageAnalysis | undefined,
@@ -1427,6 +1466,7 @@ function featureVisibility(
   palette: readonly PreparedColor[],
   activeMask: Uint8Array,
   regionIds: readonly (string | undefined)[],
+  featurePlacements: readonly ResolvedFeaturePlacement[],
 ): FeatureVisibilityResult {
   const landmarks = (analysis?.landmarks ?? []).filter((landmark) =>
     landmarkEffectiveConfidence(landmark) > 0
@@ -1447,10 +1487,17 @@ function featureVisibility(
     }
   }
   const colorsById = new Map(palette.map((color) => [color.id, color]))
+  const placementByFeatureId = new Map(featurePlacements.map((placement) => [
+    placement.featureId,
+    placement,
+  ]))
   const evaluated = landmarks.map((landmark) => {
     const profile = featureProfiles[landmark.kind]
     const effectiveConfidence = landmarkEffectiveConfidence(landmark)
-    const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
+    const placement = placementByFeatureId.get(landmark.id)
+    const templateAware = placement !== undefined && landmark.carrierRegionId !== undefined
+    const [centerX, centerY] = (templateAware ? placement?.center : undefined)
+      ?? gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
     const center = centerY * width + centerX
     const colorId = colorIds[center]
     const color = colorId === undefined ? undefined : colorsById.get(colorId)
@@ -1476,21 +1523,36 @@ function featureVisibility(
     const radius = landmarkGridRadiusCells(landmark, crop, fit)
     const regionCells: number[] = []
     const matchingCells = new Set<number>()
-    const ringCells: number[] = []
-    for (let offsetY = -radius - 1; offsetY <= radius + 1; offsetY += 1) {
-      for (let offsetX = -radius - 1; offsetX <= radius + 1; offsetX += 1) {
-        const x = centerX + offsetX
-        const y = centerY + offsetY
-        if (x < 0 || y < 0 || x >= width || y >= height) continue
-        const index = y * width + x
+    const ringCellSet = new Set<number>()
+    if (templateAware && placement !== undefined) {
+      for (const index of placement.occupiedCells) {
         if (activeMask[index] !== 1) continue
-        const insideFeature = Math.abs(offsetX) <= radius && Math.abs(offsetY) <= radius
-        if (insideFeature) {
-          regionCells.push(index)
-          if (colorIds[index] === colorId) matchingCells.add(index)
-        } else ringCells.push(index)
+        regionCells.push(index)
+        matchingCells.add(index)
+        const x = index % width
+        for (const neighbor of [index - width, index + width, x > 0 ? index - 1 : -1, x + 1 < width ? index + 1 : -1]) {
+          if (neighbor >= 0 && neighbor < activeMask.length
+            && activeMask[neighbor] === 1
+            && placement.occupiedCells.includes(neighbor) === false) ringCellSet.add(neighbor)
+        }
+      }
+    } else {
+      for (let offsetY = -radius - 1; offsetY <= radius + 1; offsetY += 1) {
+        for (let offsetX = -radius - 1; offsetX <= radius + 1; offsetX += 1) {
+          const x = centerX + offsetX
+          const y = centerY + offsetY
+          if (x < 0 || y < 0 || x >= width || y >= height) continue
+          const index = y * width + x
+          if (activeMask[index] !== 1) continue
+          const insideFeature = Math.abs(offsetX) <= radius && Math.abs(offsetY) <= radius
+          if (insideFeature) {
+            regionCells.push(index)
+            if (colorIds[index] === colorId) matchingCells.add(index)
+          } else ringCellSet.add(index)
+        }
       }
     }
+    const ringCells = [...ringCellSet]
     const regionCounts = new Map<string, number>()
     for (const index of ringCells) {
       const regionId = regionIds[index]
@@ -1503,24 +1565,39 @@ function featureVisibility(
     const neighborCells = carrierRegionId === undefined
       ? ringCells
       : ringCells.filter((index) => regionIds[index] === carrierRegionId)
-    const minimumCells = radius === 0 ? 1 : Math.max(2, Math.ceil(regionCells.length * 0.4))
+    const minimumCells = templateAware === false
+      ? radius === 0 ? 1 : Math.max(2, Math.ceil(regionCells.length * 0.4))
+      : Math.max(1, placement.occupiedCells.length)
     const coverage = clamp(matchingCells.size / minimumCells, 0, 1)
     const purity = matchingCells.size / Math.max(1, regionCells.length)
-    const connectivity = connectedFeatureRatio(matchingCells, center, width)
+    const connectionSeed = matchingCells.has(center) ? center : matchingCells.values().next().value ?? center
+    const connectivity = connectedFeatureRatio(matchingCells, connectionSeed, width)
+    const featureColors = templateAware
+      ? [...new Set(regionCells.map((index) => colorIds[index]!))]
+        .flatMap((id) => colorsById.get(id) ?? [])
+      : [color]
     const contrast = neighborCells.length === 0 ? 0 : neighborCells.reduce((sum, index) => {
       const neighbor = colorsById.get(colorIds[index]!)
-      return sum + (neighbor === undefined ? 0 : colorDistance(color.lab, neighbor.lab, 'delta-e-2000'))
+      return sum + (neighbor === undefined ? 0 : Math.max(
+        0,
+        ...featureColors.map((featureColor) => colorDistance(
+          featureColor.lab,
+          neighbor.lab,
+          'delta-e-2000',
+        )),
+      ))
     }, 0) / neighborCells.length
     const contrastScore = clamp(contrast / 24, 0, 1)
+    const featureColorIds = new Set(featureColors.map((featureColor) => featureColor.id))
     const boundaryScore = ringCells.length === 0 ? 0 : ringCells.reduce(
-      (sum, index) => sum + Number(colorIds[index] !== colorId),
+      (sum, index) => sum + Number(featureColorIds.has(colorIds[index]!) === false),
       0,
     ) / ringCells.length
-    const sourceMatch = 1 / (1 + colorDistance(
-      rgbToLab(sourceRgbAt(request, landmark.x, landmark.y)),
-      color.lab,
-      'delta-e-2000',
-    ) / 15)
+    const sourceLab = rgbToLab(sourceRgbAt(request, landmark.x, landmark.y))
+    const sourceMatch = templateAware
+      ? Math.max(0, ...featureColors.map((featureColor) =>
+        1 / (1 + colorDistance(sourceLab, featureColor.lab, 'delta-e-2000') / 15)))
+      : 1 / (1 + colorDistance(sourceLab, color.lab, 'delta-e-2000') / 15)
     const rejectionReasons: string[] = []
     if (landmark.priority === 'hard' && effectiveConfidence >= 0.5) {
       if (coverage < profile.minimumCoverage || purity < profile.minimumPurity) {
@@ -1529,7 +1606,7 @@ function featureVisibility(
       if (connectivity < profile.minimumConnectivity) rejectionReasons.push('hard-feature-fragmented')
       if (contrastScore < profile.minimumContrast) rejectionReasons.push('hard-feature-low-contrast')
       if (boundaryScore < profile.minimumBoundary) rejectionReasons.push('hard-feature-boundary')
-      if (profile.metric !== 'geometry' && sourceMatch < 0.35) {
+      if (profile.metric !== 'geometry' && profile.metric !== 'contour' && sourceMatch < 0.35) {
         rejectionReasons.push('hard-feature-source-mismatch')
       }
     }
@@ -1622,6 +1699,7 @@ function scoreCandidate(
   thinStripes: number,
   uniqueColors: number,
   canvasPlanScore: number,
+  identityAppearance: number,
   hardFeatureCompleteness: number,
   valueOrderAccuracy: number,
   fragmentedArcSegments: number,
@@ -1641,8 +1719,14 @@ function scoreCandidate(
   const canvasFit = canvasPlanScore
   const silhouette = clamp(structure * 0.82 + canvasFit * 0.18, 0, 1)
   const identity = feature.confidence > 0
-    ? clamp(featureProtection * 0.7 + hardFeatureCompleteness * 0.3, 0, 1)
-    : 0.5
+    ? clamp(
+      featureProtection * 0.45
+        + hardFeatureCompleteness * 0.25
+        + identityAppearance * 0.3,
+      0,
+      1,
+    )
+    : clamp(identityAppearance * 0.7 + 0.15, 0, 1)
   const valueHierarchy = clamp(valueOrderAccuracy, 0, 1)
   const pixelClusters = clamp(1 - (
     isolatedCells * 2 + thinStripes + fragmentedArcSegments + smallComponents * 2 + singleCellBands
@@ -1655,7 +1739,7 @@ function scoreCandidate(
     'high-contrast': 0.005,
     soft: 0,
   }
-  const identityWeight = 0.16 + 0.07 * feature.confidence
+  const identityWeight = 0.22 + 0.1 * feature.confidence
   const colorWeight = style === 'faithful' ? 0.12 : 0.09
   const craftWeight = style === 'simple' ? 0.1 : 0.07
   const totalWeight = 0.25 + identityWeight + 0.15 + 0.13 + colorWeight + craftWeight + 0.06
@@ -1671,6 +1755,7 @@ function scoreCandidate(
     total,
     silhouette,
     identity,
+    identityAppearance,
     valueHierarchy,
     pixelClusters,
     craftCost,
@@ -1943,6 +2028,8 @@ function generateCandidate(
     Math.round(Math.min(request.options.maxColors, availablePalette.length)
       * artDirection.generation.maxColorFactor),
   ))
+  const preferredFeatureColors = preferredFeaturePaletteColorIds(request, availablePalette)
+  const requiredFeatureColors = [...new Set(preferredFeatureColors.values())].slice(0, maximumColors)
   const palettePlanning = colorPlanningActive && structurePlan !== undefined
     && valuePlanning !== undefined
     ? buildPalettePlan({
@@ -1954,6 +2041,7 @@ function generateCandidate(
       maximumColors,
       distanceMethod,
       featurePlacements,
+      requiredColorIds: requiredFeatureColors,
       ...(request.palette.inventory === undefined
         ? {}
         : { inventory: request.palette.inventory }),
@@ -1970,8 +2058,10 @@ function generateCandidate(
       availablePalette,
       maximumColors,
       distanceMethod,
+      requiredFeatureColors,
     )
     : context.preparedPalette.filter((color) => selectedPaletteIds.has(color.id))
+  const selectedFeatureColorIds = new Set(selectedPalette.map((color) => color.id))
   const assigned = palettePlanning === undefined
     ? assignGrid(pixels, pixelLabs, selectedPalette, baseline, distanceMethod)
     : { colorIds: palettePlanning.colorIds }
@@ -1994,6 +2084,9 @@ function generateCandidate(
     .map((landmark) => landmark.id))
   const colorPlacements = featurePlacements.filter((placement) =>
     semanticFeatureIds.has(placement.featureId))
+  const colorPlacementIds = new Set(colorPlacements.map((placement) => placement.featureId))
+  const selectedFeaturePreferences = new Map([...preferredFeatureColors].filter(([featureId, colorId]) =>
+    colorPlacementIds.has(featureId) && selectedFeatureColorIds.has(colorId)))
   const featureColors = baseline === 'mvp'
     ? resolveFeatureColors({
       placements: colorPlacements,
@@ -2006,6 +2099,7 @@ function generateCandidate(
         budget.featureId,
         budget.minimumContrast,
       ])),
+      preferredColorIdsByFeature: selectedFeaturePreferences,
       distanceMethod,
     })
     : { colorIds: assigned.colorIds, edits: [] }
@@ -2207,11 +2301,16 @@ function generateCandidate(
     selectedPalette,
     activeMask,
     regionIds,
+    featurePlacements,
   )
-  const rejectionReasons = [...new Set([
-    ...context.canvasPlan.rejectionReasons,
-    ...visibility.rejectionReasons,
-  ])].sort()
+  const colorsByIdForIdentity = new Map(selectedPalette.map((color) => [color.id, color.rgb]))
+  const identityAppearance = identityAppearanceSimilarity(
+    rawResized.pixels,
+    finalColorIds.map((colorId, index) => colorsByIdForIdentity.get(colorId) ?? rawResized.pixels[index]!),
+    activeMask,
+    size.width,
+    size.height,
+  )
   const score = scoreCandidate(
     style,
     totalBeads,
@@ -2227,6 +2326,7 @@ function generateCandidate(
     baseline === 'mvp'
       ? context.canvasPlan.score.total
       : 1 / (1 + totalBeads / 1024),
+    identityAppearance,
     hardFeatureCompleteness,
     finalValueOrderAccuracy,
     gridRefinement?.diagnosticsAfter.fragmentedArcSegments ?? 0,
@@ -2236,6 +2336,15 @@ function generateCandidate(
   if (context.occupancyMode === 'full-frame' && subjectMaskTrust(request.analysis) >= 0.75) {
     score.total = clamp(score.total - 0.14, 0, 1)
   }
+  const identityCritical = (request.analysis?.imageType ?? request.options.imageType) === 'pet'
+    && visibility.confidence >= 0.45
+  const identityValid = identityCritical === false
+    || (score.identity >= 0.38 && hardFeatureCompleteness >= 0.6)
+  const rejectionReasons = [...new Set([
+    ...context.canvasPlan.rejectionReasons,
+    ...visibility.rejectionReasons,
+    ...(identityValid ? [] : ['pet-identity-low-similarity']),
+  ])].sort()
   const artDirectionExecution = {
     enabled: explicitArtDirection,
     importance: importanceExecution.summary,
@@ -2300,7 +2409,7 @@ function generateCandidate(
     generationId,
     variantId,
     style,
-    valid: context.canvasPlan.feasible && visibility.valid,
+    valid: context.canvasPlan.feasible && visibility.valid && identityValid,
     rejectionReasons,
     pattern: {
       width: size.width,

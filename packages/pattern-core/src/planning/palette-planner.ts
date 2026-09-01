@@ -21,6 +21,7 @@ export interface PalettePlanningInput {
   maximumColors: number
   distanceMethod: ColorDistanceMethod
   featurePlacements: readonly ResolvedFeaturePlacement[]
+  requiredColorIds?: readonly string[]
   /** Missing entries represent unrestricted stock; supplied entries are bead counts. */
   inventory?: Readonly<Record<string, number>>
   /** Ordered physical substitutes for an unavailable or insufficient preferred color. */
@@ -102,6 +103,12 @@ function validateInput(input: PalettePlanningInput): void {
     }
   }
   const colorIds = new Set(input.colors.map((color) => color.id))
+  if ((input.requiredColorIds?.length ?? 0) > input.maximumColors
+    || new Set(input.requiredColorIds ?? []).size !== (input.requiredColorIds?.length ?? 0)
+    || (input.requiredColorIds ?? []).some((colorId) => colorIds.has(colorId) === false
+      || stock(input, colorId) <= 0)) {
+    throw new RangeError('Required palette colors must be unique, stocked, known, and within the color limit')
+  }
   for (const [colorId, quantity] of Object.entries(input.inventory ?? {})) {
     if (colorIds.has(colorId) === false || Number.isInteger(quantity) === false || quantity < 0) {
       throw new RangeError('Palette inventory must reference known colors with non-negative integer counts')
@@ -205,7 +212,7 @@ function selectColors(
 ): readonly PreparedColor[] {
   const selectable = colors.filter((color) => stock(input, color.id) > 0)
   if (selectable.length === 0) throw new RangeError('Palette inventory has no available colors')
-  const selected = new Set<string>()
+  const selected = new Set<string>(input.requiredColorIds ?? [])
   const featureRoles = new Set(input.featurePlacements.flatMap((placement) =>
     placement.roles.map((entry) => entry.role)))
   if ([...featureRoles].some((role) => role.endsWith('-dark'))) {

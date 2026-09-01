@@ -29,6 +29,7 @@ export type ModelRoute =
 export interface ModelProviderRequest {
   image: PixelImage
   capabilities: readonly AICapability[]
+  imageTypeHint?: ImageType
   signal?: AbortSignal
   timeoutMs?: number
   targetGrid?: Readonly<{ width: number; height: number }>
@@ -416,6 +417,9 @@ export function validateProviderRequest(
   if (request.timeoutMs !== undefined
     && (Number.isFinite(request.timeoutMs) === false || request.timeoutMs <= 0)) {
     throw new RangeError('Provider timeout must be a finite positive number')
+  }
+  if (request.imageTypeHint !== undefined && imageTypes.has(request.imageTypeHint) === false) {
+    throw new RangeError('Provider image type hint is invalid')
   }
   if (request.timeoutMs !== undefined && request.timeoutMs > manifest.failurePolicy.timeoutMs) {
     throw new RangeError('Provider request timeout must stay within the model manifest')

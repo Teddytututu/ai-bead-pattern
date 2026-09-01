@@ -136,6 +136,22 @@ describe('PalettePlan', () => {
     assert.deepEqual(result.plan.selectedColorIds, ['z-red'])
   })
 
+  it('reserves a material color required by an identity feature', () => {
+    const result = buildPalettePlan({
+      valuePlan: valuePlan(),
+      roleIdsByCell: ['region-0:shadow', 'region-0:base', 'region-0:light'],
+      plannedLabs: [[20, 0, 0], [50, 0, 0], [80, 0, 0]],
+      structurePlan: structurePlan(),
+      colors,
+      maximumColors: 1,
+      distanceMethod: 'delta-e-2000',
+      featurePlacements: [],
+      requiredColorIds: ['gray-80'],
+    })
+
+    assert.deepEqual(result.plan.selectedColorIds, ['gray-80'])
+  })
+
   it('assigns physical colors in strict outline through light order when the palette supports it', () => {
     const orderedValues: ValuePlan = {
       roles: [

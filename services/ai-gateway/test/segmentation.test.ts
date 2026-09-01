@@ -168,6 +168,27 @@ describe('rembg HTTP segmentation provider', () => {
     )
   })
 
+  it('builds the automatic crop from the dominant connected subject component', async () => {
+    const values = new Array(100).fill(0)
+    for (let y = 2; y <= 8; y += 1) {
+      for (let x = 3; x <= 6; x += 1) values[y * 10 + x] = 255
+    }
+    values[9 * 10] = 255
+    const output = await maskPng(10, 10, values)
+    const provider = new RembgHttpSegmentationProvider({
+      cropPaddingRatio: 0,
+      fetch: async () => new Response(Uint8Array.from(output), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      }),
+    })
+
+    const result = await provider.segment(request(10, 10))
+
+    assert.deepEqual(result.analysis.suggestedCrop, { x: 3, y: 2, width: 4, height: 7 })
+    assert.equal(result.analysis.subjectMask!.values[90], 0)
+  })
+
   it('probes the real rembg API documentation endpoint with bounded health metadata', async () => {
     const provider = new RembgHttpSegmentationProvider({
       fetch: async (input, init) => {

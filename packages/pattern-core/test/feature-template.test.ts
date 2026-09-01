@@ -49,6 +49,19 @@ describe('feature template library', () => {
       .map((template) => template.id), ['endpoint-c1', 'endpoint-c2'])
   })
 
+  it('uses a dark pupil and a lighter iris role for every two-cell eye template', () => {
+    const twoCellEyes = featureTemplateLibrary.filter((template) =>
+      template.kind === 'eye' && template.cells.length === 2)
+
+    assert.ok(twoCellEyes.length > 0)
+    for (const template of twoCellEyes) {
+      assert.deepEqual(
+        new Set(template.cells.map((cell) => cell.role)),
+        new Set(['eye-dark', 'eye-highlight']),
+      )
+    }
+  })
+
   it('rejects a semantic role that belongs to another feature kind', () => {
     assert.throws(() => validateFeatureTemplate({
       id: 'invalid-eye',

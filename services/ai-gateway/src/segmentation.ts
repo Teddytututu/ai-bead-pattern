@@ -4,9 +4,10 @@ import type {
   BinaryMask,
   CropRect,
   ImageAnalysis,
+  ImageType,
   PixelImage,
 } from '@ai-bead-pattern/pattern-core'
-import { numericArrayFingerprintSync } from '@ai-bead-pattern/pattern-core'
+import { inferPetAnalysis, numericArrayFingerprintSync } from '@ai-bead-pattern/pattern-core'
 
 export type SegmentationModel =
   | 'birefnet-general-lite'
@@ -16,6 +17,7 @@ export type SegmentationModel =
 
 export interface SegmentationRequest {
   image: PixelImage
+  imageTypeHint?: ImageType
   model?: SegmentationModel
   postProcessMask?: boolean
   signal?: AbortSignal
@@ -101,6 +103,10 @@ function validateRequest(request: SegmentationRequest): void {
     && (Number.isFinite(request.timeoutMs) === false || request.timeoutMs <= 0)) {
     throw new RangeError('Segmentation timeout must be a finite positive number')
   }
+  if (request.imageTypeHint !== undefined
+    && new Set<ImageType>(['portrait', 'pet', 'illustration', 'landscape', 'general']).has(request.imageTypeHint) === false) {
+    throw new RangeError('Segmentation image type hint is invalid')
+  }
 }
 
 async function encodePng(image: PixelImage): Promise<Buffer> {
@@ -159,6 +165,67 @@ function boundaryImportance(mask: DecodedMask): Float32Array {
   return weights
 }
 
+function dominantConnectedMask(mask: DecodedMask, threshold: number): DecodedMask {
+  const visited = new Uint8Array(mask.values.length)
+  let largest: number[] = []
+  for (let start = 0; start < mask.values.length; start += 1) {
+    if (visited[start] === 1 || (mask.values[start] ?? 0) < threshold) continue
+    const queue = [start]
+    const component: number[] = []
+    visited[start] = 1
+    while (queue.length > 0) {
+      const index = queue.pop()!
+      component.push(index)
+      const x = index % mask.width
+      const y = Math.floor(index / mask.width)
+      for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+          if (offsetX === 0 && offsetY === 0) continue
+          const nextX = x + offsetX
+          const nextY = y + offsetY
+          if (nextX < 0 || nextY < 0 || nextX >= mask.width || nextY >= mask.height) continue
+          const next = nextY * mask.width + nextX
+          if (visited[next] === 1 || (mask.values[next] ?? 0) < threshold) continue
+          visited[next] = 1
+          queue.push(next)
+        }
+      }
+    }
+    if (component.length > largest.length) largest = component
+  }
+  if (largest.length === 0) return mask
+  const keep = new Uint8Array(mask.values.length)
+  for (const index of largest) keep[index] = 1
+  for (const index of largest) {
+    const x = index % mask.width
+    const y = Math.floor(index / mask.width)
+    for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+      for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+        const nextX = x + offsetX
+        const nextY = y + offsetY
+        if (nextX < 0 || nextY < 0 || nextX >= mask.width || nextY >= mask.height) continue
+        const next = nextY * mask.width + nextX
+        if ((mask.values[next] ?? 0) > 0) keep[next] = 1
+      }
+    }
+  }
+  return {
+    width: mask.width,
+    height: mask.height,
+    values: Float32Array.from(mask.values, (value, index) => keep[index] === 1 ? value : 0),
+  }
+}
+
+function rectangularMask(width: number, height: number, crop: CropRect): BinaryMask {
+  const values = new Float32Array(width * height)
+  const right = Math.min(width, crop.x + crop.width)
+  const bottom = Math.min(height, crop.y + crop.height)
+  for (let y = Math.max(0, crop.y); y < bottom; y += 1) {
+    for (let x = Math.max(0, crop.x); x < right; x += 1) values[y * width + x] = 1
+  }
+  return { width, height, values }
+}
+
 function subjectCrop(
   mask: DecodedMask,
   threshold: number,
@@ -188,24 +255,35 @@ function subjectCrop(
 
 function analysisFromMask(
   mask: DecodedMask,
+  image: PixelImage,
   model: SegmentationModel,
   cropThreshold: number,
   cropPaddingRatio: number,
+  imageTypeHint?: ImageType,
 ): ImageAnalysis {
+  const cleanedMask = dominantConnectedMask(mask, cropThreshold)
   const subjectMask: BinaryMask = {
-    width: mask.width,
-    height: mask.height,
-    values: mask.values,
+    width: cleanedMask.width,
+    height: cleanedMask.height,
+    values: cleanedMask.values,
   }
-  const confidence = maskCertaintyHeuristic(mask.values)
-  const crop = subjectCrop(mask, cropThreshold, cropPaddingRatio)
+  const confidence = maskCertaintyHeuristic(cleanedMask.values)
+  const componentCrop = subjectCrop(cleanedMask, cropThreshold, cropPaddingRatio)
+  const inferredPet = imageTypeHint === 'portrait' || imageTypeHint === 'illustration' || imageTypeHint === 'landscape'
+    ? undefined
+    : inferPetAnalysis(image, subjectMask)
+  const pet = inferredPet !== undefined
+    && (imageTypeHint === 'pet' || inferredPet.confidence >= 0.62)
+    ? inferredPet
+    : undefined
+  const crop = pet?.suggestedCrop ?? componentCrop
   const provenance = [{
     origin: 'model' as const,
     provider: 'rembg-http',
     model,
     version: 'mask-v1-certainty-v1',
   }]
-  const maskFingerprint = numericArrayFingerprintSync(mask.values)
+  const maskFingerprint = numericArrayFingerprintSync(cleanedMask.values)
   const analysis: ImageAnalysis = {
     confidence,
     subjectMask,
@@ -217,9 +295,9 @@ function analysisFromMask(
       provenance,
     },
     importanceMap: {
-      width: mask.width,
-      height: mask.height,
-      weights: boundaryImportance(mask),
+      width: cleanedMask.width,
+      height: cleanedMask.height,
+      weights: boundaryImportance(cleanedMask),
     },
     semanticRegions: [{
       id: 'subject',
@@ -228,14 +306,25 @@ function analysisFromMask(
       importance: 0.8,
       mask: subjectMask,
       provenance,
-    }],
+    }, ...(pet === undefined ? [] : [{
+      id: 'pet-face',
+      label: 'pet face',
+      confidence: pet.confidence,
+      importance: 1,
+      mask: pet.faceMask,
+      provenance: [{ origin: 'heuristic' as const, provider: 'pet-geometry', version: 'pet-face-v2' }],
+    }])],
+    ...(pet === undefined ? {} : {
+      imageType: 'pet' as const,
+      landmarks: pet.landmarks,
+    }),
     modelVersions: { segmentation: `rembg/${model}` },
     provenance,
   }
   if (crop !== undefined) {
     analysis.suggestedCrop = crop
     analysis.suggestedCropSource = 'automatic'
-    analysis.suggestedCropConfidence = confidence
+    analysis.suggestedCropConfidence = pet?.suggestedCropConfidence ?? confidence
   }
   return analysis
 }
@@ -365,7 +454,14 @@ export class RembgHttpSegmentationProvider implements SegmentationProvider {
       return {
         provider: 'rembg-http',
         model,
-        analysis: analysisFromMask(mask, model, this.#cropThreshold, this.#cropPaddingRatio),
+        analysis: analysisFromMask(
+          mask,
+          request.image,
+          model,
+          this.#cropThreshold,
+          this.#cropPaddingRatio,
+          request.imageTypeHint,
+        ),
         elapsedMs: Math.max(0, performance.now() - startedAt),
       }
     } finally {
@@ -373,7 +469,6 @@ export class RembgHttpSegmentationProvider implements SegmentationProvider {
       request.signal?.removeEventListener('abort', forwardAbort)
     }
   }
-
   async probe(signal?: AbortSignal): Promise<{
     status: 'ready' | 'degraded' | 'unavailable'
     latencyMs: number

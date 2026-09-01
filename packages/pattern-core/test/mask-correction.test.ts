@@ -50,7 +50,7 @@ function aiEvidence(): SubjectMaskEvidence {
 }
 
 describe('mask correction engine', () => {
-  it('adds and erases a soft circular brush without mutating the base mask', () => {
+  it('adds and erases a solid circular brush without mutating the base mask', () => {
     const base = mask(5, 5, 0)
     const added = applyMaskStrokes(base, [stroke()])
     const erased = applyMaskStrokes(
@@ -60,11 +60,21 @@ describe('mask correction engine', () => {
 
     assert.equal(base.values[12], 0)
     assert.equal(added.values[12], 1)
-    assert.ok((added.values[11] ?? 0) > 0)
-    assert.ok((added.values[11] ?? 0) < 1)
+    assert.equal(added.values[11], 1)
     assert.equal(erased.values[12], 0)
-    assert.ok((erased.values[11] ?? 0) > 0)
-    assert.ok((erased.values[11] ?? 0) < 1)
+    assert.equal(erased.values[11], 0)
+  })
+
+  it('stores a binary mask after confirmation', () => {
+    const base = aiEvidence()
+    base.mask.values[0] = 0.49
+    base.mask.values[1] = 0.51
+
+    const confirmed = confirmMaskCorrection(createMaskCorrectionDraft(base, [stroke()]))
+
+    assert.equal([...confirmed.mask.values].every((value) => value === 0 || value === 1), true)
+    assert.equal(confirmed.mask.values[0], 0)
+    assert.equal(confirmed.mask.values[1], 1)
   })
 
   it('interpolates a continuous brush path between sparse pointer samples', () => {
@@ -122,7 +132,7 @@ describe('mask correction engine', () => {
     base.mask.values[6] = 0.75
     const confirmed = confirmMaskCorrection(createMaskCorrectionDraft(base))
 
-    assert.deepEqual(confirmed.mask.values, base.mask.values)
+    assert.equal(confirmed.mask.values[6], 1)
     assert.notEqual(confirmed.revision, base.revision)
     assert.equal(confirmed.userConfirmed, true)
     assert.equal(confirmed.source, 'ai+manual')

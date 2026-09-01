@@ -1,7 +1,13 @@
 import { expect, test } from '@playwright/test'
 
 async function waitForGeneration(page) {
-  await page.waitForFunction(() => document.querySelector('#statusText')?.textContent !== '生成中')
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#statusText')?.textContent ?? ''
+    const generateButton = document.querySelector('#generateButton')
+    return generateButton instanceof HTMLButtonElement
+      && generateButton.disabled === false
+      && /\d+\s*ms$/.test(status)
+  })
 }
 
 async function uploadWideImage(page) {

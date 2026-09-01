@@ -19,6 +19,7 @@ export interface FeatureColorResolutionInput {
   height: number
   activeMask?: Uint8Array
   minimumContrastByFeature?: ReadonlyMap<string, number>
+  preferredColorIdsByFeature?: ReadonlyMap<string, string>
   distanceMethod: ColorDistanceMethod
 }
 
@@ -66,6 +67,12 @@ function validateInput(input: FeatureColorResolutionInput, colors: readonly Prep
     throw new RangeError('Feature color occupancy must contain binary values')
   }
   const colorIds = new Set(colors.map((color) => color.id))
+  const featureIds = new Set(input.placements.map((placement) => placement.featureId))
+  for (const [featureId, colorId] of input.preferredColorIdsByFeature ?? []) {
+    if (featureIds.has(featureId) === false || colorIds.has(colorId) === false) {
+      throw new RangeError('Feature preferred colors must reference supplied placements and palette colors')
+    }
+  }
   for (let index = 0; index < cells; index += 1) {
     if ((input.activeMask?.[index] ?? 1) === 1 && colorIds.has(input.initialColorIds[index]!) === false) {
       throw new RangeError('Feature color assignments must reference the supplied palette')
@@ -88,6 +95,79 @@ function rankedColor(
 ): PreparedColor {
   return [...colors].sort((first, second) =>
     score(second) - score(first) || first.id.localeCompare(second.id))[0]!
+}
+
+function preferredFeatureColor(
+  role: FeatureCellRole,
+  entries: readonly { cell: number }[],
+  initialColorIds: readonly string[],
+  colorsById: ReadonlyMap<string, PreparedColor>,
+  carrier: Lab,
+  method: ColorDistanceMethod,
+): PreparedColor | undefined {
+  const counts = new Map<string, number>()
+  for (const entry of entries) {
+    const colorId = initialColorIds[entry.cell]!
+    counts.set(colorId, (counts.get(colorId) ?? 0) + 1)
+  }
+  if (role !== 'nose-base' && counts.size === 1) return colorsById.get([...counts.keys()][0]!)
+  if (role !== 'eye-dark' && role !== 'eye-highlight') return undefined
+  return rankedColor(
+    [...counts.keys()].map((colorId) => colorsById.get(colorId)!),
+    (color) => {
+      const frequency = counts.get(color.id) ?? 0
+      const chroma = Math.hypot(color.lab[1], color.lab[2])
+      const carrierContrast = colorDistance(carrier, color.lab, method)
+      const orderedValue = role === 'eye-dark'
+        ? color.lab[0] < carrier[0] ? 12 : 0
+        : color.lab[0] > carrier[0] ? 12 : 0
+      return frequency * 20 + chroma * 0.7 + carrierContrast * 0.35 + orderedValue
+    },
+  )
+}
+
+function sourcePreferredFeatureColor(
+  role: FeatureCellRole,
+  entries: readonly { featureId: string }[],
+  preferredColorIdsByFeature: ReadonlyMap<string, string> | undefined,
+  colorsById: ReadonlyMap<string, PreparedColor>,
+  carrier: Lab,
+  method: ColorDistanceMethod,
+): PreparedColor | undefined {
+  if (preferredColorIdsByFeature === undefined
+    || (role !== 'eye-highlight' && role !== 'nose-base')) return undefined
+  const counts = new Map<string, number>()
+  for (const entry of entries) {
+    const colorId = preferredColorIdsByFeature.get(entry.featureId)
+    if (colorId !== undefined) counts.set(colorId, (counts.get(colorId) ?? 0) + 1)
+  }
+  if (counts.size === 0) return undefined
+  return rankedColor(
+    [...counts.keys()].map((colorId) => colorsById.get(colorId)!),
+    (color) => {
+      const frequency = counts.get(color.id) ?? 0
+      const chroma = Math.hypot(color.lab[1], color.lab[2])
+      const contrast = colorDistance(carrier, color.lab, method)
+      const roleAffinity = role === 'nose-base'
+        ? Math.max(0, color.lab[1]) * 1.2 - Math.max(0, color.lab[2]) * 0.2
+        : chroma + color.lab[0] * 0.2
+      return frequency * 50 + roleAffinity + contrast * 0.2
+    },
+  )
+}
+
+function selectEyeDark(
+  colors: readonly PreparedColor[],
+  carrier: Lab,
+  minimumContrast: number,
+  method: ColorDistanceMethod,
+): PreparedColor {
+  return rankedColor(colors, (color) => {
+    const contrast = colorDistance(carrier, color.lab, method)
+    const darkRole = color.lab[0] <= 45 ? 1_500 : 0
+    const reachesContrast = contrast >= minimumContrast ? 300 : 0
+    return darkRole + reachesContrast + (100 - color.lab[0]) * 4 + contrast * 0.5
+  })
 }
 
 function selectDark(
@@ -158,15 +238,31 @@ function selectNose(
   method: ColorDistanceMethod,
   preferred?: PreparedColor,
 ): PreparedColor {
+  const targetContrast = Math.max(8, minimumContrast)
   if (preferred !== undefined
+    && colorDistance(carrier, preferred.lab, method) >= targetContrast * 0.7) return preferred
+  const preferredChroma = preferred === undefined
+    ? 0
+    : Math.hypot(preferred.lab[1], preferred.lab[2])
+  if (preferred !== undefined
+    && preferredChroma < 12
     && preferred.lab[0] < carrier[0]
     && colorDistance(carrier, preferred.lab, method) >= Math.max(3, minimumContrast * 0.4)) return preferred
-  const targetContrast = Math.max(6, minimumContrast * 0.55)
   return rankedColor(colors, (color) => {
     const contrast = colorDistance(carrier, color.lab, method)
     const darkness = carrier[0] - color.lab[0]
-    const staysDarker = darkness > 0 ? 200 : 0
-    return staysDarker - Math.abs(contrast - targetContrast) * 2 - Math.abs(darkness - 10)
+    const redAffinity = Math.max(0, color.lab[1]) * 1.4
+      + Math.max(0, -color.lab[2]) * 0.35
+      - Math.max(0, color.lab[2]) * 0.35
+    const reachesContrast = contrast >= targetContrast ? 300 : 0
+    const usefulTone = darkness >= 5 && darkness <= 55 ? 80 : 0
+    const preferredBonus = color.id === preferred?.id ? 40 : 0
+    return reachesContrast
+      + usefulTone
+      + redAffinity * 3
+      + Math.min(contrast, 40) * 1.5
+      - Math.abs(darkness - 25) * 0.6
+      + preferredBonus
   })
 }
 
@@ -210,9 +306,24 @@ export function resolveFeatureColors(
       ? [...neighborCells]
       : entries.map((entry) => entry.cell)
     const labs = carrierCells.map((cell) => colorsById.get(input.initialColorIds[cell]!)!.lab)
-    carrierByRole.set(role, averageLab(labs))
-    const existingIds = new Set(entries.map((entry) => input.initialColorIds[entry.cell]!))
-    if (existingIds.size === 1) preferredByRole.set(role, colorsById.get([...existingIds][0]!)!)
+    const carrier = averageLab(labs)
+    carrierByRole.set(role, carrier)
+    const preferred = sourcePreferredFeatureColor(
+      role,
+      entries,
+      input.preferredColorIdsByFeature,
+      colorsById,
+      carrier,
+      input.distanceMethod,
+    ) ?? preferredFeatureColor(
+      role,
+      entries,
+      input.initialColorIds,
+      colorsById,
+      carrier,
+      input.distanceMethod,
+    )
+    if (preferred !== undefined) preferredByRole.set(role, preferred)
     minimumContrastByRole.set(role, Math.max(0, ...entries.map((entry) =>
       input.minimumContrastByFeature?.get(entry.featureId) ?? 0)))
   }
@@ -222,7 +333,9 @@ export function resolveFeatureColors(
     if (carrier === undefined) continue
     const minimumContrast = minimumContrastByRole.get(role) ?? 0
     const preferred = preferredByRole.get(role)
-    const color = role === 'eye-highlight'
+    const color = role === 'eye-dark'
+      ? selectEyeDark(colors, carrier, minimumContrast, input.distanceMethod)
+      : role === 'eye-highlight'
       ? selectHighlight(colors, selected.get('eye-dark') ?? selectDark(
         colors,
         carrier,

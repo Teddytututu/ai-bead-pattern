@@ -370,6 +370,7 @@ export interface CandidateScore {
   total: number
   silhouette: number
   identity: number
+  identityAppearance?: number
   valueHierarchy: number
   pixelClusters: number
   craftCost: number

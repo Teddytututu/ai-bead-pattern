@@ -8,6 +8,7 @@ import {
   fitContainRect,
   maskEditSessionIsDirty,
   normalizePointerPoint,
+  resolveStrokePoints,
   snapStrokeToBoundary,
 } from './mask-editor.mjs'
 
@@ -153,6 +154,43 @@ describe('demo mask editor helpers', () => {
     assert.ok(result.confidence > 0.5)
   })
 
+  it('keeps the hand-drawn path unchanged until automatic snapping is enabled', () => {
+    const width = 9
+    const height = 9
+    const data = new Uint8ClampedArray(width * height * 4).fill(255)
+    const points = [{ x: 0.3, y: 0.4 }, { x: 0.6, y: 0.5 }]
+
+    const result = resolveStrokePoints(points, { width, height, data }, false)
+
+    assert.deepEqual(result.points, points)
+    assert.equal(result.snappedCount, 0)
+  })
+
+  it('uses the current subject-mask boundary when the source image has no visible edge', () => {
+    const width = 9
+    const height = 9
+    const data = new Uint8ClampedArray(width * height * 4).fill(180)
+    const values = new Float32Array(width * height)
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 5; x < width; x += 1) values[y * width + x] = 1
+    }
+
+    const result = resolveStrokePoints(
+      [{ x: 0.2, y: 0.5 }, { x: 0.4, y: 0.5 }, { x: 0.46, y: 0.5 }, { x: 0.8, y: 0.5 }],
+      { width, height, data },
+      true,
+      {
+        referenceMask: { width, height, values },
+        maxDistanceNormalized: 0.2,
+        endpointLock: 0.02,
+      },
+    )
+
+    assert.ok(result.snappedCount >= 2)
+    assert.ok(Math.abs(result.points[1].x - 0.5) < 0.06)
+    assert.ok(Math.abs(result.points[2].x - 0.5) < 0.06)
+  })
+
   it('wires the editor to the original evidence and saved edit session', async () => {
     const html = await readFile(new URL('./index.html', import.meta.url), 'utf8')
 
@@ -179,5 +217,6 @@ describe('demo mask editor helpers', () => {
     assert.match(html, /importanceStrength:\s*3\.5/)
     assert.match(html, /id="toggleOutlineButton"/)
     assert.match(html, /outline:\s*showOutline/)
+    assert.match(html, /id="maskSnapToggle" type="checkbox" checked/)
   })
 })

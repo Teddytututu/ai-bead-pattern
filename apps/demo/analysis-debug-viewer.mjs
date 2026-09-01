@@ -182,7 +182,14 @@ export function resolveAnalysisDebugLayer(id, {
     return evidenceLayer(id, evidence, analysis?.modelVersions?.segmentation)
   }
   if (id === 'face') {
-    return semanticLayer(id, region(analysis, 'face-skin'), analysis?.modelVersions?.portraitSemantics)
+    const petFace = region(analysis, 'pet-face')
+    return semanticLayer(
+      id,
+      region(analysis, 'face-skin') ?? petFace,
+      petFace === undefined
+        ? analysis?.modelVersions?.portraitSemantics
+        : analysis?.modelVersions?.petSemantics,
+    )
   }
   if (id === 'hair') {
     return semanticLayer(id, region(analysis, 'hair'), analysis?.modelVersions?.portraitSemantics)

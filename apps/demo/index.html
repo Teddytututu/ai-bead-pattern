@@ -369,6 +369,8 @@
 
     .mask-tool-group { display: flex; align-items: center; gap: 6px; }
     .mask-tool-label { color: var(--muted); font-size: 11px; font-weight: 700; }
+    .mask-snap-toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface); font-size: 12px; font-weight: 700; cursor: pointer; }
+    .mask-snap-toggle input { width: 16px; height: 16px; accent-color: #177eff; }
     .mask-segmented { display: grid; grid-auto-flow: column; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
     .mask-segmented button { min-width: 58px; height: 32px; padding: 0 10px; border: 0; border-right: 1px solid var(--border); background: var(--surface); color: var(--muted); cursor: pointer; }
     .mask-segmented button:last-child { border-right: 0; }
@@ -1026,6 +1028,10 @@
             <button type="button" data-mask-radius="0.04" aria-pressed="false">大</button>
           </div>
         </div>
+        <label class="mask-snap-toggle" title="沿主体蒙版边缘吸附当前笔画">
+          <input id="maskSnapToggle" type="checkbox" checked>
+          自动贴边
+        </label>
         <div class="mask-tool-group">
           <button class="icon-button" id="maskUndoButton" type="button" aria-label="撤销" title="撤销">↶</button>
           <button class="icon-button" id="maskRedoButton" type="button" aria-label="重做" title="重做">↷</button>
@@ -1111,6 +1117,7 @@
       derivePreferenceGenerationParameters,
       fitBradleyTerry,
       fitPreferenceModelV2,
+      inferPetAnalysis,
       preferenceRecordFromWorkbenchSession,
       rankPreferenceCandidates,
       redoMaskEdit,
@@ -1266,6 +1273,7 @@
       maskEditorCloseButton: document.querySelector('#maskEditorCloseButton'),
       maskModeControl: document.querySelector('#maskModeControl'),
       maskRadiusControl: document.querySelector('#maskRadiusControl'),
+      maskSnapToggle: document.querySelector('#maskSnapToggle'),
       maskUndoButton: document.querySelector('#maskUndoButton'),
       maskRedoButton: document.querySelector('#maskRedoButton'),
       maskResetButton: document.querySelector('#maskResetButton'),
@@ -1400,6 +1408,7 @@
         closeButton: elements.maskEditorCloseButton,
         modeControl: elements.maskModeControl,
         radiusControl: elements.maskRadiusControl,
+        snapToggle: elements.maskSnapToggle,
         undoButton: elements.maskUndoButton,
         redoButton: elements.maskRedoButton,
         resetButton: elements.maskResetButton,
@@ -1553,7 +1562,9 @@
       const availability = routeAvailability(aiHealth, selectedModelRoute)
       if (availability.available === false) throw new Error('当前模型路线尚未接入运行环境')
       elements.modelRouteStatus.textContent = '分析中'
-      const result = await runAiRoute(sourceImage, selectedModelRoute)
+      const result = await runAiRoute(sourceImage, selectedModelRoute, {
+        request: { imageTypeHint: sourceAnalysis.imageType },
+      })
       if (result.status === 'unavailable') throw new Error('模型服务当前未提供分析结果')
       sourceAnalysis = result.analysis
       originalSubjectEvidence = sourceAnalysis.subjectMaskEvidence
@@ -1811,41 +1822,54 @@
       return canvasToPixelImage(canvas)
     }
 
-    function createSampleAnalysis(image) {
-      const base = inferSubjectAnalysis(image)
-      const faceMask = base.subjectMaskEvidence.mask
-      const width = image.width
-      const height = image.height
-      const point = (x, y) => ({ x: width * x, y: height * y })
+    function createSampleAnalysis(image, bundledMask) {
+      const local = inferSubjectAnalysis(image)
       const provenance = [{
-        origin: 'heuristic',
-        provider: 'demo-sample',
+        origin: bundledMask === undefined ? 'heuristic' : 'model',
+        provider: bundledMask === undefined ? 'demo-sample' : 'bundled-birefnet',
         model: 'bundled-cc0-cat',
         version: '2026-09-01',
       }]
+      const subjectMask = bundledMask ?? local.subjectMaskEvidence.mask
+      const pet = inferPetAnalysis(image, subjectMask)
+      const faceMask = pet?.faceMask ?? {
+        width: image.width,
+        height: image.height,
+        values: new Float32Array(image.width * image.height),
+      }
+      const base = {
+        ...local,
+        subjectMask,
+        subjectMaskEvidence: {
+          mask: subjectMask,
+          confidence: bundledMask === undefined ? local.confidence : 0.96,
+          source: bundledMask === undefined ? local.subjectMaskEvidence.source : 'ai',
+          revision: bundledMask === undefined ? local.subjectMaskEvidence.revision : 'demo:bundled-birefnet:cat-v1',
+          provenance,
+        },
+      }
       return {
         ...base,
         imageType: 'pet',
-        landmarks: [
-          { id: 'left-eye-center', kind: 'eye', ...point(0.39, 0.41), confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
-          { id: 'right-eye-center', kind: 'eye', ...point(0.61, 0.41), confidence: 1, priority: 'hard', symmetryGroup: 'eyes', carrierRegionId: 'face-skin', provenance },
-          { id: 'nose-tip', kind: 'nose', ...point(0.5, 0.51), confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
-          { id: 'mouth-center', kind: 'mouth', ...point(0.5, 0.56), confidence: 1, priority: 'hard', carrierRegionId: 'face-skin', provenance },
-          { id: 'left-ear-tip', kind: 'ear', ...point(0.34, 0.12), confidence: 0.96, priority: 'hard', carrierRegionId: 'subject', provenance },
-          { id: 'right-ear-tip', kind: 'ear', ...point(0.72, 0.15), confidence: 0.96, priority: 'hard', carrierRegionId: 'subject', provenance },
-        ],
+        ...(pet === undefined ? {} : {
+          landmarks: pet.landmarks,
+          suggestedCrop: pet.suggestedCrop,
+          suggestedCropSource: 'automatic',
+          suggestedCropConfidence: pet.suggestedCropConfidence,
+          confidence: pet.confidence,
+        }),
         semanticRegions: [
           {
             id: 'subject',
             label: 'subject',
             mask: base.subjectMaskEvidence.mask,
-            confidence: 1,
+            confidence: base.subjectMaskEvidence.confidence,
             importance: 0.9,
             provenance,
           },
           {
-            id: 'face-skin',
-            label: 'face-skin',
+            id: 'pet-face',
+            label: 'pet face',
             mask: faceMask,
             confidence: 1,
             importance: 1,
@@ -1854,14 +1878,17 @@
         ],
         modelVersions: {
           ...base.modelVersions,
-          faceLandmarks: 'demo/bundled-cat-v1',
-          portraitSemantics: 'demo/bundled-cat-v1',
+          petLandmarks: 'pet-geometry/pet-face-v2',
+          petSemantics: 'pet-geometry/pet-face-v2',
         },
       }
     }
 
     async function loadBundledSample() {
-      const response = await fetch('./assets/sample-cat.png', { cache: 'no-store' })
+      const [response, maskResponse] = await Promise.all([
+        fetch('./assets/sample-cat.png', { cache: 'no-store' }),
+        fetch('./assets/sample-cat-mask.png', { cache: 'no-store' }),
+      ])
       if (response.ok === false) throw new Error(`示例图加载失败: ${response.status}`)
       const bitmap = await createImageBitmap(await response.blob())
       const maximum = 512
@@ -1873,7 +1900,24 @@
       context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
       bitmap.close()
       const image = canvasToPixelImage(canvas)
-      return { image, analysis: createSampleAnalysis(image) }
+      let bundledMask
+      if (maskResponse.ok) {
+        const maskBitmap = await createImageBitmap(await maskResponse.blob())
+        const maskCanvas = document.createElement('canvas')
+        maskCanvas.width = canvas.width
+        maskCanvas.height = canvas.height
+        const maskContext = maskCanvas.getContext('2d', { willReadFrequently: true })
+        maskContext.drawImage(maskBitmap, 0, 0, maskCanvas.width, maskCanvas.height)
+        maskBitmap.close()
+        const maskPixels = maskContext.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data
+        bundledMask = {
+          width: maskCanvas.width,
+          height: maskCanvas.height,
+          values: Float32Array.from({ length: maskCanvas.width * maskCanvas.height }, (_, index) =>
+            (maskPixels[index * 4] ?? 0) / 255),
+        }
+      }
+      return { image, analysis: createSampleAnalysis(image, bundledMask) }
     }
 
     function canvasToPixelImage(canvas) {
