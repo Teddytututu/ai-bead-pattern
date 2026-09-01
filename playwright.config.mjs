@@ -13,9 +13,9 @@ export default defineConfig({
   },
   webServer: {
     command: 'node scripts/serve-demo.mjs',
-    env: { PORT: '4174' },
+    env: { PORT: '4174', AI_BEAD_E2E_FIXTURE: '1' },
     url: 'http://127.0.0.1:4174/apps/demo/',
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 10_000,
   },
 })

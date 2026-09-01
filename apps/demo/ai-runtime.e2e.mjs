@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-test('runs real neural analysis and exposes model contributions', async ({ page }) => {
+test('runs neural analysis and exposes model contributions', async ({ page }) => {
   test.setTimeout(60_000)
   await page.goto('/apps/demo/')
   await expect(page.locator('#modelRouteSelect')).toBeVisible()

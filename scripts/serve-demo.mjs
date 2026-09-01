@@ -15,7 +15,11 @@ const mimeTypes = {
   '.json': 'application/json; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
 }
-const aiApiHandler = createDemoAiApiHandler()
+const aiApiHandler = process.env.AI_BEAD_E2E_FIXTURE === '1'
+  ? createDemoAiApiHandler({
+      service: (await import('./demo-ai-e2e-fixture.mjs')).createDemoAiE2EService(),
+    })
+  : createDemoAiApiHandler()
 
 function sendText(response, statusCode, body) {
   response.writeHead(statusCode, { 'Content-Type': 'text/plain; charset=utf-8' })
