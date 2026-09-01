@@ -87,19 +87,36 @@ export function hydrateAiAnalysisResult(result) {
   return {
     ...result,
     analysis: hydrateAnalysis(result.analysis),
-    learnedProposals: (result.learnedProposals ?? []).map((proposal) => ({
-      ...proposal,
-      image: (() => {
-        if (Number.isInteger(proposal.image?.width) === false
-          || Number.isInteger(proposal.image?.height) === false
-          || proposal.image.width <= 0 || proposal.image.height <= 0
-          || Array.isArray(proposal.image.data) === false
-          || proposal.image.data.length !== proposal.image.width * proposal.image.height * 4) {
-          throw new RangeError('Learned proposal RGBA data differs from its dimensions')
-        }
-        return { ...proposal.image, data: Uint8ClampedArray.from(proposal.image.data) }
-      })(),
-    })),
+    learnedProposals: (result.learnedProposals ?? []).map((proposal) => {
+      if (proposal === null || typeof proposal !== 'object' || Array.isArray(proposal)
+        || typeof proposal.id !== 'string' || proposal.id.trim().length === 0
+        || typeof proposal.modelId !== 'string' || proposal.modelId.trim().length === 0
+        || (proposal.kind !== 'learned-pixelization' && proposal.kind !== 'generative-proposal')) {
+        throw new RangeError('Learned proposal identity and kind are invalid')
+      }
+      if (Number.isFinite(proposal.confidence) === false
+        || proposal.confidence < 0 || proposal.confidence > 1) {
+        throw new RangeError('Learned proposal confidence must stay within 0..1')
+      }
+      if (proposal.targetGrid !== undefined
+        && (Number.isInteger(proposal.targetGrid.width) === false
+          || Number.isInteger(proposal.targetGrid.height) === false
+          || proposal.targetGrid.width <= 0 || proposal.targetGrid.height <= 0)) {
+        throw new RangeError('Learned proposal target grid must use positive integer dimensions')
+      }
+      if (Number.isInteger(proposal.image?.width) === false
+        || Number.isInteger(proposal.image?.height) === false
+        || proposal.image.width <= 0 || proposal.image.height <= 0
+        || Array.isArray(proposal.image.data) === false
+        || proposal.image.data.length !== proposal.image.width * proposal.image.height * 4
+        || proposal.image.data.some((value) => Number.isInteger(value) === false || value < 0 || value > 255)) {
+        throw new RangeError('Learned proposal RGBA data differs from its dimensions or value range')
+      }
+      return {
+        ...proposal,
+        image: { ...proposal.image, data: Uint8ClampedArray.from(proposal.image.data) },
+      }
+    }),
     preferenceFeatures: (result.preferenceFeatures ?? []).map((features) => {
       if (Array.isArray(features.names) === false || Array.isArray(features.values) === false
         || features.names.length === 0 || features.names.length !== features.values.length
@@ -114,6 +131,14 @@ export function hydrateAiAnalysisResult(result) {
 export function routeAvailability(health, route) {
   analysisCapabilitiesForRoute(route)
   return health?.routes?.[route] ?? { available: false, status: 'checking', providers: [] }
+}
+
+export function selectLearnedProposal(proposals, route) {
+  if (route !== 'learned-pixelization' && route !== 'generative-proposal') return undefined
+  return [...(proposals ?? [])]
+    .filter((proposal) => proposal.kind === route)
+    .sort((first, second) => second.confidence - first.confidence
+      || first.id.localeCompare(second.id))[0]
 }
 
 async function responseJson(response) {

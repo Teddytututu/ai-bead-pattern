@@ -8,8 +8,8 @@ test('runs real neural analysis and exposes model contributions', async ({ page 
   await expect(page.locator('#modelRouteSelect option[value="generative-proposal"]')).toBeDisabled()
 
   await page.locator('#modelRouteSelect').selectOption('neural-analysis')
+  await expect(page.locator('#analysisSource')).toContainText('BiRefNet', { timeout: 45_000 })
   await expect(page.locator('#statusText')).not.toHaveText('生成中', { timeout: 45_000 })
-  await expect(page.locator('#analysisSource')).toContainText('BiRefNet')
 
   await page.getByRole('button', { name: '分析图层' }).click()
   const dialog = page.getByRole('dialog', { name: '图像理解' })

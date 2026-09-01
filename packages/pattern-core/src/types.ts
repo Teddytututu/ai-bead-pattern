@@ -43,7 +43,8 @@ export interface MaterialPalette {
 }
 
 export type ImageType = 'portrait' | 'pet' | 'illustration' | 'landscape' | 'general'
-export type ResizeMethod = 'area' | 'bilinear' | 'nearest'
+/** Sampling modes; cell-aware follows the learned cell/aliasing split with a deterministic fallback. */
+export type ResizeMethod = 'area' | 'bilinear' | 'nearest' | 'cell-aware'
 export type ColorDistanceMethod = 'delta-e-76' | 'delta-e-2000'
 export type PatternStyle = 'faithful' | 'cute' | 'simple' | 'high-contrast' | 'soft'
 export type BaselineMode = 'a0' | 'a1' | 'mvp'

@@ -6,6 +6,7 @@ import {
   hydrateAiAnalysisResult,
   pixelImageRequestBody,
   routeAvailability,
+  selectLearnedProposal,
 } from './ai-runtime.mjs'
 
 describe('demo AI runtime client', () => {
@@ -82,6 +83,27 @@ describe('demo AI runtime client', () => {
       analysis: {},
       preferenceFeatures: [{ modelId: 'test', names: ['a'], values: [0.2, 0.3], confidence: 0.8 }],
     }), /features/)
+    assert.throws(() => hydrateAiAnalysisResult({
+      analysis: {},
+      learnedProposals: [{
+        id: 'proposal-1',
+        kind: 'learned-pixelization',
+        modelId: 'test/model',
+        confidence: 0.8,
+        targetGrid: { width: 0, height: 32 },
+        image: { width: 1, height: 1, data: [0, 0, 0, 255] },
+      }],
+    }), /target grid/)
+    assert.throws(() => hydrateAiAnalysisResult({
+      analysis: {},
+      learnedProposals: [{
+        id: 'proposal-1',
+        kind: 'learned-pixelization',
+        modelId: 'test/model',
+        confidence: Number.NaN,
+        image: { width: 1, height: 1, data: [0, 0, 0, 255] },
+      }],
+    }), /confidence/)
   })
 
   it('reports explicit route availability from health metadata', () => {
@@ -97,5 +119,28 @@ describe('demo AI runtime client', () => {
     assert.equal(routeAvailability(health, 'neural-analysis').available, true)
     assert.equal(routeAvailability(health, 'generative-proposal').available, false)
     assert.equal(routeAvailability(undefined, 'neural-analysis').status, 'checking')
+  })
+
+  it('selects the strongest learned proposal and carries its target grid into generation', () => {
+    const proposals = [{
+      id: 'weak',
+      kind: 'learned-pixelization',
+      image: { width: 16, height: 16, data: new Uint8ClampedArray(16 * 16 * 4) },
+      confidence: 0.45,
+      modelId: 'pixel/model',
+      targetGrid: { width: 32, height: 32 },
+    }, {
+      id: 'strong',
+      kind: 'learned-pixelization',
+      image: { width: 24, height: 24, data: new Uint8ClampedArray(24 * 24 * 4) },
+      confidence: 0.91,
+      modelId: 'pixel/model',
+      targetGrid: { width: 48, height: 48 },
+    }]
+
+    const selected = selectLearnedProposal(proposals, 'learned-pixelization')
+    assert.equal(selected?.id, 'strong')
+    assert.deepEqual(selected?.targetGrid, { width: 48, height: 48 })
+    assert.equal(selectLearnedProposal(proposals, 'generative-proposal'), undefined)
   })
 })

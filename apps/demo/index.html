@@ -1143,6 +1143,7 @@
       fetchAiHealth,
       routeAvailability,
       runAiRoute,
+      selectLearnedProposal,
     } from './ai-runtime.mjs'
     import { createPreferenceRuntime } from './preference-runtime.mjs'
 
@@ -1929,6 +1930,7 @@
         maxCandidates: 10,
         styles: selectedStyles(),
         baseline: selectedBaseline,
+        aiEnhancement: selectedModelRoute !== 'deterministic',
         backgroundRgb: [245, 245, 242],
         structure: {
           importanceStrength: 3.5,
@@ -1966,11 +1968,35 @@
       await new Promise((resolve) => requestAnimationFrame(resolve))
       try {
         await prepareSelectedAnalysis()
+        const aiResult = aiResultByRoute.get(selectedModelRoute)
+        const learnedProposal = selectLearnedProposal(
+          aiResult?.learnedProposals,
+          selectedModelRoute,
+        )
+        const proposalGrid = learnedProposal?.targetGrid
+        const options = generationOptions()
         const result = await algorithm.generate({
-          image: sourceImage,
+          image: learnedProposal?.image ?? sourceImage,
           palette,
-          analysis: sourceAnalysis,
-          options: generationOptions(),
+          analysis: learnedProposal === undefined
+            ? sourceAnalysis
+            : {
+              confidence: learnedProposal.confidence,
+              imageType: sourceAnalysis.imageType,
+              modelVersions: { learnedPixelization: learnedProposal.modelId },
+              provenance: [{
+                origin: 'model',
+                provider: 'ai-gateway',
+                model: learnedProposal.modelId,
+              }],
+            },
+          options: learnedProposal === undefined || proposalGrid === undefined
+            ? options
+            : {
+              ...options,
+              canvas: { mode: 'fixed', size: proposalGrid },
+              resizeMethod: 'cell-aware',
+            },
         })
         const primary = result.recommended ?? result.bestEffort
         if (primary === undefined) throw new Error('当前参数没有生成候选方案')
@@ -1985,7 +2011,10 @@
         const modeName = { mvp: '结构版', a1: '面积缩放', a0: '最近邻' }[selectedBaseline]
         if (result.status === 'success') {
           const shapeName = primary.metrics.shapeApplied ? '主体形状' : '全画面'
-          setStatus(`${modeName} · ${shapeName} · ${Math.round(result.timing.coreTotalMs)} ms`)
+          const sourceName = learnedProposal === undefined
+            ? ''
+            : ` · ${learnedProposal.kind === 'learned-pixelization' ? '学习像素化' : '生成提案'}`
+          setStatus(`${modeName} · ${shapeName}${sourceName} · ${Math.round(result.timing.coreTotalMs)} ms`)
         } else {
           setStatus('关键特征表达不足，请扩大画布、缩小主体范围或调整关键点', 'warning')
         }

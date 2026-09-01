@@ -309,7 +309,7 @@ function validateMask(
 
 function validateRequest(request: PatternGenerationRequest): void {
   validateEnum(request.options.baseline, new Set(['a0', 'a1', 'mvp']), 'baseline')
-  validateEnum(request.options.resizeMethod, new Set(['area', 'bilinear', 'nearest']), 'resizeMethod')
+  validateEnum(request.options.resizeMethod, new Set(['area', 'bilinear', 'nearest', 'cell-aware']), 'resizeMethod')
   validateEnum(
     request.options.colorDistanceMethod,
     new Set(['delta-e-76', 'delta-e-2000']),
@@ -625,10 +625,22 @@ function resolveStyles(options: PatternOptions, baseline: BaselineMode): readonl
   return [...new Set(styles)]
 }
 
-function resolveResizeMethod(options: PatternOptions, baseline: BaselineMode): ResizeMethod {
+function resolveResizeMethod(
+  options: PatternOptions,
+  baseline: BaselineMode,
+  analysis?: ImageAnalysis,
+  preserveThinStructures = false,
+): ResizeMethod {
   if (baseline === 'a0') return 'nearest'
   if (baseline === 'a1') return 'area'
-  return options.resizeMethod ?? 'area'
+  if (options.resizeMethod !== undefined) return options.resizeMethod
+  if (preserveThinStructures) return 'area'
+  const learnedEvidence = analysis?.subjectMaskEvidence?.source === 'ai'
+    || analysis?.subjectMaskEvidence?.source === 'ai+manual'
+    || analysis?.subjectMaskEvidence?.source === 'fused'
+    || (analysis?.provenance ?? []).some((entry) => entry.origin === 'model')
+  if (learnedEvidence) return 'cell-aware'
+  return 'area'
 }
 
 function resolveDistanceMethod(options: PatternOptions, baseline: BaselineMode): ColorDistanceMethod {
@@ -2480,7 +2492,12 @@ export class DeterministicPatternAlgorithm {
       }
     })
     canvasPlanningMs = Math.max(0, performance.now() - canvasPlanningStartedAt)
-    const resizeMethod = resolveResizeMethod(request.options, baseline)
+    const resizeMethod = resolveResizeMethod(
+      request.options,
+      baseline,
+      request.analysis,
+      preserveThinStructures,
+    )
     const distanceMethod = resolveDistanceMethod(request.options, baseline)
     const candidates: PatternCandidate[] = []
     const candidateGenerationStartedAt = performance.now()

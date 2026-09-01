@@ -35,6 +35,10 @@ function alphaAt(image: PixelImage, x: number, y: number): number {
   return (image.data[(safeY * image.width + safeX) * 4 + 3] ?? 255) / 255
 }
 
+function luminance(rgb: RGB): number {
+  return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
+}
+
 function nearestSample(image: PixelImage, sourceX: number, sourceY: number, backgroundRgb: RGB): RGB {
   return pixelAt(image, Math.round(sourceX), Math.round(sourceY), backgroundRgb)
 }
@@ -166,6 +170,67 @@ function guidedAreaSample(
   ]
 }
 
+function cellAwareSample(
+  image: PixelImage,
+  sourceLeft: number,
+  sourceTop: number,
+  sourceRight: number,
+  sourceBottom: number,
+  backgroundRgb: RGB,
+  guidance: SamplingGuidance,
+): RGB {
+  const base = guidedAreaSample(
+    image,
+    sourceLeft,
+    sourceTop,
+    sourceRight,
+    sourceBottom,
+    backgroundRgb,
+    guidance,
+  )
+  const baseLightness = luminance(base)
+  const supportByBucket = new Uint32Array(12)
+  let sampleCount = 0
+  for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
+    for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
+      const pixel = pixelAt(image, sourceX, sourceY, backgroundRgb)
+      const bucket = clamp(Math.round(luminance(pixel) / 24), 0, supportByBucket.length - 1)
+      supportByBucket[bucket] = (supportByBucket[bucket] ?? 0) + 1
+      sampleCount += 1
+    }
+  }
+  let best: { pixel: RGB; score: number; edge: number } | undefined
+  for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
+    for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
+      const safeX = clamp(sourceX, 0, image.width - 1)
+      const safeY = clamp(sourceY, 0, image.height - 1)
+      const index = safeY * image.width + safeX
+      const pixel = pixelAt(image, sourceX, sourceY, backgroundRgb)
+      const edge = guidance.source.edge[index] ?? 0
+      const importance = guidance.source.importance[index] ?? 0
+      const bucket = clamp(Math.round(luminance(pixel) / 24), 0, supportByBucket.length - 1)
+      const support = (supportByBucket[bucket - 1] ?? 0)
+        + supportByBucket[bucket]!
+        + (supportByBucket[bucket + 1] ?? 0)
+      const colorDistance = Math.abs(luminance(pixel) - baseLightness) / 255
+      const supportRatio = support / Math.max(1, sampleCount)
+      const score = edge * 1.8 + importance * 1.15
+        + supportRatio * 0.55 - colorDistance * 0.65
+      if (best === undefined || score > best.score) {
+        best = { pixel, score, edge }
+      }
+    }
+  }
+  if (best === undefined) return base
+  const edgeThreshold = 0.22
+  const selectedEdge = best.edge
+  if (selectedEdge < edgeThreshold) return base
+  const amount = clamp(0.58 + selectedEdge * 0.3, 0.58, 0.86)
+  return [0, 1, 2].map((channel) => Math.round(
+    base[channel]! * (1 - amount) + best!.pixel[channel]! * amount,
+  )) as unknown as RGB
+}
+
 export interface CanvasFit {
   x: number
   y: number
@@ -243,7 +308,23 @@ export function resizePixels(
       activeMask[index] = 1
       const localX = x - fit.x
       const localY = y - fit.y
-      if (method === 'nearest') {
+      if (method === 'cell-aware') {
+        const sourceLeft = clamp(crop.x + localX * scaleX, crop.x, crop.x + crop.width)
+        const sourceTop = clamp(crop.y + localY * scaleY, crop.y, crop.y + crop.height)
+        const sourceRight = clamp(crop.x + (localX + 1) * scaleX, crop.x, crop.x + crop.width)
+        const sourceBottom = clamp(crop.y + (localY + 1) * scaleY, crop.y, crop.y + crop.height)
+        pixels.push(guidance === undefined
+          ? areaSample(image, sourceLeft, sourceTop, sourceRight, sourceBottom, backgroundRgb)
+          : cellAwareSample(
+            image,
+            sourceLeft,
+            sourceTop,
+            sourceRight,
+            sourceBottom,
+            backgroundRgb,
+            guidance,
+          ))
+      } else if (method === 'nearest') {
         pixels.push(nearestSample(
           image,
           sourcePoint[0],

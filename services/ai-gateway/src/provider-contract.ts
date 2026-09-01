@@ -134,6 +134,10 @@ const landmarkKinds = new Set<LandmarkKind>([
   'custom',
 ])
 const landmarkPriorities = new Set<LandmarkPriority>(['hard', 'soft'])
+const learnedProposalKinds = new Set<LearnedProposal['kind']>([
+  'learned-pixelization',
+  'generative-proposal',
+])
 
 function record(value: unknown, label: string): Readonly<Record<string, unknown>> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -438,11 +442,26 @@ export function validatePreferenceFeatures(value: PreferenceFeatures): void {
 export function validateLearnedProposal(value: LearnedProposal): void {
   stringValue(value.id, 'Learned proposal id')
   stringValue(value.modelId, 'Learned proposal model id')
+  if (learnedProposalKinds.has(value.kind) === false) {
+    throw new RangeError('Learned proposal kind is invalid')
+  }
   unit(value.confidence, 'Learned proposal confidence')
   if (Number.isInteger(value.image.width) === false || value.image.width <= 0
     || Number.isInteger(value.image.height) === false || value.image.height <= 0
+    || value.image.data instanceof Uint8ClampedArray === false
     || value.image.data.length !== value.image.width * value.image.height * 4) {
     throw new RangeError('Learned proposal image must contain valid RGBA data')
+  }
+  if (value.targetGrid !== undefined
+    && (Number.isInteger(value.targetGrid.width) === false
+      || Number.isInteger(value.targetGrid.height) === false
+      || value.targetGrid.width <= 0 || value.targetGrid.height <= 0)) {
+    throw new RangeError('Learned proposal target grid must use positive integer dimensions')
+  }
+  optionalString(value.paletteId, 'Learned proposal palette id')
+  optionalString(value.styleId, 'Learned proposal style id')
+  if (value.seed !== undefined && (Number.isSafeInteger(value.seed) === false || value.seed < 0)) {
+    throw new RangeError('Learned proposal seed must use a non-negative safe integer')
   }
 }
 

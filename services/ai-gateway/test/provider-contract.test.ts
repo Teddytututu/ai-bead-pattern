@@ -9,6 +9,7 @@ import {
   HttpVisionProvider,
   MODEL_CATALOG,
   RembgVisionProvider,
+  validateLearnedProposal,
   validateModelManifest,
   type AIModelProvider,
   type ModelProviderRequest,
@@ -90,6 +91,36 @@ describe('model manifest and catalog', () => {
       ...localManifest,
       input: { ...localManifest.input, maximumWidth: 0 },
     }), /input/)
+  })
+})
+
+describe('learned proposal contract', () => {
+  const proposal = {
+    id: 'proposal-1',
+    kind: 'learned-pixelization' as const,
+    image: image(),
+    confidence: 0.8,
+    modelId: 'test/pixelizer',
+    targetGrid: { width: 32, height: 48 },
+  }
+
+  it('accepts a replayable proposal with a positive target grid', () => {
+    assert.doesNotThrow(() => validateLearnedProposal(proposal))
+  })
+
+  it('rejects invalid routes, grids, and RGBA values before composition', () => {
+    assert.throws(() => validateLearnedProposal({
+      ...proposal,
+      kind: 'unknown-route' as never,
+    }), /kind/)
+    assert.throws(() => validateLearnedProposal({
+      ...proposal,
+      targetGrid: { width: 0, height: 48 },
+    }), /target grid/)
+    assert.throws(() => validateLearnedProposal({
+      ...proposal,
+      image: { ...proposal.image, data: new Uint8Array(proposal.image.data) as never },
+    }), /RGBA/)
   })
 })
 
