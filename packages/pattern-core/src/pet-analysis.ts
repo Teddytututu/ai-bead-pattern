@@ -61,6 +61,40 @@ function maskBounds(mask: BinaryMask): Bounds | undefined {
   return { left, top, right, bottom, width: right - left + 1, height: bottom - top + 1 }
 }
 
+function principalComponentMask(mask: BinaryMask): BinaryMask {
+  const visited = new Uint8Array(mask.values.length)
+  let selected: number[] = []
+  for (let start = 0; start < mask.values.length; start += 1) {
+    if (visited[start] !== 0 || (mask.values[start] ?? 0) < 0.5) continue
+    const component: number[] = []
+    const queue = [start]
+    visited[start] = 1
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const current = queue[cursor]!
+      component.push(current)
+      const x = current % mask.width
+      const y = Math.floor(current / mask.width)
+      for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+          if (offsetX === 0 && offsetY === 0) continue
+          const nextX = x + offsetX
+          const nextY = y + offsetY
+          if (nextX < 0 || nextX >= mask.width || nextY < 0 || nextY >= mask.height) continue
+          const next = nextY * mask.width + nextX
+          if (visited[next] !== 0 || (mask.values[next] ?? 0) < 0.5) continue
+          visited[next] = 1
+          queue.push(next)
+        }
+      }
+    }
+    if (component.length > selected.length) selected = component
+  }
+  if (selected.length === 0 || selected.length === mask.values.length) return mask
+  const values = new Float32Array(mask.values.length)
+  for (const index of selected) values[index] = mask.values[index] ?? 0
+  return { width: mask.width, height: mask.height, values }
+}
+
 function luminance(image: PixelImage, x: number, y: number): number {
   const index = (y * image.width + x) * 4
   return ((image.data[index] ?? 0) * 0.2126
@@ -233,7 +267,11 @@ function noseFeature(
   expectedY: number,
   radius: number,
 ): PointScore {
-  let best: PointScore = { x: Math.round(expectedX), y: Math.round(expectedY), score: 0 }
+  let best: PointScore = {
+    x: clamp(Math.round(expectedX), 0, image.width - 1),
+    y: clamp(Math.round(expectedY), 0, image.height - 1),
+    score: 0,
+  }
   for (let y = Math.max(0, Math.floor(expectedY - radius)); y <= Math.min(image.height - 1, Math.ceil(expectedY + radius)); y += 1) {
     for (let x = Math.max(0, Math.floor(expectedX - radius)); x <= Math.min(image.width - 1, Math.ceil(expectedX + radius)); x += 1) {
       if ((mask.values[y * mask.width + x] ?? 0) < 0.5) continue
@@ -371,9 +409,10 @@ function landmark(
 
 export function inferPetAnalysis(image: PixelImage, mask: BinaryMask): PetAnalysisResult | undefined {
   validate(image, mask)
-  const bounds = maskBounds(mask)
+  const analysisMask = principalComponentMask(mask)
+  const bounds = maskBounds(analysisMask)
   if (bounds === undefined || bounds.width < 6 || bounds.height < 6) return undefined
-  const ears = earTips(mask, bounds)
+  const ears = earTips(analysisMask, bounds)
   if (ears === undefined) return undefined
   const [leftEar, rightEar] = ears
   const earSeparation = rightEar.x - leftEar.x
@@ -383,7 +422,7 @@ export function inferPetAnalysis(image: PixelImage, mask: BinaryMask): PetAnalys
   const earTop = Math.min(leftEar.y, rightEar.y)
   const noseSeed = noseFeature(
     image,
-    mask,
+    analysisMask,
     centerX,
     Math.min(bounds.bottom, earTop + faceWidth * 0.8),
     faceWidth * 0.18,
@@ -393,16 +432,16 @@ export function inferPetAnalysis(image: PixelImage, mask: BinaryMask): PetAnalys
     : centerX
   const [rawLeftEye, rawRightEye] = eyePair(
     image,
-    mask,
+    analysisMask,
     faceAxisX,
     faceWidth,
     earTop,
   )
-  const leftEye = refineEyeCenter(image, mask, rawLeftEye, faceWidth * 0.07)
-  const rightEye = refineEyeCenter(image, mask, rawRightEye, faceWidth * 0.07)
+  const leftEye = refineEyeCenter(image, analysisMask, rawLeftEye, faceWidth * 0.07)
+  const rightEye = refineEyeCenter(image, analysisMask, rawRightEye, faceWidth * 0.07)
   const eyeY = (leftEye.y + rightEye.y) / 2
   const eyeMidpointX = (leftEye.x + rightEye.x) / 2
-  const nose = noseFeature(image, mask, eyeMidpointX, eyeY + faceWidth * 0.21, faceWidth * 0.13)
+  const nose = noseFeature(image, analysisMask, eyeMidpointX, eyeY + faceWidth * 0.21, faceWidth * 0.13)
   const earSymmetry = clamp(1 - Math.abs(leftEar.y - rightEar.y) / Math.max(1, faceWidth * 0.35), 0, 1)
   const eyeSymmetry = clamp(1 - Math.abs(leftEye.y - rightEye.y) / Math.max(1, faceWidth * 0.12), 0, 1)
   const eyeEvidence = clamp((leftEye.score + rightEye.score) / 2, 0, 1)
@@ -435,7 +474,7 @@ export function inferPetAnalysis(image: PixelImage, mask: BinaryMask): PetAnalys
     imageType: 'pet',
     landmarks,
     faceMask: petFaceMask(
-      mask,
+      analysisMask,
       leftEar,
       rightEar,
       leftEye,

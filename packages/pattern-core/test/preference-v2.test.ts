@@ -108,6 +108,34 @@ function record(
 }
 
 describe('PreferenceRecord V2 contract', () => {
+  it('retains a replayable vision-model annotator identity and confidence', () => {
+    const a = candidate('a')
+    const b = candidate('b')
+    const visionRecord = record('vision-r-1', 'vision-source-1', a, b, 'a', {
+      annotator: {
+        anonymousId: 'vision:auto-eval',
+        cohort: 'automatic-vision-v1',
+        raterType: 'vision-model',
+        confidence: 0.72,
+        elapsedMs: 431,
+        model: {
+          name: 'gpt-5.6-vision',
+          version: '2026-09-02',
+          weightSource: 'openai-managed',
+          license: 'OpenAI service terms',
+        },
+      },
+    })
+
+    const normalized = normalizePreferenceRecordV2(visionRecord)
+
+    assert.equal(normalized.annotator.raterType, 'vision-model')
+    assert.equal(normalized.annotator.confidence, 0.72)
+    assert.equal(normalized.annotator.elapsedMs, 431)
+    assert.equal(normalized.annotator.model?.name, 'gpt-5.6-vision')
+    assert.deepEqual(replayPreferenceRecord(JSON.stringify(visionRecord)).record, normalized)
+  })
+
   it('normalizes candidate, annotation, comparison, and score order for stable replay', () => {
     const a = candidate('a')
     const b = candidate('b')
@@ -176,6 +204,10 @@ describe('PreferenceRecord V2 contract', () => {
       ranking: ['b', 'a'],
       bestCandidateId: 'a',
     }), /best candidate.*ranking/i)
+    assert.throws(() => validatePreferenceRecordV2({
+      ...valid,
+      annotator: { ...valid.annotator, raterType: 'vision-model', confidence: 1.2 },
+    }), /annotator.*confidence/i)
   })
 
   it('deduplicates semantic replays and migrates V1 comparisons', () => {
@@ -383,6 +415,25 @@ describe('preference learning and bounded generation feedback', () => {
     assert.ok(parameters.edgeProtection <= 4)
     assert.ok(parameters.localSearchIterations <= 12)
     assert.ok(parameters.maxColorsScale >= 0.6)
+  })
+
+  it('uses learned feature priorities to change generation controls before issue counts accumulate', () => {
+    const baselineModel = fitPreferenceModelV2([])
+    const model = {
+      ...baselineModel,
+      learnedWeights: {
+        ...baselineModel.learnedWeights,
+        identityFeatures: 0.3,
+        valueOrder: 0.2,
+        craftEase: 0.01,
+      },
+    }
+
+    const parameters = derivePreferenceGenerationParameters(model)
+
+    assert.ok(parameters.importanceStrength > 1)
+    assert.ok(parameters.valueOrderStrength > 1)
+    assert.ok(parameters.maxColorsScale > 1)
   })
 
   it('learns from multidimensional scores before a pairwise choice is submitted', () => {

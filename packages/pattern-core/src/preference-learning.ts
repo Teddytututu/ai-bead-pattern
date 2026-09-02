@@ -264,6 +264,7 @@ interface TrainingExample {
 function comparisonExamples(records: readonly PreferenceRecordV2[]): readonly TrainingExample[] {
   const examples: TrainingExample[] = []
   for (const record of records) {
+    const annotatorConfidence = record.annotator.confidence ?? 1
     const candidates = candidateMap(record)
     const difference = (first: PreferenceCandidateV2, second: PreferenceCandidateV2): PreferenceFeatureVector =>
       Object.fromEntries(PREFERENCE_FEATURES.map((name) => [
@@ -276,7 +277,7 @@ function comparisonExamples(records: readonly PreferenceRecordV2[]): readonly Tr
       examples.push({
         difference: difference(first, second),
         target: comparison.choice === 'a' ? 1 : comparison.choice === 'b' ? 0 : 0.5,
-        weight: comparison.weight ?? 1,
+        weight: comparison.weight ?? annotatorConfidence,
       })
     }
     if (record.ranking !== undefined) {
@@ -287,7 +288,7 @@ function comparisonExamples(records: readonly PreferenceRecordV2[]): readonly Tr
         examples.push({
           difference: difference(first, second),
           target: 1,
-          weight: 0.5,
+          weight: 0.5 * annotatorConfidence,
         })
       }
     }
@@ -304,7 +305,7 @@ function comparisonExamples(records: readonly PreferenceRecordV2[]): readonly Tr
         examples.push({
           difference: difference(first, second),
           target: clamp(0.5 + meanDifference / 8, 0, 1),
-          weight: 0.7,
+          weight: 0.7 * annotatorConfidence,
         })
       }
     }
@@ -524,20 +525,65 @@ export function derivePreferenceGenerationParameters(
     }
   }
   const adjustments = model.generationAdjustments
+  const learnedPriority = (
+    name: PreferenceFeatureName,
+    sensitivity = 0.5,
+    minimum = 1,
+  ): number => {
+    const baselineWeight = Math.max(0.001, model.baselineWeights[name])
+    const learnedWeight = Math.max(0.001, model.learnedWeights[name])
+    return clamp(Math.pow(learnedWeight / baselineWeight, sensitivity), minimum, 1.5)
+  }
+  const featurePriority = learnedPriority('identityFeatures')
+  const thinPriority = learnedPriority('thinStructure')
+  const boundaryPriority = learnedPriority('boundaryAnchors')
+  const valuePriority = learnedPriority('valueOrder')
+  const refinementPriority = Math.sqrt(
+    learnedPriority('pixelClusters') * learnedPriority('contourRhythm'),
+  )
+  const craftPriority = learnedPriority('craftEase', 0.35, 0.75)
   return {
-    importanceStrength: clamp(baseline.importanceStrength * adjustments.featureProtection, 0.25, 2),
-    edgeStrength: clamp(baseline.edgeStrength
-      * (adjustments.thinStructure + adjustments.boundaryAnchor) / 2, 0.25, 2),
-    edgeProtection: clamp(baseline.edgeProtection * adjustments.boundaryAnchor, 0.25, 4),
-    isolatedPixelPenalty: clamp(baseline.isolatedPixelPenalty * adjustments.refinement, 0.25, 4),
-    stripePenalty: clamp(baseline.stripePenalty * adjustments.refinement, 0.25, 4),
-    valueOrderStrength: clamp(baseline.valueOrderStrength * adjustments.valueOrder, 0.25, 2),
+    importanceStrength: clamp(
+      baseline.importanceStrength * adjustments.featureProtection * featurePriority,
+      0.25,
+      2,
+    ),
+    edgeStrength: clamp(
+      baseline.edgeStrength
+        * (adjustments.thinStructure * thinPriority + adjustments.boundaryAnchor * boundaryPriority) / 2,
+      0.25,
+      2,
+    ),
+    edgeProtection: clamp(
+      baseline.edgeProtection * adjustments.boundaryAnchor * boundaryPriority,
+      0.25,
+      4,
+    ),
+    isolatedPixelPenalty: clamp(
+      baseline.isolatedPixelPenalty * adjustments.refinement * refinementPriority,
+      0.25,
+      4,
+    ),
+    stripePenalty: clamp(
+      baseline.stripePenalty * adjustments.refinement * refinementPriority,
+      0.25,
+      4,
+    ),
+    valueOrderStrength: clamp(
+      baseline.valueOrderStrength * adjustments.valueOrder * valuePriority,
+      0.25,
+      2,
+    ),
     localSearchIterations: Math.round(clamp(
-      baseline.localSearchIterations * adjustments.refinement,
+      baseline.localSearchIterations * adjustments.refinement * refinementPriority,
       1,
       12,
     )),
-    maxColorsScale: clamp(baseline.maxColorsScale / adjustments.craftCost, 0.6, 1.25),
+    maxColorsScale: clamp(
+      baseline.maxColorsScale / (adjustments.craftCost * craftPriority),
+      0.6,
+      1.25,
+    ),
   }
 }
 

@@ -2009,6 +2009,11 @@ function generateCandidate(
       pixelLabs: pixels.map(rgbToLab),
       activeMask,
       levels: valueLevels,
+      minimumSemanticGaps: {
+        eyeSkin: 16 * clamp(structureOptions.valueOrderStrength ?? 1, 0.25, 2),
+        faceHair: 10 * clamp(structureOptions.valueOrderStrength ?? 1, 0.25, 2),
+        subjectBackground: 12 * clamp(structureOptions.valueOrderStrength ?? 1, 0.25, 2),
+      },
       lighting: {
         direction: artDirection.lightDirection,
         intensity: clamp(0.55 + artDirection.profile.edgeRhythm * 0.3, 0.55, 0.85),

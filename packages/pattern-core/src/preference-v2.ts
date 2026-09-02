@@ -79,6 +79,10 @@ export interface PreferenceSourceIdentity {
 export interface PreferenceAnnotatorIdentity {
   anonymousId: string
   cohort?: string
+  raterType?: 'human' | 'vision-model'
+  confidence?: number
+  elapsedMs?: number
+  model?: PreferenceModelIdentity
 }
 
 export interface PreferenceCellSelection {
@@ -421,9 +425,28 @@ export function validatePreferenceRecordV2(input: unknown): asserts input is Pre
   if (candidateIds.size !== candidates.length) throw new RangeError('Preference candidate ids must be unique')
   const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]))
   assertRecord(input.annotator, 'Preference annotator')
-  assertKnownKeys(input.annotator, ['anonymousId', 'cohort'], 'Preference annotator')
+  assertKnownKeys(input.annotator, [
+    'anonymousId', 'cohort', 'raterType', 'confidence', 'elapsedMs', 'model',
+  ], 'Preference annotator')
   assertNonEmptyString(input.annotator.anonymousId, 'Preference annotator anonymous id')
   if (input.annotator.cohort !== undefined) assertNonEmptyString(input.annotator.cohort, 'Preference annotator cohort')
+  if (input.annotator.raterType !== undefined
+    && input.annotator.raterType !== 'human'
+    && input.annotator.raterType !== 'vision-model') {
+    throw new RangeError('Preference annotator rater type is invalid')
+  }
+  if (input.annotator.confidence !== undefined) {
+    assertUnit(input.annotator.confidence, 'Preference annotator confidence')
+  }
+  if (input.annotator.elapsedMs !== undefined) {
+    assertFinite(input.annotator.elapsedMs, 'Preference annotator elapsedMs')
+    if (input.annotator.elapsedMs < 0) {
+      throw new RangeError('Preference annotator elapsedMs must be zero or positive')
+    }
+  }
+  if (input.annotator.model !== undefined) {
+    validateModelIdentity(input.annotator.model, 'Preference annotator model')
+  }
   validateAxisScores(input.axisScores, candidateIds)
   if (Array.isArray(input.issueAnnotations) === false) throw new TypeError('Preference issue annotations must be an array')
   input.issueAnnotations.forEach((annotation, index) =>
@@ -554,6 +577,17 @@ export function normalizePreferenceRecordV2(input: PreferenceRecordV2): Preferen
   if (input.source.digest !== undefined) source.digest = input.source.digest.trim()
   const annotator: PreferenceAnnotatorIdentity = { anonymousId: input.annotator.anonymousId.trim() }
   if (input.annotator.cohort !== undefined) annotator.cohort = input.annotator.cohort.trim()
+  if (input.annotator.raterType !== undefined) annotator.raterType = input.annotator.raterType
+  if (input.annotator.confidence !== undefined) annotator.confidence = input.annotator.confidence
+  if (input.annotator.elapsedMs !== undefined) annotator.elapsedMs = input.annotator.elapsedMs
+  if (input.annotator.model !== undefined) {
+    annotator.model = {
+      name: input.annotator.model.name.trim(),
+      version: input.annotator.model.version.trim(),
+      weightSource: input.annotator.model.weightSource.trim(),
+      license: input.annotator.model.license.trim(),
+    }
+  }
   const normalized: PreferenceRecordV2 = {
     schemaVersion: 2,
     id: input.id.trim(),

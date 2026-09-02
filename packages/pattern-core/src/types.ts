@@ -74,6 +74,8 @@ export interface OptimizationOptions {
 export interface StructureOptions {
   importanceStrength?: number
   edgeStrength?: number
+  /** Multiplier for semantic eye/skin, face/hair, and subject/background lightness gaps. */
+  valueOrderStrength?: number
   valueLevels?: 2 | 3 | 4
   occupancyMode?: 'auto' | 'full-frame' | 'subject-shape'
   shapeRefinementIterations?: number

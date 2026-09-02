@@ -162,6 +162,7 @@ export function createPreferenceRuntime({ core, storage = globalThis.localStorag
         ...input.structure,
         importanceStrength: parameters.importanceStrength,
         edgeStrength: parameters.edgeStrength,
+        valueOrderStrength: parameters.valueOrderStrength,
       },
       optimization: {
         ...input.optimization,

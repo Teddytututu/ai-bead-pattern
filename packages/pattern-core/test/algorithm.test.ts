@@ -1406,6 +1406,57 @@ describe('deterministic pattern algorithm', () => {
     assert.ok(success(result).metrics.uniqueColors <= 3)
   })
 
+  it('uses learned value-order strength to widen subject and background separation', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const grayscalePalette: MaterialPalette = {
+      id: 'value-strength-gray',
+      name: 'Value strength gray',
+      colors: Array.from({ length: 11 }, (_, index) => {
+        const value = index * 25
+        return {
+          id: `gray-${value}`,
+          name: `Gray ${value}`,
+          hex: `#${value.toString(16).padStart(2, '0').repeat(3)}`,
+          rgb: [value, value, value] as const,
+        }
+      }),
+    }
+    const source = image(4, 1, [
+      [110, 110, 110], [115, 115, 115], [125, 125, 125], [130, 130, 130],
+    ])
+    const analysis = {
+      semanticRegions: [{
+        id: 'subject', label: 'subject', confidence: 1,
+        mask: { width: 4, height: 1, values: new Float32Array([1, 1, 0, 0]) },
+      }, {
+        id: 'background', label: 'background', confidence: 1,
+        mask: { width: 4, height: 1, values: new Float32Array([0, 0, 1, 1]) },
+      }],
+    }
+    const generate = (valueOrderStrength: number) => algorithm.generate({
+      image: source,
+      palette: grayscalePalette,
+      analysis,
+      options: {
+        canvas: { mode: 'fixed', size: { width: 4, height: 1 } },
+        maxColors: 8,
+        styles: ['faithful'],
+        structure: { valueLevels: 3, valueOrderStrength },
+        optimization: { minRegionSize: 1 },
+      },
+    })
+
+    const low = candidate(await generate(0.5)).valuePlan!
+    const high = candidate(await generate(1.5)).valuePlan!
+    const semanticGap = (roles: typeof low.roles) => {
+      const subjectBase = roles.find((role) => role.kind === 'base' && role.regionId.includes('subject'))!
+      const backgroundBase = roles.find((role) => role.kind === 'base' && role.regionId.includes('background'))!
+      return Math.abs(subjectBase.targetLightness - backgroundBase.targetLightness)
+    }
+
+    assert.ok(semanticGap(high.roles) > semanticGap(low.roles))
+  })
+
   it('scores canvas candidates by landmark expressibility', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const source = image(8, 2, Array.from({ length: 16 }, () => [255, 0, 0] as const))
