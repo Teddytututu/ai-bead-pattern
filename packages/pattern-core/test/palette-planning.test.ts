@@ -68,6 +68,38 @@ describe('PalettePlan', () => {
     assert.deepEqual(result.colorIds, ['gray-20', 'gray-50', 'gray-80'])
   })
 
+  it('keeps a neutral value ladder inside low-chroma material colors', () => {
+    const neutralValues: ValuePlan = {
+      roles: [
+        { id: 'r:shadow', regionId: 'r', kind: 'shadow', targetLightness: 45, minimumSeparation: 6, importance: 1 },
+        { id: 'r:base', regionId: 'r', kind: 'base', targetLightness: 51, minimumSeparation: 6, importance: 1 },
+        { id: 'r:light', regionId: 'r', kind: 'light', targetLightness: 57, minimumSeparation: 6, importance: 1 },
+      ],
+    }
+    const materialColors: readonly MaterialColor[] = [
+      { id: 'black', name: 'Black', hex: '#111111', rgb: [17, 17, 17] },
+      { id: 'charcoal', name: 'Charcoal', hex: '#3a3a3a', rgb: [58, 58, 58] },
+      { id: 'gray', name: 'Gray', hex: '#777777', rgb: [119, 119, 119] },
+      { id: 'silver', name: 'Silver', hex: '#b8b8b8', rgb: [184, 184, 184] },
+      { id: 'green', name: 'Green', hex: '#4a9b55', rgb: [74, 155, 85] },
+      { id: 'cyan', name: 'Cyan', hex: '#4fc3c8', rgb: [79, 195, 200] },
+    ]
+    const result = buildPalettePlan({
+      valuePlan: neutralValues,
+      roleIdsByCell: ['r:shadow', 'r:base', 'r:light'],
+      plannedLabs: [[45, 0, 0], [51, 0, 0], [57, 0, 0]],
+      structurePlan: structurePlan(),
+      colors: materialColors,
+      maximumColors: materialColors.length,
+      distanceMethod: 'delta-e-2000',
+      featurePlacements: [],
+    })
+
+    assert.deepEqual(result.colorIds, ['charcoal', 'gray', 'silver'])
+    assert.equal(Object.values(result.plan.allowedColorIdsByRole)
+      .flat().some((colorId) => colorId === 'green' || colorId === 'cyan'), false)
+  })
+
   it('uses a shared subset when the material color budget is smaller than the role count', () => {
     const placement: ResolvedFeaturePlacement = {
       featureId: 'left-eye-center',

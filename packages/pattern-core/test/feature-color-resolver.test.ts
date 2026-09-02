@@ -178,6 +178,33 @@ describe('feature role color resolution', () => {
     assert.ok(['coral', 'pink', 'rose'].includes(result.roleColorIds['nose-base'] ?? ''))
   })
 
+  it('uses a dark contour color for an ear tip instead of an accidental saturated sample', () => {
+    const ear: ResolvedFeaturePlacement = {
+      featureId: 'visible-ear-tip',
+      kind: 'ear',
+      templateId: 'ear-tip-e1',
+      center: [1, 1],
+      occupiedCells: [4],
+      roles: [{ cell: 4, role: 'ear-tip' }],
+      shift: [0, 0],
+      score: 1,
+    }
+    const initialColorIds = new Array(9).fill('white')
+    initialColorIds[4] = 'olive'
+
+    const result = resolveFeatureColors({
+      placements: [ear],
+      initialColorIds,
+      colors,
+      width: 3,
+      height: 3,
+      minimumContrastByFeature: new Map([['visible-ear-tip', 10]]),
+      distanceMethod: 'delta-e-2000',
+    })
+
+    assert.equal(result.roleColorIds['ear-tip'], 'black')
+  })
+
   it('records each changed feature cell as a feature placement edit', () => {
     const result = resolveFeatureColors({
       placements: [leftEye],

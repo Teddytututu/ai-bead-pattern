@@ -160,9 +160,12 @@ function buildRoles(
     const preferred = [...allColors].sort((first, second) =>
       roleCost(colorRole, first, input.distanceMethod) - roleCost(colorRole, second, input.distanceMethod)
       || first.id.localeCompare(second.id))[0]!
+    const idealChroma = Math.hypot(colorRole.idealLab[1], colorRole.idealLab[2])
     const hueCompatible = allColors.filter((color) =>
       stock(input, color.id) >= cells.length
-      && (colorRole.allowedHueShift >= 180
+      && (idealChroma < 8
+        ? Math.hypot(color.lab[1], color.lab[2]) <= 12
+        : colorRole.allowedHueShift >= 180
         || Math.hypot(color.lab[1], color.lab[2]) < 6
         || hueDifference(colorRole.idealLab, color.lab) <= colorRole.allowedHueShift))
     const available = hueCompatible.length === 0

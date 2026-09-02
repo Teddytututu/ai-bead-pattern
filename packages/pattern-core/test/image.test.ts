@@ -20,6 +20,22 @@ function edgeImage(): PixelImage {
   return { width, height, data }
 }
 
+function neutralPatchWithChromaticOutlier(): PixelImage {
+  const width = 4
+  const height = 4
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let index = 0; index < width * height; index += 1) {
+    data[index * 4] = 120
+    data[index * 4 + 1] = 120
+    data[index * 4 + 2] = 120
+    data[index * 4 + 3] = 255
+  }
+  data[0] = 0
+  data[1] = 100
+  data[2] = 0
+  return { width, height, data }
+}
+
 function luminance(pixel: readonly [number, number, number]): number {
   return pixel[0] * 0.2126 + pixel[1] * 0.7152 + pixel[2] * 0.0722
 }
@@ -39,5 +55,26 @@ describe('cell-aware image sampling', () => {
 
     assert.ok(luminance(cellAware.pixels[0]!) < luminance(area.pixels[0]!) - 20)
     assert.ok(luminance(cellAware.pixels[1]!) > luminance(area.pixels[1]!) - 4)
+  })
+
+  it('moves high-contrast luminance without amplifying an isolated chromatic sample', () => {
+    const image = neutralPatchWithChromaticOutlier()
+    const crop = { x: 0, y: 0, width: image.width, height: image.height }
+    const edge = new Float32Array(image.width * image.height)
+    edge[0] = 1
+    const cellAware = resizePixels(image, crop, 1, 1, 'cell-aware', [255, 255, 255], {
+      source: {
+        width: image.width,
+        height: image.height,
+        importance: new Float32Array(image.width * image.height),
+        edge,
+      },
+      importanceStrength: 1,
+      edgeStrength: 2,
+    })
+    const pixel = cellAware.pixels[0]!
+
+    assert.ok(Math.max(...pixel) - Math.min(...pixel) <= 12)
+    assert.ok(luminance(pixel) < 110)
   })
 })

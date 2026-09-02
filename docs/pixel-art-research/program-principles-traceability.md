@@ -6,9 +6,9 @@
 |---|---|---|---|---|---|---|
 | 构图、尺度、细节预算、焦点、负空间、比例 | 先分配画布资源，再分配语义细节 | canvas planner, `CanvasPlan`, art direction | auto/fixed sizes, occupancy, focus | canvasFit, detail budgets | canvas/art-direction tests | 已实现 |
 | 剪影、连通、轮廓节奏、像素簇、孤立格、色带、锯齿、曲线 | 形状占用先于颜色，弱证据边界允许簇整理 | shape, grid refinement | refinement mode, penalties | IoU, components, holes, stripes | shape/refinement tests | 已实现 |
-| 人物、宠物、物件身份关键点 | 高价值特征先落格并锁定 | feature templates/planning/evaluation | feature budgets, contrast | hard completeness, collision, symmetry error | feature tests/gate | 已实现 |
+| 人物、宠物、物件身份关键点 | 高价值特征先落格并锁定；侧脸宠物按方向分配单眼、口鼻、耳尖、尾尖与脚掌 | pet analysis, feature templates/planning/evaluation | profile evidence, direction evidence, feature budgets, contrast | hard completeness, collision, symmetry error | pet/feature tests/gate | 已实现 |
 | 明度、光源、体积、投影、环境光、反射 | 先建区域明度角色，再映射实体色 | value/palette planning | levels, separations | value order, region contrast | value/palette tests | 已实现 |
-| 有限色板、色相偏移、饱和度、Lab、替代色、库存 | 先满足角色关系，再优化色差和库存 | palette planner, material palette | max colors, allowed ids | palette cost, Delta E | palette tests | 已实现 |
+| 有限色板、色相偏移、饱和度、Lab、替代色、库存 | 先满足角色关系，再优化色差和库存；灰度角色限制在低色度材料梯度 | palette planner, material palette | max colors, allowed ids, neutral role chroma 8/12 | palette cost, Delta E, neutral-role purity | palette tests | 已实现 |
 | 抗锯齿、抖动、过渡预算、切换、噪声 | 过渡格受区域和制作预算约束 | art direction/grid refinement | dither/AA budget | switches, isolated cells, bands | art-direction/refinement tests | 已实现 |
 | 场景、透视、景深、遮挡、自然物、建筑 | 按层级、焦点和结构分配细节 | scene/material profiles | depth/focus/material | layer and occlusion budgets | art-direction tests | 已实现 |
 | 图块、地形、角、边、接缝、变体 | 边界签名决定 tile 兼容 | tile profile/export | edge state | seam signature, variant budget | art-direction tests | 已实现 |
@@ -30,3 +30,5 @@
 - `a0-nearest`：总分均值 0.561，剪影 0.751，像素簇 0.697，制作易用 0.717，平均颜色数 9.02。
 - 真实 BiRefNet：512×325 输入，健康状态 ready，分析响应 200，返回主体蒙版、语义区、重要性图、建议裁剪和模型溯源。
 - 视觉模型范围：BiRefNet 已有本机真实推理；SAM 2、MediaPipe、MMPose、DINOv2、SigLIP、Depth Anything V2、SD-piXL 已完成冻结目录与 Provider 合同，运行时按部署状态展示。
+- 宠物 `v13`：6 张真实图、每张 4 个候选；灰度侧脸犬的青绿杂色清零，侧脸关键点覆盖眼、口鼻、耳尖、上下颌、尾尖和脚掌。
+- 内置视觉学习：36 条 PreferenceRecord V2；冻结留出集 48 个成对比较，准确率 0.500 → 0.521，log loss 0.7081 → 0.7057。

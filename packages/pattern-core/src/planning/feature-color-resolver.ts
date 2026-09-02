@@ -110,7 +110,9 @@ function preferredFeatureColor(
     const colorId = initialColorIds[entry.cell]!
     counts.set(colorId, (counts.get(colorId) ?? 0) + 1)
   }
-  if (role !== 'nose-base' && counts.size === 1) return colorsById.get([...counts.keys()][0]!)
+  if (role !== 'nose-base' && role !== 'ear-tip' && counts.size === 1) {
+    return colorsById.get([...counts.keys()][0]!)
+  }
   if (role !== 'eye-dark' && role !== 'eye-highlight') return undefined
   return rankedColor(
     [...counts.keys()].map((colorId) => colorsById.get(colorId)!),

@@ -39,6 +39,27 @@ function luminance(rgb: RGB): number {
   return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722
 }
 
+function median(values: number[]): number {
+  values.sort((first, second) => first - second)
+  const middle = Math.floor(values.length / 2)
+  return values.length % 2 === 0
+    ? (values[middle - 1]! + values[middle]!) / 2
+    : values[middle]!
+}
+
+function withMedianChroma(pixels: readonly RGB[], targetLuminance: number): RGB {
+  const blueOffsets = pixels.map((pixel) => pixel[2] - luminance(pixel))
+  const redOffsets = pixels.map((pixel) => pixel[0] - luminance(pixel))
+  const blue = targetLuminance + median(blueOffsets)
+  const red = targetLuminance + median(redOffsets)
+  const green = (targetLuminance - red * 0.2126 - blue * 0.0722) / 0.7152
+  return [red, green, blue].map((channel) => clamp(
+    Math.round(channel),
+    0,
+    255,
+  )) as unknown as RGB
+}
+
 function nearestSample(image: PixelImage, sourceX: number, sourceY: number, backgroundRgb: RGB): RGB {
   return pixelAt(image, Math.round(sourceX), Math.round(sourceY), backgroundRgb)
 }
@@ -190,10 +211,12 @@ function cellAwareSample(
   )
   const baseLightness = luminance(base)
   const supportByBucket = new Uint32Array(12)
+  const patchPixels: RGB[] = []
   let sampleCount = 0
   for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
     for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
       const pixel = pixelAt(image, sourceX, sourceY, backgroundRgb)
+      patchPixels.push(pixel)
       const bucket = clamp(Math.round(luminance(pixel) / 24), 0, supportByBucket.length - 1)
       supportByBucket[bucket] = (supportByBucket[bucket] ?? 0) + 1
       sampleCount += 1
@@ -226,9 +249,8 @@ function cellAwareSample(
   const selectedEdge = best.edge
   if (selectedEdge < edgeThreshold) return base
   const amount = clamp(0.58 + selectedEdge * 0.3, 0.58, 0.86)
-  return [0, 1, 2].map((channel) => Math.round(
-    base[channel]! * (1 - amount) + best!.pixel[channel]! * amount,
-  )) as unknown as RGB
+  const selectedLightness = baseLightness * (1 - amount) + luminance(best.pixel) * amount
+  return withMedianChroma(patchPixels, selectedLightness)
 }
 
 export interface CanvasFit {

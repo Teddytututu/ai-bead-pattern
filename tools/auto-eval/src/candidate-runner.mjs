@@ -114,7 +114,7 @@ function mergeAnalysis(image, mask, metadata, category) {
     mask: pet.faceMask,
     confidence: pet.confidence,
     importance: 1,
-    provenance: [{ origin: 'heuristic', provider: 'pet-geometry', version: 'pet-face-v1' }],
+    provenance: [{ origin: 'heuristic', provider: 'pet-geometry', version: 'pet-face-v2' }],
   }])]
   return {
     subjectMask: mask,
@@ -130,7 +130,10 @@ function mergeAnalysis(image, mask, metadata, category) {
     confidence: pet?.confidence ?? metadata.evidence.confidence,
     modelVersions: {
       ...(metadata.modelVersions ?? {}),
-      ...(pet === undefined ? {} : { petAnalysis: 'pattern-core/pet-analysis-v1' }),
+      ...(pet === undefined ? {} : {
+        petAnalysis: 'pattern-core/pet-analysis-v2',
+        petHeadPose: pet.headPose,
+      }),
     },
     provenance: metadata.evidence.provenance,
   }

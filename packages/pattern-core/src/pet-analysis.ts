@@ -7,6 +7,7 @@ import type {
 
 export interface PetAnalysisResult {
   imageType: 'pet'
+  headPose: 'frontal' | 'profile-left' | 'profile-right'
   landmarks: readonly ImageLandmark[]
   faceMask: BinaryMask
   suggestedCrop: CropRect
@@ -27,6 +28,20 @@ interface Bounds {
   bottom: number
   width: number
   height: number
+}
+
+interface ProfileAnalysis {
+  pose: 'profile-left' | 'profile-right'
+  direction: -1 | 1
+  ear: PointScore
+  eye: PointScore
+  nose: PointScore
+  mouth: PointScore
+  upperJaw: PointScore
+  lowerJaw: PointScore
+  headWidth: number
+  headHeight: number
+  confidence: number
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -127,6 +142,210 @@ function localContrast(image: PixelImage, x: number, y: number, radius: number):
     }
   }
   return maximum - minimum
+}
+
+function maskPoint(mask: BinaryMask, x: number, y: number): boolean {
+  return x >= 0 && y >= 0 && x < mask.width && y < mask.height
+    && (mask.values[y * mask.width + x] ?? 0) >= 0.5
+}
+
+function strongestPoint(
+  image: PixelImage,
+  mask: BinaryMask,
+  bounds: Bounds,
+  scoreAt: (x: number, y: number) => number,
+): PointScore {
+  let best: PointScore = { x: bounds.left, y: bounds.top, score: 0 }
+  for (let y = bounds.top; y <= bounds.bottom; y += 1) {
+    for (let x = bounds.left; x <= bounds.right; x += 1) {
+      if (maskPoint(mask, x, y) === false) continue
+      const score = scoreAt(x, y)
+      if (score > best.score) best = { x, y, score }
+    }
+  }
+  return best
+}
+
+function profileTipCandidate(
+  image: PixelImage,
+  mask: BinaryMask,
+  bounds: Bounds,
+  direction: -1 | 1,
+  headTop: number,
+  headBottom: number,
+  headCenterX: number,
+  headWidth: number,
+): PointScore {
+  const band: Bounds = {
+    left: bounds.left,
+    right: bounds.right,
+    top: Math.max(bounds.top, Math.floor(headTop + (headBottom - headTop) * 0.18)),
+    bottom: Math.min(bounds.bottom, Math.ceil(headTop + (headBottom - headTop) * 0.78)),
+    width: bounds.width,
+    height: Math.max(1, headBottom - headTop + 1),
+  }
+  return strongestPoint(image, mask, band, (x, y) => {
+    const forward = clamp(direction * (x - headCenterX) / Math.max(1, headWidth * 0.5), 0, 1)
+    const vertical = clamp(1 - Math.abs(y - (headTop + band.height * 0.48)) / Math.max(1, band.height * 0.42), 0, 1)
+    return forward * 0.25
+      + (1 - luminance(image, x, y)) * 0.32
+      + localContrast(image, x, y, Math.max(1, Math.round(headWidth * 0.025))) * 0.28
+      + redExcess(image, x, y) * 0.08
+      + vertical * 0.07
+  })
+}
+
+function profileFeature(
+  image: PixelImage,
+  mask: BinaryMask,
+  expectedX: number,
+  expectedY: number,
+  radiusX: number,
+  radiusY: number,
+): PointScore {
+  const bounds: Bounds = {
+    left: Math.max(0, Math.floor(expectedX - radiusX)),
+    right: Math.min(image.width - 1, Math.ceil(expectedX + radiusX)),
+    top: Math.max(0, Math.floor(expectedY - radiusY)),
+    bottom: Math.min(image.height - 1, Math.ceil(expectedY + radiusY)),
+    width: Math.max(1, Math.ceil(radiusX * 2)),
+    height: Math.max(1, Math.ceil(radiusY * 2)),
+  }
+  return strongestPoint(image, mask, bounds, (x, y) => {
+    const distance = Math.hypot(
+      (x - expectedX) / Math.max(1, radiusX),
+      (y - expectedY) / Math.max(1, radiusY),
+    )
+    return (1 - luminance(image, x, y)) * 0.34
+      + localContrast(image, x, y, Math.max(1, Math.round(Math.min(radiusX, radiusY) * 0.2))) * 0.34
+      + saturation(image, x, y) * 0.12
+      + clamp(1 - distance, 0, 1) * 0.2
+  })
+}
+
+function profileBoundaryPoint(
+  mask: BinaryMask,
+  bounds: Bounds,
+  direction: -1 | 1,
+  expectedY: number,
+  radiusY: number,
+  inward: number,
+): PointScore {
+  let best: PointScore | undefined
+  for (let y = Math.max(bounds.top, Math.floor(expectedY - radiusY));
+    y <= Math.min(bounds.bottom, Math.ceil(expectedY + radiusY)); y += 1) {
+    const start = direction === 1 ? bounds.right : bounds.left
+    const end = direction === 1 ? bounds.left : bounds.right
+    for (let x = start; direction === 1 ? x >= end : x <= end; x -= direction) {
+      if (maskPoint(mask, x, y) === false) continue
+      const targetX = x - direction * inward
+      const resolvedX = Math.round(clamp(targetX, bounds.left, bounds.right))
+      if (maskPoint(mask, resolvedX, y)) {
+        const score = 1 - Math.abs(y - expectedY) / Math.max(1, radiusY)
+        if (best === undefined || score > best.score) best = { x: resolvedX, y, score }
+      }
+      break
+    }
+  }
+  return best ?? {
+    x: Math.round(clamp(direction === 1 ? bounds.right - inward : bounds.left + inward, bounds.left, bounds.right)),
+    y: Math.round(clamp(expectedY, bounds.top, bounds.bottom)),
+    score: 0,
+  }
+}
+
+function inferProfileAnalysis(
+  image: PixelImage,
+  mask: BinaryMask,
+  bounds: Bounds,
+): ProfileAnalysis | undefined {
+  const headBottom = bounds.top + bounds.height * 0.42
+  let headLeft = bounds.right
+  let headRight = bounds.left
+  let headSumX = 0
+  let headCount = 0
+  for (let y = bounds.top; y <= Math.min(bounds.bottom, Math.ceil(headBottom)); y += 1) {
+    for (let x = bounds.left; x <= bounds.right; x += 1) {
+      if (maskPoint(mask, x, y) === false) continue
+      headLeft = Math.min(headLeft, x)
+      headRight = Math.max(headRight, x)
+      headSumX += x
+      headCount += 1
+    }
+  }
+  if (headCount === 0 || headRight - headLeft < 5) return undefined
+  const headWidth = headRight - headLeft + 1
+  const headHeight = headBottom - bounds.top + 1
+  const headCenterX = headSumX / headCount
+  const leftTip = profileTipCandidate(
+    image, mask, bounds, -1, bounds.top, headBottom, headCenterX, headWidth,
+  )
+  const rightTip = profileTipCandidate(
+    image, mask, bounds, 1, bounds.top, headBottom, headCenterX, headWidth,
+  )
+  const direction: -1 | 1 = rightTip.score >= leftTip.score ? 1 : -1
+  const nose = direction === 1 ? rightTip : leftTip
+  const opposite = direction === 1 ? leftTip : rightTip
+  const forwardOffset = Math.abs(nose.x - headCenterX) / Math.max(1, headWidth)
+  const directionalEvidence = clamp((nose.score - opposite.score) / 0.22, 0, 1)
+  const profileEvidence = clamp((forwardOffset - 0.26) / 0.2, 0, 1) * 0.55
+    + directionalEvidence * 0.45
+  const subjectElongation = bounds.height / Math.max(1, bounds.width)
+  const elongatedProfile = subjectElongation >= 1.12
+    && profileEvidence >= 0.42
+    && directionalEvidence >= 0.2
+  if (elongatedProfile === false && profileEvidence < 0.78) return undefined
+
+  const eyeExpectedX = nose.x - direction * headWidth * 0.3
+  const eyeExpectedY = bounds.top + headHeight * 0.28
+  const eye = refineEyeCenter(
+    image,
+    mask,
+    profileFeature(image, mask, eyeExpectedX, eyeExpectedY, headWidth * 0.2, headHeight * 0.28),
+    headWidth * 0.06,
+  )
+  const ear = strongestPoint(image, mask, {
+    left: headLeft,
+    right: headRight,
+    top: bounds.top,
+    bottom: Math.min(bounds.bottom, Math.ceil(bounds.top + headHeight * 0.55)),
+    width: headWidth,
+    height: headHeight,
+  }, (x, y) => {
+    const behindEye = clamp(direction * (eye.x - x) / Math.max(1, headWidth * 0.42), 0, 1)
+    const topness = clamp(1 - (y - bounds.top) / Math.max(1, headHeight * 0.58), 0, 1)
+    const nearEye = clamp(1 - Math.abs(x - (eye.x - direction * headWidth * 0.12)) / Math.max(1, headWidth * 0.34), 0, 1)
+    return topness * 0.58 + behindEye * 0.2 + nearEye * 0.22
+  })
+  const mouthExpectedX = eye.x + (nose.x - eye.x) * 0.58
+  const mouthExpectedY = nose.y + headHeight * 0.08
+  const mouth = profileFeature(
+    image, mask, mouthExpectedX, mouthExpectedY, headWidth * 0.18, headHeight * 0.15,
+  )
+  const upperJaw = profileBoundaryPoint(
+    mask, bounds, direction, nose.y - headHeight * 0.06, headHeight * 0.08, headWidth * 0.05,
+  )
+  const lowerJaw = profileBoundaryPoint(
+    mask, bounds, direction, nose.y + headHeight * 0.09, headHeight * 0.08, headWidth * 0.1,
+  )
+  const confidence = Math.max(0.5, clamp(
+    profileEvidence * 0.38 + nose.score * 0.2 + eye.score * 0.22 + mouth.score * 0.12 + ear.score * 0.08,
+    0,
+    1,
+  ))
+  return {
+    pose: direction === 1 ? 'profile-right' : 'profile-left',
+    direction,
+    ear,
+    eye,
+    nose,
+    mouth,
+    upperJaw,
+    lowerJaw,
+    headWidth,
+    headHeight,
+    confidence,
+  }
 }
 
 function eyeCandidates(
@@ -385,6 +604,109 @@ function petFaceMask(
   return { width: subjectMask.width, height: subjectMask.height, values }
 }
 
+function distanceToSegment(
+  x: number,
+  y: number,
+  start: { x: number, y: number },
+  end: { x: number, y: number },
+): number {
+  const deltaX = end.x - start.x
+  const deltaY = end.y - start.y
+  const lengthSquared = deltaX * deltaX + deltaY * deltaY
+  if (lengthSquared <= 1e-8) return Math.hypot(x - start.x, y - start.y)
+  const position = clamp(((x - start.x) * deltaX + (y - start.y) * deltaY) / lengthSquared, 0, 1)
+  return Math.hypot(x - (start.x + deltaX * position), y - (start.y + deltaY * position))
+}
+
+function profileFaceMask(subjectMask: BinaryMask, profile: ProfileAnalysis): BinaryMask {
+  const values = new Float32Array(subjectMask.values.length)
+  const headCenter = {
+    x: profile.eye.x - profile.direction * profile.headWidth * 0.08,
+    y: profile.eye.y + profile.headHeight * 0.08,
+  }
+  const radiusX = profile.headWidth * 0.38
+  const radiusY = profile.headHeight * 0.38
+  const muzzleRadius = Math.max(1, profile.headHeight * 0.14)
+  const earBase = {
+    x: profile.eye.x - profile.direction * profile.headWidth * 0.12,
+    y: profile.eye.y - profile.headHeight * 0.06,
+  }
+  const earHalfWidth = profile.headWidth * 0.12
+  const earBaseFirst = { x: earBase.x - earHalfWidth, y: earBase.y }
+  const earBaseSecond = { x: earBase.x + earHalfWidth, y: earBase.y }
+  for (let y = 0; y < subjectMask.height; y += 1) {
+    for (let x = 0; x < subjectMask.width; x += 1) {
+      const index = y * subjectMask.width + x
+      const subjectValue = subjectMask.values[index] ?? 0
+      if (subjectValue <= 0) continue
+      const head = ((x - headCenter.x) / radiusX) ** 2 + ((y - headCenter.y) / radiusY) ** 2 <= 1
+      const muzzle = distanceToSegment(x, y, profile.eye, profile.nose) <= muzzleRadius
+      const ear = pointInTriangle(x, y, profile.ear, earBaseFirst, earBaseSecond)
+      if (head || muzzle || ear) values[index] = subjectValue
+    }
+  }
+  return { width: subjectMask.width, height: subjectMask.height, values }
+}
+
+function cropAroundBounds(image: PixelImage, bounds: Bounds, marginRatio: number): CropRect {
+  const margin = Math.max(2, Math.round(Math.max(bounds.width, bounds.height) * marginRatio))
+  const left = clamp(bounds.left - margin, 0, image.width - 1)
+  const top = clamp(bounds.top - margin, 0, image.height - 1)
+  const right = clamp(bounds.right + margin + 1, left + 1, image.width)
+  const bottom = clamp(bounds.bottom + margin + 1, top + 1, image.height)
+  return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
+function profileBodyEndpoints(
+  image: PixelImage,
+  mask: BinaryMask,
+  bounds: Bounds,
+  direction: -1 | 1,
+): { tail: PointScore, frontPaw: PointScore, rearPaw: PointScore } {
+  const centerX = (bounds.left + bounds.right) / 2
+  const lowerBody: Bounds = {
+    left: bounds.left,
+    right: bounds.right,
+    top: Math.floor(bounds.top + bounds.height * 0.48),
+    bottom: bounds.bottom,
+    width: bounds.width,
+    height: Math.max(1, Math.ceil(bounds.height * 0.52)),
+  }
+  const frontBand: Bounds = {
+    ...lowerBody,
+    left: direction === 1 ? Math.floor(centerX) : bounds.left,
+    right: direction === 1 ? bounds.right : Math.ceil(centerX),
+  }
+  const rearBand: Bounds = {
+    ...lowerBody,
+    left: direction === 1 ? bounds.left : Math.floor(centerX),
+    right: direction === 1 ? Math.ceil(centerX) : bounds.right,
+  }
+  const bottomness = (y: number) => clamp(
+    (y - lowerBody.top) / Math.max(1, lowerBody.bottom - lowerBody.top),
+    0,
+    1,
+  )
+  const forwardness = (x: number) => clamp(
+    direction * (x - centerX) / Math.max(1, bounds.width * 0.5),
+    0,
+    1,
+  )
+  const backwardness = (x: number) => clamp(
+    direction * (centerX - x) / Math.max(1, bounds.width * 0.5),
+    0,
+    1,
+  )
+  const tail = strongestPoint(image, mask, lowerBody, (x, y) =>
+    backwardness(x) * 0.72
+      + clamp(1 - Math.abs(y - (bounds.top + bounds.height * 0.72)) / Math.max(1, bounds.height * 0.3), 0, 1) * 0.28)
+  const frontPaw = strongestPoint(image, mask, frontBand, (x, y) =>
+    bottomness(y) * 0.78 + forwardness(x) * 0.22)
+  const rearPaw = strongestPoint(image, mask, rearBand, (x, y) =>
+    bottomness(y) * 0.82 + backwardness(x) * 0.18)
+  return { tail, frontPaw, rearPaw }
+}
+
 function landmark(
   id: string,
   kind: ImageLandmark['kind'],
@@ -402,7 +724,7 @@ function landmark(
     sourceRadiusPx: kind === 'eye' ? 3 : kind === 'nose' ? 2 : 1,
     gridRadiusCells: kind === 'eye' ? 1 : 0.5,
     carrierRegionId: 'pet-face',
-    provenance: [{ origin: 'heuristic', provider: 'pet-geometry', version: 'pet-face-v1' }],
+    provenance: [{ origin: 'heuristic', provider: 'pet-geometry', version: 'pet-face-v2' }],
     ...options,
   }
 }
@@ -412,6 +734,38 @@ export function inferPetAnalysis(image: PixelImage, mask: BinaryMask): PetAnalys
   const analysisMask = principalComponentMask(mask)
   const bounds = maskBounds(analysisMask)
   if (bounds === undefined || bounds.width < 6 || bounds.height < 6) return undefined
+  const profile = inferProfileAnalysis(image, analysisMask, bounds)
+  if (profile !== undefined) {
+    const crop = cropAroundBounds(image, bounds, 0.08)
+    const body = profileBodyEndpoints(image, analysisMask, bounds, profile.direction)
+    const bodyLandmarkOptions: Partial<ImageLandmark> = {
+      priority: 'soft',
+      sourceRadiusPx: 2,
+      gridRadiusCells: 0.5,
+      carrierRegionId: 'subject',
+      affectsOccupancy: true,
+    }
+    const landmarks = [
+      landmark('visible-ear-tip', 'ear', profile.ear, profile.confidence, { affectsOccupancy: true }),
+      landmark('visible-eye-center', 'eye', profile.eye, profile.eye.score, { gridRadiusCells: 0 }),
+      landmark('nose-tip', 'nose', profile.nose, profile.nose.score),
+      landmark('mouth-corner', 'mouth', profile.mouth, profile.mouth.score),
+      landmark('upper-jaw-end', 'face-contour', profile.upperJaw, profile.confidence, { affectsOccupancy: true }),
+      landmark('lower-jaw-end', 'face-contour', profile.lowerJaw, profile.confidence, { affectsOccupancy: true }),
+      landmark('tail-tip', 'body', body.tail, profile.confidence * 0.8, bodyLandmarkOptions),
+      landmark('front-paw', 'body', body.frontPaw, profile.confidence * 0.8, bodyLandmarkOptions),
+      landmark('rear-paw', 'body', body.rearPaw, profile.confidence * 0.8, bodyLandmarkOptions),
+    ]
+    return {
+      imageType: 'pet',
+      headPose: profile.pose,
+      landmarks,
+      faceMask: profileFaceMask(analysisMask, profile),
+      suggestedCrop: crop,
+      suggestedCropConfidence: profile.confidence,
+      confidence: profile.confidence,
+    }
+  }
   const ears = earTips(analysisMask, bounds)
   if (ears === undefined) return undefined
   const [leftEar, rightEar] = ears
@@ -472,6 +826,7 @@ export function inferPetAnalysis(image: PixelImage, mask: BinaryMask): PetAnalys
   ]
   return {
     imageType: 'pet',
+    headPose: 'frontal',
     landmarks,
     faceMask: petFaceMask(
       analysisMask,
