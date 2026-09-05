@@ -3,6 +3,7 @@ const routeCapabilities = Object.freeze({
   'neural-analysis': Object.freeze(['subject-segmentation', 'edge-thin-structure']),
   'learned-pixelization': Object.freeze(['learned-pixelization']),
   'generative-proposal': Object.freeze(['generative-proposal']),
+  'preference-scoring': Object.freeze(['embedding', 'preference-scoring']),
 })
 
 export function analysisCapabilitiesForRoute(route) {
@@ -27,6 +28,7 @@ export function pixelImageRequestBody(image, route, options = {}) {
     || image.data.length !== image.width * image.height * 4) {
     throw new RangeError('Pixel image must contain complete RGBA data')
   }
+  const { referenceImage, ...requestOptions } = options
   return {
     route,
     capabilities: analysisCapabilitiesForRoute(route),
@@ -35,7 +37,212 @@ export function pixelImageRequestBody(image, route, options = {}) {
       height: image.height,
       rgbaBase64: base64(image.data),
     },
-    ...options,
+    ...(referenceImage === undefined ? {} : {
+      referenceImage: {
+        width: referenceImage.width,
+        height: referenceImage.height,
+        rgbaBase64: base64(referenceImage.data),
+      },
+    }),
+    ...requestOptions,
+  }
+}
+
+function positiveInteger(value, label) {
+  if (Number.isInteger(value) === false || value <= 0) {
+    throw new RangeError(`${label} must use a positive integer`)
+  }
+  return value
+}
+
+function finiteNumber(value, label) {
+  if (Number.isFinite(value) === false) throw new RangeError(`${label} must be finite`)
+  return value
+}
+
+export function createContainSourceFrame(source, proposal) {
+  const sourceWidth = positiveInteger(source?.width, 'Source width')
+  const sourceHeight = positiveInteger(source?.height, 'Source height')
+  const proposalWidth = positiveInteger(proposal?.width, 'Proposal width')
+  const proposalHeight = positiveInteger(proposal?.height, 'Proposal height')
+  const scale = Math.min(proposalWidth / sourceWidth, proposalHeight / sourceHeight)
+  const width = sourceWidth * scale
+  const height = sourceHeight * scale
+  return {
+    fit: 'contain',
+    sourceWidth,
+    sourceHeight,
+    x: (proposalWidth - width) / 2,
+    y: (proposalHeight - height) / 2,
+    width,
+    height,
+  }
+}
+
+export function hydrateProposalSourceFrame(sourceFrame, proposalImage) {
+  if (sourceFrame === null || typeof sourceFrame !== 'object' || Array.isArray(sourceFrame)) {
+    throw new RangeError('Learned proposal source frame must be an object')
+  }
+  if (sourceFrame.fit !== 'contain') {
+    throw new RangeError('Learned proposal source frame fit must use contain')
+  }
+  const sourceWidth = positiveInteger(sourceFrame.sourceWidth, 'Learned proposal source width')
+  const sourceHeight = positiveInteger(sourceFrame.sourceHeight, 'Learned proposal source height')
+  const proposalWidth = positiveInteger(proposalImage?.width, 'Learned proposal width')
+  const proposalHeight = positiveInteger(proposalImage?.height, 'Learned proposal height')
+  const hydrated = {
+    fit: 'contain',
+    sourceWidth,
+    sourceHeight,
+    x: finiteNumber(sourceFrame.x, 'Learned proposal source frame x'),
+    y: finiteNumber(sourceFrame.y, 'Learned proposal source frame y'),
+    width: finiteNumber(sourceFrame.width, 'Learned proposal source frame width'),
+    height: finiteNumber(sourceFrame.height, 'Learned proposal source frame height'),
+  }
+  if (hydrated.x < 0 || hydrated.y < 0 || hydrated.width <= 0 || hydrated.height <= 0
+    || hydrated.x + hydrated.width > proposalWidth + 1e-6
+    || hydrated.y + hydrated.height > proposalHeight + 1e-6) {
+    throw new RangeError('Learned proposal source frame must stay inside the proposal image')
+  }
+  const expected = createContainSourceFrame(
+    { width: sourceWidth, height: sourceHeight },
+    { width: proposalWidth, height: proposalHeight },
+  )
+  const tolerance = Math.max(0.01, Math.max(proposalWidth, proposalHeight) / 512)
+  if (Math.abs(hydrated.x - expected.x) > tolerance
+    || Math.abs(hydrated.y - expected.y) > tolerance
+    || Math.abs(hydrated.width - expected.width) > tolerance
+    || Math.abs(hydrated.height - expected.height) > tolerance) {
+    throw new RangeError('Learned proposal source frame must describe a centered contain mapping')
+  }
+  return hydrated
+}
+
+function sourceField(values, width, height, label) {
+  const isArrayLike = Array.isArray(values) || ArrayBuffer.isView(values)
+  if (isArrayLike === false || values.length !== width * height) {
+    throw new RangeError(`${label} values differ from source dimensions`)
+  }
+  const typed = Float32Array.from(values)
+  if ([...typed].some((value) => Number.isFinite(value) === false || value < 0 || value > 1)) {
+    throw new RangeError(`${label} values must stay within 0..1`)
+  }
+  return typed
+}
+
+function projectedScalarField(values, frame, proposal, interpolation) {
+  const output = new Float32Array(proposal.width * proposal.height)
+  const sourceValues = sourceField(
+    values,
+    frame.sourceWidth,
+    frame.sourceHeight,
+    'Source analysis field',
+  )
+  const scaleX = frame.sourceWidth / frame.width
+  const scaleY = frame.sourceHeight / frame.height
+  for (let y = 0; y < proposal.height; y += 1) {
+    const proposalCenterY = y + 0.5
+    if (proposalCenterY < frame.y || proposalCenterY >= frame.y + frame.height) continue
+    const sourceY = (proposalCenterY - frame.y) * scaleY - 0.5
+    for (let x = 0; x < proposal.width; x += 1) {
+      const proposalCenterX = x + 0.5
+      if (proposalCenterX < frame.x || proposalCenterX >= frame.x + frame.width) continue
+      const sourceX = (proposalCenterX - frame.x) * scaleX - 0.5
+      if (interpolation === 'nearest') {
+        const nearestX = Math.max(0, Math.min(frame.sourceWidth - 1, Math.round(sourceX)))
+        const nearestY = Math.max(0, Math.min(frame.sourceHeight - 1, Math.round(sourceY)))
+        output[y * proposal.width + x] = sourceValues[nearestY * frame.sourceWidth + nearestX]
+        continue
+      }
+      const clampedSourceX = Math.max(0, Math.min(frame.sourceWidth - 1, sourceX))
+      const clampedSourceY = Math.max(0, Math.min(frame.sourceHeight - 1, sourceY))
+      const left = Math.floor(clampedSourceX)
+      const top = Math.floor(clampedSourceY)
+      const right = Math.min(frame.sourceWidth - 1, left + 1)
+      const bottom = Math.min(frame.sourceHeight - 1, top + 1)
+      const xWeight = clampedSourceX - left
+      const yWeight = clampedSourceY - top
+      const topValue = sourceValues[top * frame.sourceWidth + left] * (1 - xWeight)
+        + sourceValues[top * frame.sourceWidth + right] * xWeight
+      const bottomValue = sourceValues[bottom * frame.sourceWidth + left] * (1 - xWeight)
+        + sourceValues[bottom * frame.sourceWidth + right] * xWeight
+      output[y * proposal.width + x] = topValue * (1 - yWeight) + bottomValue * yWeight
+    }
+  }
+  return output
+}
+
+function projectedMask(mask, frame, proposal) {
+  if (mask?.width !== frame.sourceWidth || mask?.height !== frame.sourceHeight) {
+    throw new RangeError('Source analysis mask dimensions differ from the proposal source frame')
+  }
+  return {
+    width: proposal.width,
+    height: proposal.height,
+    values: projectedScalarField(mask.values, frame, proposal, 'nearest'),
+  }
+}
+
+export function projectSourceAnalysisToProposal(sourceAnalysis = {}, proposal) {
+  const proposalImage = proposal?.image
+  const frame = hydrateProposalSourceFrame(proposal?.sourceFrame, proposalImage)
+  const scaleX = frame.width / frame.sourceWidth
+  const scaleY = frame.height / frame.sourceHeight
+  if (sourceAnalysis.importanceMap !== undefined
+    && (sourceAnalysis.importanceMap.width !== frame.sourceWidth
+      || sourceAnalysis.importanceMap.height !== frame.sourceHeight)) {
+    throw new RangeError('Source importance dimensions differ from the proposal source frame')
+  }
+  return {
+    ...sourceAnalysis,
+    ...(sourceAnalysis.subjectMask === undefined ? {} : {
+      subjectMask: projectedMask(sourceAnalysis.subjectMask, frame, proposalImage),
+    }),
+    ...(sourceAnalysis.subjectMaskEvidence === undefined ? {} : {
+      subjectMaskEvidence: {
+        ...sourceAnalysis.subjectMaskEvidence,
+        mask: projectedMask(sourceAnalysis.subjectMaskEvidence.mask, frame, proposalImage),
+      },
+    }),
+    ...(sourceAnalysis.semanticRegions === undefined ? {} : {
+      semanticRegions: sourceAnalysis.semanticRegions.map((region) => ({
+        ...region,
+        mask: projectedMask(region.mask, frame, proposalImage),
+      })),
+    }),
+    ...(sourceAnalysis.importanceMap === undefined ? {} : {
+      importanceMap: {
+        width: proposalImage.width,
+        height: proposalImage.height,
+        weights: projectedScalarField(
+          sourceAnalysis.importanceMap.weights,
+          frame,
+          proposalImage,
+          'bilinear',
+        ),
+      },
+    }),
+    ...(sourceAnalysis.landmarks === undefined ? {} : {
+      landmarks: sourceAnalysis.landmarks.map((landmark) => ({
+        ...landmark,
+        x: frame.x + (landmark.x + 0.5) * scaleX - 0.5,
+        y: frame.y + (landmark.y + 0.5) * scaleY - 0.5,
+        ...(landmark.sourceRadiusPx === undefined ? {} : {
+          sourceRadiusPx: landmark.sourceRadiusPx * (scaleX + scaleY) / 2,
+        }),
+        ...(landmark.radius === undefined ? {} : {
+          radius: landmark.radius * (scaleX + scaleY) / 2,
+        }),
+      })),
+    }),
+    ...(sourceAnalysis.suggestedCrop === undefined ? {} : {
+      suggestedCrop: {
+        x: frame.x + sourceAnalysis.suggestedCrop.x * scaleX,
+        y: frame.y + sourceAnalysis.suggestedCrop.y * scaleY,
+        width: sourceAnalysis.suggestedCrop.width * scaleX,
+        height: sourceAnalysis.suggestedCrop.height * scaleY,
+      },
+    }),
   }
 }
 
@@ -112,9 +319,14 @@ export function hydrateAiAnalysisResult(result) {
         || proposal.image.data.some((value) => Number.isInteger(value) === false || value < 0 || value > 255)) {
         throw new RangeError('Learned proposal RGBA data differs from its dimensions or value range')
       }
+      const image = {
+        ...proposal.image,
+        data: Uint8ClampedArray.from(proposal.image.data),
+      }
       return {
         ...proposal,
-        image: { ...proposal.image, data: Uint8ClampedArray.from(proposal.image.data) },
+        image,
+        sourceFrame: hydrateProposalSourceFrame(proposal.sourceFrame, image),
       }
     }),
     preferenceFeatures: (result.preferenceFeatures ?? []).map((features) => {

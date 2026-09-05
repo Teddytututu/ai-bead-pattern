@@ -181,6 +181,18 @@ export function prepareSubjectLasso(points, maximumPoints = 256) {
   }
 }
 
+export function createInstancePromptFromLasso(points, options = {}) {
+  const prepared = prepareSubjectLasso(points, 63)
+  if (prepared.valid === false) {
+    throw new RangeError('Subject lasso must enclose enough image area')
+  }
+  const label = typeof options.label === 'string' ? options.label.trim() : ''
+  return {
+    lasso: prepared.points.map((point) => ({ x: point.x, y: point.y })),
+    ...(label.length === 0 ? {} : { labels: [label] }),
+  }
+}
+
 function writePixel(target, index, color, alpha) {
   const offset = index * 4
   target[offset] = color[0]
@@ -295,7 +307,15 @@ export function createLiveStrokePreview(canvas) {
   }
 }
 
-export function createMaskEditorController({ elements, core, onConfirm, onClose, onFirstPointer }) {
+export function createMaskEditorController({
+  elements,
+  core,
+  onConfirm,
+  onClose,
+  onFirstPointer,
+  onSelectSubject,
+  onSelectError,
+}) {
   let sourceImage
   let baseEvidence
   let session
@@ -310,6 +330,8 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
   let closeOutcome
   let firstPointerType
   let snapSummary
+  let selectionPending = false
+  let selectionSource
   const sourceBuffer = document.createElement('canvas')
   const overlayBuffer = document.createElement('canvas')
   const livePreview = createLiveStrokePreview(elements.canvas)
@@ -353,14 +375,19 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     const dirty = maskEditSessionIsDirty(session, confirmedSession)
     elements.undoButton.disabled = session?.cursor === 0
     elements.redoButton.disabled = session === undefined || session.cursor === session.strokes.length
+    elements.confirmButton.disabled = selectionPending
     const snapText = snapSummary === undefined
       ? ''
       : mode === 'select'
-        ? ' · 自动识别主体'
+        ? selectionSource === 'sam2'
+          ? ' · SAM 2 已贴合主体'
+          : ' · 本地结构已贴合主体'
         : elements.snapToggle?.checked === true
           ? ` · 自动贴边 ${snapSummary.snappedCount} 点`
           : ''
-    elements.detail.textContent = session === undefined
+    elements.detail.textContent = selectionPending
+      ? 'SAM 2 正在贴合主体'
+      : session === undefined
       ? '沿主体外侧圈一圈'
       : session.strokes.length === 0
         ? '沿主体外侧圈一圈，松手后自动识别'
@@ -373,7 +400,6 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     if (radiusGroup !== null) radiusGroup.hidden = mode === 'select'
     if (elements.snapToggle !== undefined) {
       elements.snapToggle.disabled = mode === 'select'
-      elements.snapToggle.checked = true
     }
   }
 
@@ -437,7 +463,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     }
   }
 
-  function finishPointer(event, commit) {
+  async function finishPointer(event, commit) {
     if (pointerId !== event.pointerId) return
     if (previewFrame !== undefined) {
       cancelAnimationFrame(previewFrame)
@@ -447,7 +473,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     livePreview.reset()
     if (commit) {
       appendPoint(event)
-      const prepared = mode === 'select' ? prepareSubjectLasso(pointerPoints) : undefined
+      const prepared = mode === 'select' ? prepareSubjectLasso(pointerPoints, 63) : undefined
       if (mode === 'select' && prepared.valid === false) {
         drawMask(draft.mask)
         pointerId = undefined
@@ -469,6 +495,39 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
       const resolvedPoints = mode === 'select'
         ? snappedLasso.valid ? snappedLasso.points : prepared.points
         : snapSummary.points
+      if (mode === 'select' && onSelectSubject !== undefined) {
+        selectionPending = true
+        selectionSource = undefined
+        syncControls()
+        try {
+          const selection = await onSelectSubject({
+            image: sourceImage,
+            evidence: baseEvidence,
+            instancePrompt: createInstancePromptFromLasso(resolvedPoints),
+          })
+          if (selection?.evidence !== undefined) {
+            const evidence = selection.evidence
+            if (evidence.mask?.width !== sourceImage.width
+              || evidence.mask?.height !== sourceImage.height
+              || evidence.mask.values?.length !== sourceImage.width * sourceImage.height) {
+              throw new RangeError('Selected subject mask must align with the source image')
+            }
+            baseEvidence = evidence
+            confirmedSession = core.createMaskEditSession(evidence.revision)
+            session = confirmedSession
+            selectionSource = selection.source ?? 'sam2'
+          } else {
+            selectionSource = 'local'
+          }
+        } catch (error) {
+          selectionSource = 'local'
+          onSelectError?.(error)
+        } finally {
+          selectionPending = false
+        }
+      } else if (mode === 'select') {
+        selectionSource = 'local'
+      }
       session = core.appendMaskEditStroke(session, {
         ...currentPointerStroke(),
         id: uniqueStrokeId(),
@@ -496,7 +555,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
   }
 
   elements.canvas.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || session === undefined) return
+    if (event.button !== 0 || session === undefined || selectionPending) return
     if (firstPointerType === undefined) {
       firstPointerType = event.pointerType || 'mouse'
       onFirstPointer?.(firstPointerType)
@@ -513,12 +572,17 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     appendPoint(event)
     schedulePreview()
   })
-  elements.canvas.addEventListener('pointerup', (event) => finishPointer(event, true))
-  elements.canvas.addEventListener('pointercancel', (event) => finishPointer(event, false))
+  elements.canvas.addEventListener('pointerup', (event) => {
+    void finishPointer(event, true)
+  })
+  elements.canvas.addEventListener('pointercancel', (event) => {
+    void finishPointer(event, false)
+  })
   elements.modeControl.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-mask-mode]')
     if (button === null) return
     mode = button.dataset.maskMode
+    snapSummary = undefined
     syncControls()
   })
   elements.radiusControl.addEventListener('click', (event) => {
@@ -554,7 +618,7 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
     try {
       const evidence = core.confirmMaskEditSession(baseEvidence, session)
       confirmedSession = session
-      const regeneration = onConfirm({ evidence, session })
+      const regeneration = onConfirm({ evidence, session, baseEvidence })
       closeOutcome = 'confirmed'
       elements.dialog.close()
       await regeneration
@@ -577,7 +641,10 @@ export function createMaskEditorController({ elements, core, onConfirm, onClose,
       closeOutcome = 'cancelled'
       firstPointerType = undefined
       snapSummary = undefined
+      selectionPending = false
+      selectionSource = undefined
       mode = 'select'
+      if (elements.snapToggle !== undefined) elements.snapToggle.checked = true
       strokeSequence = session.strokes.length + 1
       prepareImageBuffers()
       elements.dialog.showModal()

@@ -1,5 +1,16 @@
 import { expect, test } from '@playwright/test'
 
+async function waitForGeneration(page) {
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#status')
+    const generateButton = document.querySelector('#generateButton')
+    return generateButton instanceof HTMLButtonElement
+      && generateButton.disabled === false
+      && status instanceof HTMLElement
+      && status.dataset.state !== 'busy'
+  })
+}
+
 test('runs neural analysis and exposes model contributions', async ({ page }) => {
   test.setTimeout(60_000)
   await page.goto('/apps/demo/')
@@ -34,4 +45,23 @@ test('keeps route controls and unavailable state readable on mobile', async ({ p
   }))
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.viewportWidth)
   expect(layout.selectWidth).toBeLessThan(layout.viewportWidth)
+})
+
+test('discovers pet landmarks after uploading a cat without type metadata', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.goto('/apps/demo/')
+  await waitForGeneration(page)
+  await expect(page.locator('#modelRouteSelect option[value="neural-analysis"]'))
+    .toBeEnabled({ timeout: 20_000 })
+
+  await page.locator('#fileInput').setInputFiles('apps/demo/assets/sample-cat.png')
+  await waitForGeneration(page)
+  await page.locator('#modelRouteSelect').selectOption('neural-analysis')
+  await waitForGeneration(page)
+
+  await page.getByRole('button', { name: '分析图层' }).click()
+  const dialog = page.getByRole('dialog', { name: '图像理解' })
+  await expect(dialog.getByRole('button', { name: '关键点', exact: true })).toBeEnabled()
+  await expect(dialog.locator('#analysisDebugContributions')).toContainText('grounded-sam2-local')
+  await expect(dialog.locator('#analysisDebugContributions')).toContainText('mmpose-animal-local')
 })

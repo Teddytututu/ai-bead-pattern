@@ -1,7 +1,14 @@
 import { expect, test } from '@playwright/test'
 
 async function waitForGeneration(page) {
-  await page.waitForFunction(() => document.querySelector('#statusText')?.textContent !== '生成中')
+  await page.waitForFunction(() => {
+    const status = document.querySelector('#status')
+    const generateButton = document.querySelector('#generateButton')
+    return generateButton instanceof HTMLButtonElement
+      && generateButton.disabled === false
+      && status instanceof HTMLElement
+      && status.dataset.state !== 'busy'
+  })
 }
 
 async function uploadWideImage(page) {
@@ -42,7 +49,7 @@ test('roughly circles a subject, confirms once, and restores the solid selection
   }
   await page.mouse.up()
   await expect(page.locator('#maskEditorDetail')).toContainText('待确认')
-  await expect(page.locator('#maskEditorDetail')).toContainText('自动识别')
+  await expect(page.locator('#maskEditorDetail')).toContainText('SAM 2 已贴合主体')
 
   await page.getByRole('button', { name: '撤销' }).click()
   await expect(page.getByRole('button', { name: '重做' })).toBeEnabled()
@@ -72,8 +79,16 @@ test('roughly circles a subject, confirms once, and restores the solid selection
   const reopenedBounds = await canvas.boundingBox()
   expect(reopenedBounds).not.toBeNull()
   await page.getByRole('button', { name: '补充' }).click()
+  await expect(page.getByLabel('自动贴边')).toBeChecked()
+  await expect(page.locator('#maskEditorDetail')).not.toContainText('自动贴边')
   await page.mouse.click(reopenedBounds.x + reopenedBounds.width * 0.25, reopenedBounds.y + reopenedBounds.height * 0.75)
+  await expect(page.locator('#maskEditorDetail')).toContainText('自动贴边')
   await expect(page.locator('#maskEditorDetail')).toContainText('取消将放弃')
+  await page.getByLabel('自动贴边').uncheck()
+  await expect(page.getByLabel('自动贴边')).not.toBeChecked()
+  await page.getByRole('button', { name: '擦除' }).click()
+  await page.mouse.click(reopenedBounds.x + reopenedBounds.width * 0.3, reopenedBounds.y + reopenedBounds.height * 0.75)
+  await expect(page.locator('#maskEditorDetail')).not.toContainText('自动贴边')
   await page.getByRole('button', { name: '取消并关闭主体编辑器' }).click()
   await page.getByRole('button', { name: '圈选主体' }).click()
   await expect(page.locator('#maskEditorDetail')).toContainText('1 / 1 次调整 · 已确认')

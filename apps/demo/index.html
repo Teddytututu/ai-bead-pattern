@@ -678,9 +678,9 @@
       </div>
       <h1>拼豆工作台</h1>
     </div>
-    <div class="status" id="status" data-state="ready" role="status" aria-live="polite">
+    <div class="status" id="status" data-state="busy" role="status" aria-live="polite">
       <span class="status-dot" aria-hidden="true"></span>
-      <span id="statusText">准备完成</span>
+      <span id="statusText">正在准备</span>
     </div>
   </header>
 
@@ -801,6 +801,14 @@
             <button type="button" data-levels="4" aria-pressed="false">4</button>
           </div>
         </div>
+        <div class="control-group">
+          <div class="control-label"><span>描边</span><span class="control-value" id="outlineModeValue">选择性</span></div>
+          <div class="segmented three" id="outlineModeControl" aria-label="图纸描边模式">
+            <button type="button" data-outline-mode="off" aria-pressed="false">关闭</button>
+            <button type="button" data-outline-mode="selective" aria-pressed="true">选择性</button>
+            <button type="button" data-outline-mode="full" aria-pressed="false">完整</button>
+          </div>
+        </div>
       </section>
 
       <section class="section">
@@ -832,11 +840,11 @@
       </section>
 
       <section class="section">
-        <button class="generate-button" id="generateButton" type="button">生成图纸</button>
+        <button class="generate-button" id="generateButton" type="button" disabled>生成图纸</button>
       </section>
     </aside>
 
-    <section class="stage" id="stage" data-busy="false" aria-label="拼豆图纸预览">
+    <section class="stage" id="stage" data-busy="true" aria-label="拼豆图纸预览">
       <div class="stage-toolbar">
         <div class="stage-meta">
           <h2 class="stage-title" id="patternTitle">推荐方案</h2>
@@ -844,7 +852,6 @@
         </div>
         <div class="toolbar-actions">
           <button class="text-button" id="openAnalysisDebugButton" type="button">分析图层</button>
-          <button class="text-button" id="toggleOutlineButton" type="button" aria-pressed="false">轮廓线：关</button>
           <button class="icon-button" id="toggleGridButton" type="button" title="切换网格" aria-label="切换网格" aria-pressed="true">#</button>
           <button class="icon-button" id="downloadButton" type="button" title="下载 PNG" aria-label="下载 PNG" disabled>↓</button>
         </div>
@@ -1034,9 +1041,9 @@
             <button type="button" data-mask-radius="0.04" aria-pressed="false">大</button>
           </div>
         </div>
-        <label class="mask-snap-toggle" title="结合视觉模型与主体边缘完成自动识别">
+        <label class="mask-snap-toggle" title="让局部补充或擦除笔画吸附到主体边缘">
           <input id="maskSnapToggle" type="checkbox" checked>
-          自动识别
+          自动贴边
         </label>
         <div class="mask-tool-group">
           <button class="icon-button" id="maskUndoButton" type="button" aria-label="撤销" title="撤销">↶</button>
@@ -1131,7 +1138,10 @@
       selectPreferenceModelVersion,
       undoMaskEdit,
     } from '/packages/pattern-core/dist/index.js'
-    import { createMaskEditorController } from './mask-editor.mjs'
+    import {
+      createInstancePromptFromLasso,
+      createMaskEditorController,
+    } from './mask-editor.mjs'
     import {
       applyCorrectedSubjectEvidence,
       createAnalysisDebugViewer,
@@ -1154,6 +1164,7 @@
     import { createPreferenceWorkbenchController } from './preference-workbench-ui.mjs'
     import {
       fetchAiHealth,
+      projectSourceAnalysisToProposal,
       routeAvailability,
       runAiRoute,
       selectLearnedProposal,
@@ -1200,6 +1211,8 @@
       occupancyValue: document.querySelector('#occupancyValue'),
       valueLevelsControl: document.querySelector('#valueLevelsControl'),
       valueLevelsValue: document.querySelector('#valueLevelsValue'),
+      outlineModeControl: document.querySelector('#outlineModeControl'),
+      outlineModeValue: document.querySelector('#outlineModeValue'),
       styleControl: document.querySelector('#styleControl'),
       cleanGrid: document.querySelector('#cleanGrid'),
       refinementModeControl: document.querySelector('#refinementModeControl'),
@@ -1210,7 +1223,6 @@
       patternTitle: document.querySelector('#patternTitle'),
       patternDetail: document.querySelector('#patternDetail'),
       openAnalysisDebugButton: document.querySelector('#openAnalysisDebugButton'),
-      toggleOutlineButton: document.querySelector('#toggleOutlineButton'),
       toggleGridButton: document.querySelector('#toggleGridButton'),
       downloadButton: document.querySelector('#downloadButton'),
       candidateList: document.querySelector('#candidateList'),
@@ -1333,13 +1345,14 @@
     let maskEditorBaseEvidence
     let candidates = []
     let selectedCandidate = null
+    let candidateEvaluation
     let selectedSize = 'auto'
     let selectedBaseline = 'mvp'
     let selectedOccupancy = 'auto'
     let selectedValueLevels = 3
+    let selectedOutlineMode = 'selective'
     let selectedRefinementMode = 'quality'
     let showGrid = true
-    let showOutline = false
     let currentGenerationId
     let activePreferencePair
     let preferenceRecords = loadPreferenceRecords()
@@ -1434,8 +1447,9 @@
         redoMaskEdit,
         undoMaskEdit,
       },
-      onConfirm: async ({ evidence, session }) => {
+      onConfirm: async ({ evidence, session, baseEvidence }) => {
         const correctionEndedAt = Date.now()
+        maskEditorBaseEvidence = baseEvidence
         savedMaskEditSession = session
         sourceAnalysis = applyCorrectedSubjectEvidence(sourceAnalysis, evidence)
         analysisByRoute.set(selectedModelRoute, sourceAnalysis)
@@ -1467,6 +1481,25 @@
           renderMaskGateComparison()
           updateMaskGatePanel()
         }
+      },
+      onSelectSubject: async ({ instancePrompt }) => {
+        const provider = aiHealth?.providers?.find((entry) => entry.providerId === 'sam2-local')
+        if (provider === undefined || provider.status === 'unavailable') return undefined
+        const result = await runAiRoute(sourceImage, 'neural-analysis', {
+          request: {
+            imageTypeHint: sourceAnalysis.imageType,
+            providerIds: ['sam2-local'],
+            instancePrompt: createInstancePromptFromLasso(instancePrompt.lasso, {
+              label: sourceAnalysis.imageType === 'pet' ? 'pet' : 'subject',
+            }),
+          },
+        })
+        const evidence = result.analysis.subjectMaskEvidence
+        if (result.status === 'unavailable' || evidence === undefined) return undefined
+        return { evidence, source: 'sam2' }
+      },
+      onSelectError: (error) => {
+        console.warn('SAM 2 subject selection used the local structure fallback', error)
       },
       onClose: ({ session, outcome }) => {
         if (maskGateContext === undefined || maskGateRun === undefined || outcome !== 'cancelled') return
@@ -1514,7 +1547,16 @@
 
     function refreshAnalysisDebugViewer() {
       const aiResult = aiResultByRoute.get(selectedModelRoute)
-      const providers = [...new Set((aiResult?.contributions ?? [])
+      const providerContributions = [
+        ...(aiResult?.contributions ?? []),
+        ...(candidateEvaluation?.providerContributions ?? []),
+      ]
+      const neuralPreferenceFeatures = [
+        ...(aiResult?.preferenceFeatures ?? []),
+        ...(candidateEvaluation?.neuralPreferenceFeatures ?? []).filter((entry) =>
+          entry.candidateId === undefined || entry.candidateId === selectedCandidate?.id),
+      ]
+      const providers = [...new Set(providerContributions
         .filter((entry) => entry.status === 'used')
         .map((entry) => entry.providerId))]
       analysisDebugViewer.update({
@@ -1524,8 +1566,8 @@
         candidate: selectedCandidate,
         route: selectedModelRoute,
         providers,
-        contributions: aiResult?.contributions ?? [],
-        preferenceFeatures: aiResult?.preferenceFeatures ?? [],
+        contributions: providerContributions,
+        preferenceFeatures: neuralPreferenceFeatures,
       })
     }
 
@@ -1736,6 +1778,7 @@
       analysisByRoute = new Map([['deterministic', sourceAnalysis]])
       originalEvidenceByRoute = new Map([['deterministic', originalSubjectEvidence]])
       aiResultByRoute = new Map()
+      candidateEvaluation = undefined
       savedMaskEditSession = undefined
       maskEditorBaseEvidence = undefined
       elements.maskGatePanel.hidden = false
@@ -2025,6 +2068,7 @@
           importanceStrength: 3.5,
           edgeStrength: 1.1,
           valueLevels: selectedValueLevels,
+          outlineMode: selectedOutlineMode,
           occupancyMode: selectedOccupancy,
           shapeRefinementIterations: 2,
         },
@@ -2052,6 +2096,68 @@
       return preferenceRuntime.applyGenerationOptions(options)
     }
 
+    function candidateVisionImage(candidate) {
+      const canvas = document.createElement('canvas')
+      drawPattern(canvas, candidate.pattern, { maximum: 224 })
+      return canvasToPixelImage(canvas)
+    }
+
+    async function evaluateGeneratedCandidates(generatedCandidates, generationId) {
+      const neuralPreferenceFeatures = []
+      const providerContributions = []
+      if (routeAvailability(aiHealth, 'preference-scoring').available) {
+        const providerIds = [
+          'dinov2-vits14-pair-local',
+          'openclip-vit-b32-pair-local',
+        ]
+        for (let index = 0; index < generatedCandidates.length; index += 1) {
+          const candidate = generatedCandidates[index]
+          setStatus(`视觉模型评估 ${index + 1}/${generatedCandidates.length}`, 'busy')
+          try {
+            const result = await runAiRoute(
+              candidateVisionImage(candidate),
+              'preference-scoring',
+              {
+                request: {
+                  referenceImage: sourceImage,
+                  sourceId: generationId,
+                  candidateId: candidate.id,
+                  providerIds,
+                },
+              },
+            )
+            const providerByModel = new Map(result.contributions.map((entry) => [
+              entry.modelId,
+              entry.providerId,
+            ]))
+            for (const feature of result.preferenceFeatures) {
+              neuralPreferenceFeatures.push({
+                providerId: providerByModel.get(feature.modelId) ?? feature.modelId,
+                modelId: feature.modelId,
+                candidateId: feature.candidateId ?? candidate.id,
+                names: [...feature.names],
+                values: [...feature.values],
+                confidence: feature.confidence,
+              })
+            }
+            providerContributions.push(...result.contributions)
+          } catch (error) {
+            console.warn(`Candidate vision scoring failed for ${candidate.id}`, error)
+          }
+        }
+      }
+      return composeCandidateEvaluationV2({
+        scores: Object.fromEntries(generatedCandidates.map((candidate) => [candidate.id, candidate.score])),
+        candidateValidity: Object.fromEntries(generatedCandidates.map((candidate) => [
+          candidate.id,
+          candidate.valid,
+        ])),
+        neuralPreferenceFeatures,
+        providerContributions,
+        sourceWeights: { rule: 0.4, neural: 0.6, humanPreference: 0 },
+      })
+    }
+
     async function generate() {
       setBusy(true)
       await new Promise((resolve) => requestAnimationFrame(resolve))
@@ -2067,13 +2173,18 @@
         const inferredProposalAnalysis = learnedProposal === undefined
           ? undefined
           : inferSubjectAnalysis(learnedProposal.image)
+        const projectedSourceAnalysis = learnedProposal === undefined
+          ? undefined
+          : projectSourceAnalysisToProposal(sourceAnalysis, learnedProposal)
         const proposalAnalysis = learnedProposal === undefined
           ? sourceAnalysis
           : {
             ...inferredProposalAnalysis,
+            ...projectedSourceAnalysis,
             imageType: sourceAnalysis.imageType ?? inferredProposalAnalysis.imageType,
             confidence: learnedProposal.confidence,
             modelVersions: {
+              ...inferredProposalAnalysis.modelVersions,
               ...sourceAnalysis.modelVersions,
               learnedPixelization: learnedProposal.modelId,
             },
@@ -2098,9 +2209,15 @@
               resizeMethod: 'cell-aware',
             },
         })
-        const primary = result.recommended ?? result.bestEffort
-        if (primary === undefined) throw new Error('当前参数没有生成候选方案')
-        candidates = [primary, ...result.alternatives]
+        const rulePrimary = result.recommended ?? result.bestEffort
+        if (rulePrimary === undefined) throw new Error('当前参数没有生成候选方案')
+        const generatedCandidates = [rulePrimary, ...result.alternatives]
+        candidateEvaluation = await evaluateGeneratedCandidates(generatedCandidates, result.generationId)
+        const candidatesById = new Map(generatedCandidates.map((candidate) => [candidate.id, candidate]))
+        candidates = candidateEvaluation.finalRankedCandidateIds
+          .map((candidateId) => candidatesById.get(candidateId))
+          .filter((candidate) => candidate !== undefined)
+        const primary = candidates[0] ?? rulePrimary
         currentGenerationId = result.generationId
         activePreferencePair = undefined
         preferenceRanking = undefined
@@ -2127,7 +2244,12 @@
           })
           updateMaskGatePanel()
         }
-        return result
+        return {
+          ...result,
+          recommended: primary,
+          alternatives: candidates.filter((candidate) => candidate.id !== primary.id),
+          evaluation: candidateEvaluation,
+        }
       } catch (error) {
         console.error(error)
         setStatus(error instanceof Error ? error.message : '生成失败', 'error')
@@ -2161,8 +2283,11 @@
     }
 
     function renderPattern(candidate) {
-      drawPattern(elements.patternCanvas, candidate.pattern, { grid: showGrid, beads: true, outline: showOutline })
-      elements.patternTitle.textContent = `${baselineName(candidate.pattern.metadata.baseline)} · ${occupancyName(candidate)} · ${styleName(candidate.style)}方案`
+      drawPattern(elements.patternCanvas, candidate.pattern, { grid: showGrid, beads: true })
+      const outlineName = { off: '无描边', selective: '选择性描边', full: '完整描边' }[
+        candidate.pattern.metadata.outlineMode ?? 'off'
+      ]
+      elements.patternTitle.textContent = `${baselineName(candidate.pattern.metadata.baseline)} · ${occupancyName(candidate)} · ${outlineName} · ${styleName(candidate.style)}方案`
       elements.patternDetail.textContent = `${candidate.pattern.width} × ${candidate.pattern.height} · ${candidate.materialCounts.length} 色`
       elements.beadCount.textContent = candidate.pattern.metadata.totalBeads.toLocaleString('zh-CN')
       elements.uniqueColors.textContent = String(candidate.materialCounts.length)
@@ -2416,6 +2541,7 @@
       analysisByRoute = new Map([['deterministic', sourceAnalysis]])
       originalEvidenceByRoute = new Map([['deterministic', originalSubjectEvidence]])
       aiResultByRoute = new Map()
+      candidateEvaluation = undefined
       savedMaskEditSession = undefined
       maskEditorBaseEvidence = undefined
       candidates = []
@@ -2477,6 +2603,9 @@
       for (const item of elements.valueLevelsControl.querySelectorAll('button')) {
         item.disabled = selectedBaseline !== 'mvp'
       }
+      for (const item of elements.outlineModeControl.querySelectorAll('button')) {
+        item.disabled = selectedBaseline !== 'mvp'
+      }
       for (const item of elements.occupancyControl.querySelectorAll('button')) {
         item.disabled = selectedBaseline !== 'mvp'
       }
@@ -2503,6 +2632,19 @@
       selectedValueLevels = Number(button.dataset.levels)
       elements.valueLevelsValue.textContent = `${selectedValueLevels} 档`
       for (const item of elements.valueLevelsControl.querySelectorAll('button')) {
+        item.setAttribute('aria-pressed', String(item === button))
+      }
+    })
+    elements.outlineModeControl.addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-outline-mode]')
+      if (button === null) return
+      selectedOutlineMode = button.dataset.outlineMode
+      elements.outlineModeValue.textContent = {
+        off: '关闭',
+        selective: '选择性',
+        full: '完整',
+      }[selectedOutlineMode]
+      for (const item of elements.outlineModeControl.querySelectorAll('button')) {
         item.setAttribute('aria-pressed', String(item === button))
       }
     })
@@ -2626,12 +2768,6 @@
     elements.toggleGridButton.addEventListener('click', () => {
       showGrid = showGrid === false
       elements.toggleGridButton.setAttribute('aria-pressed', String(showGrid))
-      if (selectedCandidate !== null) renderPattern(selectedCandidate)
-    })
-    elements.toggleOutlineButton.addEventListener('click', () => {
-      showOutline = !showOutline
-      elements.toggleOutlineButton.setAttribute('aria-pressed', String(showOutline))
-      elements.toggleOutlineButton.textContent = `轮廓线：${showOutline ? '开' : '关'}`
       if (selectedCandidate !== null) renderPattern(selectedCandidate)
     })
     elements.downloadButton.addEventListener('click', downloadPattern)

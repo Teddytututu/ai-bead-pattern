@@ -16,19 +16,95 @@ export function candidateFeatureVector(candidate) {
     ? 0
     : (refinement.fragmentedArcSegments + refinement.smallComponents + refinement.singleCellBands)
       / cellCount
+  const petPoseAvailable = metrics.petPoseAvailable ?? [
+    metrics.petPoseConfidence,
+    metrics.petSkeletonContinuity,
+    metrics.petBoundaryRhythm,
+    metrics.petEarStructure,
+    metrics.petMuzzleStructure,
+  ].some((value) => Number.isFinite(value))
+  const earStructure = petPoseAvailable
+    ? clamp(metrics.petEarStructure ?? score.poseStructure)
+    : undefined
+  const muzzleStructure = petPoseAvailable
+    ? clamp(metrics.petMuzzleStructure ?? score.poseStructure)
+    : undefined
+  const frontVerticalRunRatio = petPoseAvailable
+    ? clamp(metrics.petFrontVerticalRunRatio ?? 1 - score.poseStructure)
+    : undefined
+  const frontChest = petPoseAvailable
+    ? clamp(metrics.petFrontChestScore ?? 1 - frontVerticalRunRatio)
+    : undefined
+  const negativeSpace = petPoseAvailable
+    ? clamp(metrics.petNegativeSpace ?? score.poseStructure)
+    : undefined
+  const multiPet = Number.isInteger(metrics.petInstanceCount) && metrics.petInstanceCount > 1
+  const subjectComponentRecall = multiPet
+    ? clamp(metrics.petSubjectComponentRecall)
+    : undefined
+  const weakestInstanceIdentityCompleteness = multiPet
+    ? clamp(metrics.petWeakestInstanceIdentityCompleteness)
+    : undefined
+  const crossInstanceCollisionRate = multiPet
+    ? clamp(metrics.petCrossInstanceCollisionRate)
+    : undefined
+  const collisionFreedom = crossInstanceCollisionRate === undefined
+    ? undefined
+    : 1 - crossInstanceCollisionRate
+  const silhouetteParts = [score.silhouette]
+  const identityParts = [
+    score.identity,
+    score.identityAppearance ?? score.identity,
+    metrics.hardFeatureCompleteness,
+  ]
+  const contourParts = [score.structure, metrics.planBoundaryAgreement, metrics.sourceBoundaryAgreement]
+  const thinParts = [
+    metrics.featureConnectivity,
+    metrics.shapeApplied ? metrics.silhouetteBoundaryIoU : score.structure,
+  ]
+  if (petPoseAvailable) {
+    silhouetteParts.push(metrics.petBoundaryRhythm ?? score.poseStructure, frontChest, negativeSpace)
+    identityParts.push(earStructure, muzzleStructure)
+    contourParts.push(metrics.petBoundaryRhythm ?? score.structure, frontChest)
+    thinParts.push(
+      metrics.petSkeletonContinuity ?? score.structure,
+      negativeSpace,
+      metrics.petBoundaryRhythm ?? score.structure,
+      earStructure,
+      muzzleStructure,
+      1 - frontVerticalRunRatio,
+    )
+  }
+  if (multiPet) {
+    silhouetteParts.push(subjectComponentRecall, collisionFreedom)
+    identityParts.push(weakestInstanceIdentityCompleteness, collisionFreedom)
+    thinParts.push(
+      subjectComponentRecall,
+      weakestInstanceIdentityCompleteness,
+      collisionFreedom,
+    )
+  }
   return {
-    silhouette: clamp(score.silhouette),
-    identityFeatures: mean([score.identity, score.identityAppearance ?? score.identity]),
+    silhouette: mean(silhouetteParts),
+    identityFeatures: mean(identityParts),
     composition: clamp(score.canvasFit),
     valueOrder: clamp(metrics.valueOrderAccuracy),
     colorFidelity: clamp(score.colorFidelity),
     pixelClusters: mean([score.cleanliness, 1 - clusterPenalty]),
-    contourRhythm: mean([score.structure, metrics.planBoundaryAgreement, metrics.sourceBoundaryAgreement]),
-    thinStructure: mean([
-      metrics.featureConnectivity,
-      metrics.shapeApplied ? metrics.silhouetteBoundaryIoU : score.structure,
-    ]),
+    contourRhythm: mean(contourParts),
+    thinStructure: mean(thinParts),
     boundaryAnchors: mean([metrics.hardFeatureCompleteness, score.featureProtection]),
+    ...(petPoseAvailable ? {
+      earStructure,
+      muzzleStructure,
+      frontVerticalRunRatio,
+      negativeSpace,
+    } : {}),
+    ...(multiPet ? {
+      subjectComponentRecall,
+      weakestInstanceIdentityCompleteness,
+      crossInstanceCollisionRate,
+    } : {}),
     material: clamp(metrics.paletteRoleConsistency),
     styleFit: clamp(1 - metrics.artDirectionBudgetViolations / cellCount),
     craftEase: clamp(score.craftEase),
@@ -39,6 +115,8 @@ export function preferenceCandidateFromPattern(id, candidate, route = 'determini
   return {
     id,
     route,
+    valid: candidate.valid ?? true,
+    rejectionReasons: [...(candidate.rejectionReasons ?? [])],
     style: candidate.style,
     paletteId: candidate.pattern.palette.length === 0 ? 'unknown' : 'generic-24',
     grid: { width: candidate.pattern.width, height: candidate.pattern.height },
@@ -49,5 +127,6 @@ export function preferenceCandidateFromPattern(id, candidate, route = 'determini
       license: 'MIT',
     },
     features: candidateFeatureVector(candidate),
+    ...(candidate.canvasPlan === undefined ? {} : { canvasPlan: candidate.canvasPlan }),
   }
 }

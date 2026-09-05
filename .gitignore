@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 services/pixel-proposal-sidecar/.venv/
+services/openclip-sidecar/.venv/
+services/sam2-sidecar/.venv/
+services/mmpose-sidecar/.venv/
+services/dinov2-sidecar/.venv/
 **/__pycache__/
 .pytest_cache/
 

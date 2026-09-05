@@ -39,8 +39,8 @@ export class OpenAIResponsesVisionJudge {
   }
 
   async score(input) {
-    if (input.candidates.length < 2 || input.candidates.length > 4) {
-      throw new RangeError('Vision scoring requires 2..4 candidates')
+    if (input.candidates.length < 2 || input.candidates.length > 12) {
+      throw new RangeError('Vision scoring requires 2..12 candidates')
     }
     const candidateIds = input.candidates.map((candidate) => candidate.id)
     const prompt = [

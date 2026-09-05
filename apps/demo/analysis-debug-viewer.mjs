@@ -92,6 +92,29 @@ function importanceLayer(analysis) {
   }
 }
 
+function combineSemanticRegions(regions) {
+  if (regions.length === 0) return undefined
+  const first = regions[0]
+  const width = first.mask.width
+  const height = first.mask.height
+  const values = new Float32Array(width * height)
+  for (const entry of regions) {
+    if (entry.mask.width !== width || entry.mask.height !== height) {
+      throw new RangeError('Semantic region dimensions must match')
+    }
+    for (let index = 0; index < values.length; index += 1) {
+      values[index] = Math.max(values[index], entry.mask.values[index] ?? 0)
+    }
+  }
+  return {
+    id: regions.map((entry) => entry.id).join('+'),
+    label: first.label,
+    mask: { width, height, values },
+    confidence: regions.reduce((sum, entry) => sum + entry.confidence, 0) / regions.length,
+    provenance: regions.flatMap((entry) => entry.provenance ?? []),
+  }
+}
+
 function embeddingLayer(preferenceFeatures) {
   if (preferenceFeatures.length === 0) return unavailable('embedding')
   return {
@@ -182,13 +205,14 @@ export function resolveAnalysisDebugLayer(id, {
     return evidenceLayer(id, evidence, analysis?.modelVersions?.segmentation)
   }
   if (id === 'face') {
-    const petFace = region(analysis, 'pet-face')
+    const petFace = combineSemanticRegions((analysis?.semanticRegions ?? []).filter((entry) =>
+      entry.id === 'pet-face' || entry.id.endsWith(':pet-face')))
     return semanticLayer(
       id,
       region(analysis, 'face-skin') ?? petFace,
       petFace === undefined
         ? analysis?.modelVersions?.portraitSemantics
-        : analysis?.modelVersions?.petSemantics,
+        : analysis?.modelVersions?.petSemantics ?? analysis?.modelVersions?.petGeometry,
     )
   }
   if (id === 'hair') {

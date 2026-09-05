@@ -11,6 +11,7 @@ apps/wechat-miniapp/   微信小程序客户端
 packages/pattern-core/ 平台无关的图像与图纸核心
 services/ai-gateway/   AI 能力接入层
 services/pixel-proposal-sidecar/ 本地 Pixel Art + LCM 提案服务
+services/sam2-sidecar/ 本地 SAM 2.1 粗圈提示分割服务
 assets/palettes/       通用材料色卡资源
 tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
@@ -103,9 +104,20 @@ pnpm benchmark:shape
 pnpm demo
 pnpm pixel-proposal:setup
 pnpm demo:ai
+pnpm openclip:setup
+pnpm openclip:start
+pnpm sam2:setup
+pnpm sam2:test
+pnpm sam2:start
+pnpm sam2:smoke
+pnpm auto-eval:generate -- --category pet --limit 3 --openclip-endpoint http://127.0.0.1:7102
 ```
 
 `pnpm demo:ai` 会同时启动本地 Pixel Art + LCM 提案服务与浏览器工作台。模型菜单包含确定性基线、BiRefNet 神经分析、学习像素化和生成式提案；学习结果继续经过主体与宠物关键点分析、实体色板映射、连通性整理和制作成本评分。
+
+`auto-eval` 可选连接本地 OpenCLIP sidecar。每个候选保存固定模型身份、配对特征和贡献分，宠物类别额外使用宠物/鸟类边际；服务故障会记录短警告并继续输出纯规则排序。
+
+`sam2-local` 接收粗圈、外接框和正负点，返回选中实例的紧凑 RLE 蒙版、自动裁剪、predicted IoU 和稳定度。启动 sidecar 后设置 `SAM2_ENDPOINT=http://127.0.0.1:7103`，Demo 的显式 `providerIds: ['sam2-local']` 请求会直接使用提示分割结果覆盖主体证据。
 
 ## License
 

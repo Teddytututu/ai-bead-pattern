@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 
 import {
   composeMaskOverlay,
+  createInstancePromptFromLasso,
   createLiveStrokePreview,
   fitContainRect,
   maskEditSessionIsDirty,
@@ -146,6 +147,23 @@ describe('demo mask editor helpers', () => {
     assert.equal(result.valid, true)
   })
 
+  it('builds a bounded SAM 2 instance prompt from a dense rough lasso', () => {
+    const points = Array.from({ length: 400 }, (_, index) => {
+      const angle = index / 400 * Math.PI * 2
+      return {
+        x: 0.5 + Math.cos(angle) * 0.35,
+        y: 0.5 + Math.sin(angle) * 0.3,
+      }
+    })
+
+    const prompt = createInstancePromptFromLasso(points, { label: 'cat' })
+
+    assert.ok(prompt.lasso.length >= 4)
+    assert.ok(prompt.lasso.length <= 64)
+    assert.deepEqual(prompt.lasso[0], prompt.lasso.at(-1))
+    assert.deepEqual(prompt.labels, ['cat'])
+  })
+
   it('rejects a collapsed subject lasso after boundary snapping', () => {
     const result = prepareSubjectLasso([
       { x: 0.1, y: 0.5 },
@@ -225,11 +243,14 @@ describe('demo mask editor helpers', () => {
   it('wires the editor to automatic subject evidence and the saved edit session', async () => {
     const html = await readFile(new URL('./index.html', import.meta.url), 'utf8')
 
-    assert.match(html, /import \{ createMaskEditorController \} from '\.\/mask-editor\.mjs'/)
+    assert.match(html, /createMaskEditorController,[\s\S]*from '\.\/mask-editor\.mjs'/)
     assert.match(html, /async function automaticSubjectEvidence/)
     assert.match(html, /evidence = await automaticSubjectEvidence\(\)/)
     assert.match(html, /evidence,/)
     assert.match(html, /editSession: savedMaskEditSession/)
+    assert.match(html, /onSelectSubject: async/)
+    assert.match(html, /providerIds:\s*\['sam2-local'\]/)
+    assert.match(html, /instancePrompt:\s*createInstancePromptFromLasso/)
   })
 
   it('commits confirmed evidence before the single regeneration call', async () => {
@@ -245,11 +266,14 @@ describe('demo mask editor helpers', () => {
     assert.equal(confirmationBlock.match(/await generate\(\)/g)?.length, 1)
   })
 
-  it('keeps structure guidance enabled and exposes an outline comparison control', async () => {
+  it('keeps structure guidance enabled and exposes an algorithmic outline mode control', async () => {
     const html = await readFile(new URL('./index.html', import.meta.url), 'utf8')
     assert.match(html, /importanceStrength:\s*3\.5/)
-    assert.match(html, /id="toggleOutlineButton"/)
-    assert.match(html, /outline:\s*showOutline/)
+    assert.match(html, /id="outlineModeControl"/)
+    assert.match(html, /data-outline-mode="off"/)
+    assert.match(html, /data-outline-mode="selective"/)
+    assert.match(html, /data-outline-mode="full"/)
+    assert.match(html, /outlineMode:\s*selectedOutlineMode/)
     assert.match(html, /id="maskSnapToggle" type="checkbox" checked/)
   })
 })

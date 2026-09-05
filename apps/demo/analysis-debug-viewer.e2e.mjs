@@ -2,11 +2,12 @@ import { expect, test } from '@playwright/test'
 
 async function waitForGeneration(page) {
   await page.waitForFunction(() => {
-    const status = document.querySelector('#statusText')?.textContent ?? ''
+    const status = document.querySelector('#status')
     const generateButton = document.querySelector('#generateButton')
     return generateButton instanceof HTMLButtonElement
       && generateButton.disabled === false
-      && /\d+\s*ms$/.test(status)
+      && status instanceof HTMLElement
+      && status.dataset.state !== 'busy'
   })
 }
 

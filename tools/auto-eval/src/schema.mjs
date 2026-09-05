@@ -128,8 +128,8 @@ export function validateVisionJudgment(value, candidates) {
   }
   unit(judge.confidence, 'judge.confidence')
   if (finite(judge.elapsedMs, 'judge.elapsedMs') < 0) throw new RangeError('judge.elapsedMs must be zero or positive')
-  if (Array.isArray(candidates) === false || candidates.length < 2 || candidates.length > 4) {
-    throw new RangeError('vision judgment requires 2..4 candidates')
+  if (Array.isArray(candidates) === false || candidates.length < 2 || candidates.length > 12) {
+    throw new RangeError('vision judgment requires 2..12 candidates')
   }
   const candidateById = new Map(candidates.map((candidate) => [text(candidate.id, 'candidate.id'), candidate]))
   if (candidateById.size !== candidates.length) throw new RangeError('candidate ids must be unique')

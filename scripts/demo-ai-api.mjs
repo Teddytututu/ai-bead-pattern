@@ -11,6 +11,7 @@ const routeCapabilities = Object.freeze({
   'neural-analysis': Object.freeze(['subject-segmentation', 'edge-thin-structure']),
   'learned-pixelization': Object.freeze(['learned-pixelization']),
   'generative-proposal': Object.freeze(['generative-proposal']),
+  'preference-scoring': Object.freeze(['embedding', 'preference-scoring']),
 })
 
 const maximumImageDimension = 2048
@@ -68,15 +69,21 @@ function requestFromPayload(payload) {
     route: payload.route,
     capabilities,
     image: decodePixelImage(payload.image),
+    ...(payload.referenceImage === undefined ? {} : {
+      referenceImage: decodePixelImage(payload.referenceImage),
+    }),
     failureMode: 'best-effort',
     timeoutMs: payload.route === 'learned-pixelization' || payload.route === 'generative-proposal'
       ? 30 * 60_000
-      : 30_000,
+      : payload.route === 'preference-scoring' ? 120_000 : 30_000,
     ...(payload.targetGrid === undefined ? {} : { targetGrid: payload.targetGrid }),
     ...(payload.paletteId === undefined ? {} : { paletteId: payload.paletteId }),
     ...(payload.styleId === undefined ? {} : { styleId: payload.styleId }),
     ...(payload.prompt === undefined ? {} : { prompt: payload.prompt }),
+    ...(payload.providerIds === undefined ? {} : { providerIds: payload.providerIds }),
+    ...(payload.instancePrompt === undefined ? {} : { instancePrompt: payload.instancePrompt }),
     ...(payload.sourceId === undefined ? {} : { sourceId: payload.sourceId }),
+    ...(payload.candidateId === undefined ? {} : { candidateId: payload.candidateId }),
     ...(payload.imageTypeHint === undefined ? {} : { imageTypeHint: payload.imageTypeHint }),
   }
 }
@@ -108,10 +115,62 @@ function routeStatus(route, providers) {
   }
 }
 
+function automaticPetProviderPlan(request, registry) {
+  if (request.route !== 'neural-analysis'
+    || (request.imageTypeHint !== undefined && request.imageTypeHint !== 'pet')
+    || request.providerIds !== undefined) return request
+  const grounded = registry.get('grounded-sam2-local')
+  const pose = registry.get('mmpose-animal-local')
+  if (grounded === undefined || pose === undefined) return request
+  const providerIds = [grounded.manifest.providerId, pose.manifest.providerId]
+  const rembg = registry.get('rembg-birefnet-general-lite')
+  if (rembg !== undefined) providerIds.push(rembg.manifest.providerId)
+  return {
+    ...request,
+    capabilities: [...new Set([...request.capabilities, 'keypoints'])],
+    providerIds,
+  }
+}
+
 export function createDemoAiService(options = {}) {
   const registry = options.registry ?? new AIProviderRegistry()
   if (options.registry === undefined) {
     registry.register(new RembgVisionProvider(), 100)
+    const sam2Endpoint = options.sam2Endpoint ?? process.env.SAM2_ENDPOINT
+    if (typeof sam2Endpoint === 'string' && sam2Endpoint.trim().length > 0) {
+      const sam2Manifest = modelManifest('sam2-local')
+      registry.register(new HttpVisionProvider({
+        manifest: sam2Manifest,
+        endpoint: sam2Endpoint,
+        timeoutMs: options.sam2TimeoutMs ?? sam2Manifest.failurePolicy.timeoutMs,
+        ...(options.sam2Fetch === undefined ? {} : { fetch: options.sam2Fetch }),
+      }), 95)
+    }
+    const groundedSam2Endpoint = options.groundedSam2Endpoint
+      ?? process.env.GROUNDED_SAM2_ENDPOINT
+      ?? sam2Endpoint
+    if (typeof groundedSam2Endpoint === 'string' && groundedSam2Endpoint.trim().length > 0) {
+      const groundedManifest = modelManifest('grounded-sam2-local')
+      registry.register(new HttpVisionProvider({
+        manifest: groundedManifest,
+        endpoint: groundedSam2Endpoint,
+        healthPath: '/health/grounded',
+        timeoutMs: options.groundedSam2TimeoutMs ?? groundedManifest.failurePolicy.timeoutMs,
+        ...((options.groundedSam2Fetch ?? options.sam2Fetch) === undefined
+          ? {}
+          : { fetch: options.groundedSam2Fetch ?? options.sam2Fetch }),
+      }), 94)
+    }
+    const mmposeEndpoint = options.mmposeEndpoint ?? process.env.MMPOSE_ENDPOINT
+    if (typeof mmposeEndpoint === 'string' && mmposeEndpoint.trim().length > 0) {
+      const mmposeManifest = modelManifest('mmpose-animal-local')
+      registry.register(new HttpVisionProvider({
+        manifest: mmposeManifest,
+        endpoint: mmposeEndpoint,
+        timeoutMs: options.mmposeTimeoutMs ?? mmposeManifest.failurePolicy.timeoutMs,
+        ...(options.mmposeFetch === undefined ? {} : { fetch: options.mmposeFetch }),
+      }), 93)
+    }
     const proposalEndpoint = options.proposalEndpoint ?? process.env.PIXEL_PROPOSAL_ENDPOINT
     if (typeof proposalEndpoint === 'string' && proposalEndpoint.trim().length > 0) {
       registry.register(new HttpVisionProvider({
@@ -120,6 +179,26 @@ export function createDemoAiService(options = {}) {
         timeoutMs: options.proposalProbeTimeoutMs ?? 10_000,
         ...(options.proposalFetch === undefined ? {} : { fetch: options.proposalFetch }),
       }), 90)
+    }
+    const dinov2Endpoint = options.dinov2Endpoint ?? process.env.DINOV2_ENDPOINT
+    if (typeof dinov2Endpoint === 'string' && dinov2Endpoint.trim().length > 0) {
+      const dinov2Manifest = modelManifest('dinov2-vits14-pair-local')
+      registry.register(new HttpVisionProvider({
+        manifest: dinov2Manifest,
+        endpoint: dinov2Endpoint,
+        timeoutMs: options.dinov2TimeoutMs ?? dinov2Manifest.failurePolicy.timeoutMs,
+        ...(options.dinov2Fetch === undefined ? {} : { fetch: options.dinov2Fetch }),
+      }), 85)
+    }
+    const openclipEndpoint = options.openclipEndpoint ?? process.env.OPENCLIP_ENDPOINT
+    if (typeof openclipEndpoint === 'string' && openclipEndpoint.trim().length > 0) {
+      const openclipManifest = modelManifest('openclip-vit-b32-pair-local')
+      registry.register(new HttpVisionProvider({
+        manifest: openclipManifest,
+        endpoint: openclipEndpoint,
+        timeoutMs: options.openclipTimeoutMs ?? openclipManifest.failurePolicy.timeoutMs,
+        ...(options.openclipFetch === undefined ? {} : { fetch: options.openclipFetch }),
+      }), 84)
     }
   }
   const analyzer = new CompositeImageAnalyzer(registry)
@@ -150,7 +229,7 @@ export function createDemoAiService(options = {}) {
     },
 
     async analyze(payload, signal) {
-      const request = requestFromPayload(payload)
+      const request = automaticPetProviderPlan(requestFromPayload(payload), registry)
       const result = await analyzer.analyze({ ...request, signal })
       return jsonReady({
         ...result,
@@ -228,7 +307,10 @@ export function createDemoAiApiHandler(options = {}) {
       }
       const payload = await readJson(request, maximumRequestBytes)
       const route = payload?.route
-      if (endpoint === 'analyze' && route !== 'neural-analysis' && route !== 'deterministic') {
+      if (endpoint === 'analyze'
+        && route !== 'neural-analysis'
+        && route !== 'deterministic'
+        && route !== 'preference-scoring') {
         throw new RangeError('Analysis endpoint requires an analysis route')
       }
       if (endpoint === 'proposals'

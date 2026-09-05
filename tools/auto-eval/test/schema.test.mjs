@@ -51,6 +51,22 @@ describe('vision judgment schema', () => {
     ]))
   })
 
+  it('accepts one internal 32, 48, and 64 evaluation batch with twelve candidates', () => {
+    const candidates = Array.from({ length: 12 }, (_, index) => ({
+      id: `candidate-${index + 1}`,
+      grid: { width: [32, 48, 64][index % 3], height: [32, 48, 64][index % 3] },
+    }))
+    const ids = candidates.map((candidate) => candidate.id)
+    const value = judgment()
+    value.candidateScores = Object.fromEntries(ids.map((id) => [id, { ...axes }]))
+    value.issues = []
+    value.ranking = ids
+    value.bestCandidateId = ids[0]
+    value.eliminations = []
+
+    assert.doesNotThrow(() => validateVisionJudgment(value, candidates))
+  })
+
   it('rejects incomplete axes, unknown candidates, and invalid model confidence', () => {
     const missingAxis = judgment()
     delete missingAxis.candidateScores.a.palette

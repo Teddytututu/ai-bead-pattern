@@ -111,6 +111,36 @@ describe('Analysis Debug Viewer layers', () => {
     assert.equal(face.modelVersion, 'pet-geometry-v2')
   })
 
+  it('combines instance-prefixed pet faces into one visible face layer', () => {
+    const petAnalysis = {
+      ...analysis,
+      semanticRegions: [
+        {
+          id: 'pet-01:pet-face',
+          label: 'pet face',
+          mask: { width: 2, height: 2, values: new Float32Array([1, 0, 0, 0]) },
+          confidence: 0.9,
+          importance: 1,
+        },
+        {
+          id: 'pet-02:pet-face',
+          label: 'pet face',
+          mask: { width: 2, height: 2, values: new Float32Array([0, 0, 0, 1]) },
+          confidence: 0.7,
+          importance: 1,
+        },
+      ],
+      modelVersions: { petGeometry: 'pet-geometry-v3' },
+    }
+
+    const face = resolveAnalysisDebugLayer('face', { analysis: petAnalysis })
+
+    assert.equal(face.available, true)
+    assert.deepEqual([...face.mask.values], [1, 0, 0, 1])
+    assert.equal(face.confidence, 0.8)
+    assert.equal(face.modelVersion, 'pet-geometry-v3')
+  })
+
   it('returns landmark evidence and a clear unavailable layer state', () => {
     const landmarks = resolveAnalysisDebugLayer('landmarks', {
       analysis,
