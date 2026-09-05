@@ -45,6 +45,7 @@ def main() -> None:
             "width": proposal.image.width,
             "height": proposal.image.height,
             "rgbaBase64": encode_raw_rgba(proposal.image),
+            "sourceFrame": proposal.source_frame.to_wire(),
             "elapsedMs": elapsed_ms,
         })
         os._exit(0)

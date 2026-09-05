@@ -5,6 +5,7 @@ import {
   type EvidenceProvenance,
   type ImageAnalysis,
   type ImageLandmark,
+  type ImportanceMap,
   type SemanticRegion,
   type SubjectMaskEvidence,
   type SubjectMaskSource,
@@ -70,7 +71,7 @@ function normalizeSubjectEvidence(evidence: SubjectMaskEvidence): SubjectMaskEvi
 function subjectPriority(evidence: SubjectMaskEvidence): readonly [number, number, number] {
   return [
     evidence.userConfirmed === true ? 1 : 0,
-    evidence.confidence,
+    evidence.confidence * subjectSourceReliability[evidence.source],
     subjectSourcePriority[evidence.source],
   ]
 }
@@ -114,6 +115,18 @@ function provenancePriority(provenance: readonly EvidenceProvenance[] | undefine
   return Math.max(0, ...(provenance ?? []).map((entry) => evidenceOriginPriority[entry.origin]))
 }
 
+function provenanceReliability(provenance: readonly EvidenceProvenance[] | undefined): number {
+  if (provenance === undefined || provenance.length === 0) return 1
+  return Math.max(...provenance.map((entry) => evidenceOriginReliability[entry.origin]))
+}
+
+function calibratedConfidence(
+  confidence: number,
+  provenance: readonly EvidenceProvenance[] | undefined,
+): number {
+  return confidence * provenanceReliability(provenance)
+}
+
 function mergeById<T extends {
   id: string
   confidence: number
@@ -128,9 +141,13 @@ function mergeById<T extends {
         ...(provenance.length === 0 ? {} : { provenance }),
       }
       const current = selected.get(candidate.id)
+      const candidateConfidence = calibratedConfidence(candidate.confidence, candidate.provenance)
+      const currentConfidence = current === undefined
+        ? Number.NEGATIVE_INFINITY
+        : calibratedConfidence(current.confidence, current.provenance)
       const preferred = current === undefined
-        || candidate.confidence > current.confidence
-        || (candidate.confidence === current.confidence
+        || candidateConfidence > currentConfidence
+        || (candidateConfidence === currentConfidence
           && (provenancePriority(candidate.provenance) > provenancePriority(current.provenance)
             || (provenancePriority(candidate.provenance) === provenancePriority(current.provenance)
               && canonicalKey(candidate) < canonicalKey(current))))
@@ -138,6 +155,59 @@ function mergeById<T extends {
     }
   }
   return [...selected.values()].sort((first, second) => first.id.localeCompare(second.id))
+}
+
+const subjectSourceReliability: Readonly<Record<SubjectMaskSource, number>> = {
+  manual: 1,
+  'ai+manual': 0.98,
+  ai: 0.95,
+  fused: 0.94,
+  alpha: 0.9,
+  heuristic: 0.65,
+  legacy: 0.55,
+}
+
+const evidenceOriginReliability: Readonly<Record<EvidenceOrigin, number>> = {
+  manual: 1,
+  fused: 0.98,
+  model: 0.95,
+  source: 0.9,
+  heuristic: 0.65,
+}
+
+function landmarkInstanceId(landmark: ImageLandmark): string | undefined {
+  const separator = landmark.id.indexOf(':')
+  return separator > 0 ? landmark.id.slice(0, separator) : undefined
+}
+
+function reconcileLandmarkRegions(
+  landmarks: readonly ImageLandmark[],
+  regions: readonly SemanticRegion[],
+): readonly ImageLandmark[] {
+  const regionIds = new Set(regions.map((region) => region.id))
+  return landmarks.map((landmark) => {
+    const {
+      featureRegionId,
+      carrierRegionId,
+      ...base
+    } = landmark
+    const instanceId = landmarkInstanceId(landmark)
+    const resolvedFeatureRegionId = featureRegionId !== undefined && regionIds.has(featureRegionId)
+      ? featureRegionId
+      : undefined
+    const resolvedCarrierRegionId = carrierRegionId !== undefined && regionIds.has(carrierRegionId)
+      ? carrierRegionId
+      : instanceId !== undefined && regionIds.has(`${instanceId}:subject`)
+        ? `${instanceId}:subject`
+        : instanceId === undefined && regionIds.has('subject')
+          ? 'subject'
+          : undefined
+    return {
+      ...base,
+      ...(resolvedFeatureRegionId === undefined ? {} : { featureRegionId: resolvedFeatureRegionId }),
+      ...(resolvedCarrierRegionId === undefined ? {} : { carrierRegionId: resolvedCarrierRegionId }),
+    }
+  })
 }
 
 function evidenceConfidence(
@@ -187,12 +257,42 @@ function selectedCrop(
     )[0]
 }
 
-function selectedImportance(analyses: readonly ImageAnalysis[]): ImageAnalysis | undefined {
-  return analyses
-    .filter((analysis) => analysis.importanceMap !== undefined)
-    .sort((first, second) =>
-      canonicalKey(first.importanceMap).localeCompare(canonicalKey(second.importanceMap)),
-    )[0]
+function fusedImportanceMap(analyses: readonly ImageAnalysis[]): ImportanceMap | undefined {
+  const sources = analyses.filter((analysis) => analysis.importanceMap !== undefined)
+  if (sources.length === 0) return undefined
+  const reference = sources[0]!.importanceMap!
+  if (Number.isInteger(reference.width) === false || reference.width <= 0
+    || Number.isInteger(reference.height) === false || reference.height <= 0
+    || reference.weights.length !== reference.width * reference.height) {
+    throw new RangeError('Importance map dimensions and weights must align')
+  }
+  if (sources.length === 1) {
+    const weights = Float32Array.from(reference.weights)
+    for (const value of weights) {
+      if (Number.isFinite(value) === false || value < 0 || value > 1) {
+        throw new RangeError('Importance map weights must stay within 0..1')
+      }
+    }
+    return { width: reference.width, height: reference.height, weights }
+  }
+  const weights = new Float32Array(reference.weights.length)
+  for (const analysis of sources) {
+    const map = analysis.importanceMap!
+    if (map.width !== reference.width || map.height !== reference.height
+      || map.weights.length !== weights.length) {
+      throw new RangeError('Importance map dimensions must match during fusion')
+    }
+    const sourceWeight = Math.min(1, Math.max(0, analysis.confidence ?? 1))
+      * provenanceReliability(analysis.provenance)
+    for (let index = 0; index < weights.length; index += 1) {
+      const value = map.weights[index]!
+      if (Number.isFinite(value) === false || value < 0 || value > 1) {
+        throw new RangeError('Importance map weights must stay within 0..1')
+      }
+      weights[index] = Math.max(weights[index]!, value * sourceWeight)
+    }
+  }
+  return { width: reference.width, height: reference.height, weights }
 }
 
 function selectedImageType(analyses: readonly ImageAnalysis[]): ImageAnalysis | undefined {
@@ -219,10 +319,13 @@ function mergedModelVersions(analyses: readonly ImageAnalysis[]): Readonly<Recor
 
 export function fuseImageAnalyses(analyses: readonly ImageAnalysis[]): ImageAnalysis {
   const subject = selectedSubjectMask(analyses)
-  const landmarks = mergeById(analyses.map((analysis) => analysis.landmarks))
   const semanticRegions = mergeById(analyses.map((analysis) => analysis.semanticRegions))
+  const landmarks = reconcileLandmarkRegions(
+    mergeById(analyses.map((analysis) => analysis.landmarks)),
+    semanticRegions,
+  )
   const cropSource = selectedCrop(analyses, 'manual') ?? selectedCrop(analyses, 'automatic')
-  const importanceSource = selectedImportance(analyses)
+  const importanceMap = fusedImportanceMap(analyses)
   const imageTypeSource = selectedImageType(analyses)
   const modelVersions = mergedModelVersions(analyses)
   const provenance = collectedProvenance(analyses, subject, landmarks, semanticRegions)
@@ -232,7 +335,7 @@ export function fuseImageAnalyses(analyses: readonly ImageAnalysis[]): ImageAnal
     ...(subject === undefined ? {} : { subjectMaskEvidence: subject, subjectMask: subject.mask }),
     ...(semanticRegions.length === 0 ? {} : { semanticRegions }),
     ...(landmarks.length === 0 ? {} : { landmarks }),
-    ...(importanceSource?.importanceMap === undefined ? {} : { importanceMap: importanceSource.importanceMap }),
+    ...(importanceMap === undefined ? {} : { importanceMap }),
     ...(cropSource?.suggestedCrop === undefined ? {} : {
       suggestedCrop: cropSource.suggestedCrop,
       suggestedCropConfidence: cropSource.suggestedCropConfidence,

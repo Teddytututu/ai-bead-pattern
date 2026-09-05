@@ -7,7 +7,7 @@ import type {
   ImageType,
   PixelImage,
 } from '@ai-bead-pattern/pattern-core'
-import { inferPetAnalysis, numericArrayFingerprintSync } from '@ai-bead-pattern/pattern-core'
+import { inferPetInstances, numericArrayFingerprintSync } from '@ai-bead-pattern/pattern-core'
 
 export type SegmentationModel =
   | 'birefnet-general-lite'
@@ -58,6 +58,8 @@ interface DecodedMask {
 const maximumResponseBytes = 64 * 1024 * 1024
 const maximumImageSide = 2_048
 const maximumImagePixels = 4_000_000
+const secondaryComponentPrimaryAreaRatio = 0.35
+const secondaryComponentImageAreaRatio = 0.003
 const segmentationModels = new Set<SegmentationModel>([
   'birefnet-general-lite',
   'birefnet-general',
@@ -165,17 +167,18 @@ function boundaryImportance(mask: DecodedMask): Float32Array {
   return weights
 }
 
-function dominantConnectedMask(mask: DecodedMask, threshold: number): DecodedMask {
-  const visited = new Uint8Array(mask.values.length)
-  let largest: number[] = []
+function significantConnectedMask(mask: DecodedMask, threshold: number): DecodedMask {
+  const labels = new Uint32Array(mask.values.length)
+  const componentSizes = [0]
   for (let start = 0; start < mask.values.length; start += 1) {
-    if (visited[start] === 1 || (mask.values[start] ?? 0) < threshold) continue
+    if (labels[start] !== 0 || (mask.values[start] ?? 0) < threshold) continue
+    const label = componentSizes.length
     const queue = [start]
-    const component: number[] = []
-    visited[start] = 1
+    let componentSize = 0
+    labels[start] = label
     while (queue.length > 0) {
       const index = queue.pop()!
-      component.push(index)
+      componentSize += 1
       const x = index % mask.width
       const y = Math.floor(index / mask.width)
       for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
@@ -185,18 +188,36 @@ function dominantConnectedMask(mask: DecodedMask, threshold: number): DecodedMas
           const nextY = y + offsetY
           if (nextX < 0 || nextY < 0 || nextX >= mask.width || nextY >= mask.height) continue
           const next = nextY * mask.width + nextX
-          if (visited[next] === 1 || (mask.values[next] ?? 0) < threshold) continue
-          visited[next] = 1
+          if (labels[next] !== 0 || (mask.values[next] ?? 0) < threshold) continue
+          labels[next] = label
           queue.push(next)
         }
       }
     }
-    if (component.length > largest.length) largest = component
+    componentSizes.push(componentSize)
   }
-  if (largest.length === 0) return mask
+  if (componentSizes.length === 1) return mask
+  let primaryLabel = 1
+  for (let label = 2; label < componentSizes.length; label += 1) {
+    if (componentSizes[label]! > componentSizes[primaryLabel]!) primaryLabel = label
+  }
+  const retainedLabels = new Uint8Array(componentSizes.length)
+  retainedLabels[primaryLabel] = 1
+  const primaryArea = componentSizes[primaryLabel]!
+  for (let label = 1; label < componentSizes.length; label += 1) {
+    const area = componentSizes[label]!
+    if (area >= primaryArea * secondaryComponentPrimaryAreaRatio
+      && area >= mask.values.length * secondaryComponentImageAreaRatio) {
+      retainedLabels[label] = 1
+    }
+  }
   const keep = new Uint8Array(mask.values.length)
-  for (const index of largest) keep[index] = 1
-  for (const index of largest) {
+  for (let index = 0; index < labels.length; index += 1) {
+    if (retainedLabels[labels[index]!] === 1) keep[index] = 1
+  }
+  // Connected-component filtering uses hard foreground; retained regions recover one soft-alpha ring.
+  for (let index = 0; index < labels.length; index += 1) {
+    if (retainedLabels[labels[index]!] !== 1) continue
     const x = index % mask.width
     const y = Math.floor(index / mask.width)
     for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
@@ -261,7 +282,7 @@ function analysisFromMask(
   cropPaddingRatio: number,
   imageTypeHint?: ImageType,
 ): ImageAnalysis {
-  const cleanedMask = dominantConnectedMask(mask, cropThreshold)
+  const cleanedMask = significantConnectedMask(mask, cropThreshold)
   const subjectMask: BinaryMask = {
     width: cleanedMask.width,
     height: cleanedMask.height,
@@ -269,14 +290,14 @@ function analysisFromMask(
   }
   const confidence = maskCertaintyHeuristic(cleanedMask.values)
   const componentCrop = subjectCrop(cleanedMask, cropThreshold, cropPaddingRatio)
-  const inferredPet = imageTypeHint === 'portrait' || imageTypeHint === 'illustration' || imageTypeHint === 'landscape'
+  const inferredPetGroup = imageTypeHint === 'portrait' || imageTypeHint === 'illustration' || imageTypeHint === 'landscape'
     ? undefined
-    : inferPetAnalysis(image, subjectMask)
-  const pet = inferredPet !== undefined
-    && (imageTypeHint === 'pet' || inferredPet.confidence >= 0.62)
-    ? inferredPet
+    : inferPetInstances(image, subjectMask)
+  const petGroup = inferredPetGroup !== undefined
+    && (imageTypeHint === 'pet' || inferredPetGroup.confidence >= 0.62)
+    ? inferredPetGroup
     : undefined
-  const crop = pet?.suggestedCrop ?? componentCrop
+  const crop = petGroup?.suggestedCrop ?? componentCrop
   const provenance = [{
     origin: 'model' as const,
     provider: 'rembg-http',
@@ -306,25 +327,39 @@ function analysisFromMask(
       importance: 0.8,
       mask: subjectMask,
       provenance,
-    }, ...(pet === undefined ? [] : [{
-      id: 'pet-face',
+    }, ...(petGroup === undefined ? [] : petGroup.instances.flatMap((instance) => [{
+      id: `${instance.instanceId}:subject`,
+      label: 'pet instance',
+      confidence: instance.confidence,
+      importance: 0.95,
+      mask: instance.instanceMask,
+      provenance: [{ origin: 'heuristic' as const, provider: 'pet-components', version: 'significant-components-v1' }],
+    }, {
+      id: `${instance.instanceId}:pet-face`,
       label: 'pet face',
-      confidence: pet.confidence,
+      confidence: instance.confidence,
       importance: 1,
-      mask: pet.faceMask,
-      provenance: [{ origin: 'heuristic' as const, provider: 'pet-geometry', version: 'pet-face-v2' }],
-    }])],
-    ...(pet === undefined ? {} : {
+      mask: instance.faceMask,
+      provenance: [{ origin: 'heuristic' as const, provider: 'pet-geometry', version: 'pet-face-v3' }],
+    }, ...instance.bodyRegions]))],
+    ...(petGroup === undefined ? {} : {
       imageType: 'pet' as const,
-      landmarks: pet.landmarks,
+      landmarks: petGroup.instances.flatMap((instance) => instance.landmarks),
     }),
-    modelVersions: { segmentation: `rembg/${model}` },
+    modelVersions: {
+      segmentation: `rembg/${model}`,
+      ...(petGroup === undefined ? {} : {
+        petAnalysis: 'pattern-core/pet-analysis-v3-ap10k',
+        petInstances: String(petGroup.instances.length),
+        petHeadPose: petGroup.instances.map((instance) => instance.headPose).join(','),
+      }),
+    },
     provenance,
   }
   if (crop !== undefined) {
     analysis.suggestedCrop = crop
     analysis.suggestedCropSource = 'automatic'
-    analysis.suggestedCropConfidence = pet?.suggestedCropConfidence ?? confidence
+    analysis.suggestedCropConfidence = petGroup?.confidence ?? confidence
   }
   return analysis
 }
@@ -426,7 +461,7 @@ export class RembgHttpSegmentationProvider implements SegmentationProvider {
     form.append('file', new Blob([Uint8Array.from(image)], { type: 'image/png' }), 'input.png')
     form.append('model', model)
     form.append('om', 'true')
-    form.append('ppm', String(request.postProcessMask ?? true))
+    form.append('ppm', String(request.postProcessMask ?? false))
 
     const controller = new AbortController()
     const forwardAbort = () => controller.abort(request.signal?.reason)

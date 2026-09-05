@@ -2,7 +2,9 @@ import unittest
 
 from pixel_proposal_sidecar.contracts import (
     MODEL_IDENTITY,
+    ProposalSourceFrame,
     ProposalRequest,
+    contain_source_frame,
     deterministic_seeds,
 )
 
@@ -50,6 +52,33 @@ class ProposalContractTests(unittest.TestCase):
         self.assertEqual(learned, deterministic_seeds(b"cat-source", "learned-pixelization", 1))
         self.assertEqual(len(set(generated)), 3)
         self.assertNotEqual(learned[0], generated[0])
+
+    def test_builds_and_validates_a_centered_source_to_proposal_contain_frame(self) -> None:
+        frame = contain_source_frame((64, 48), (96, 96))
+
+        self.assertEqual(frame.to_wire(), {
+            "fit": "contain",
+            "sourceWidth": 64,
+            "sourceHeight": 48,
+            "x": 0.0,
+            "y": 12.0,
+            "width": 96.0,
+            "height": 72.0,
+        })
+        self.assertEqual(
+            ProposalSourceFrame.from_wire(
+                frame.to_wire(),
+                proposal_size=(96, 96),
+                source_size=(64, 48),
+            ),
+            frame,
+        )
+        with self.assertRaisesRegex(ValueError, "contain"):
+            ProposalSourceFrame.from_wire(
+                {**frame.to_wire(), "height": 80},
+                proposal_size=(96, 96),
+                source_size=(64, 48),
+            )
 
 
 if __name__ == "__main__":

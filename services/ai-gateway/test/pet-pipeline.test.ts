@@ -105,6 +105,7 @@ describe('pet pipeline regression', () => {
       status: result.status,
       reasons: candidate.rejectionReasons,
       score: candidate.score,
+      canvasPlan: candidate.canvasPlan,
       palette: candidate.palettePlan?.selectedColorIds,
       placements: candidate.featurePlacements?.map((placement) => ({
         id: placement.featureId,

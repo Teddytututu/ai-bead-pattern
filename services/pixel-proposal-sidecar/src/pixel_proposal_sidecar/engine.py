@@ -14,7 +14,7 @@ from typing import Any
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from .contracts import ProposalRequest, deterministic_seeds
+from .contracts import ProposalRequest, ProposalSourceFrame, deterministic_seeds
 
 BASE_MODEL = "Onodofthenorth/SD_PixelArt_SpriteSheet_Generator"
 BASE_REVISION = "8229c9b6e928103f0e657cfe6b14d902cb2101d6"
@@ -28,6 +28,7 @@ class GeneratedProposal:
     image: Image.Image
     confidence: float
     seed: int
+    source_frame: ProposalSourceFrame
 
 
 class InProcessPixelPipeline:
@@ -78,7 +79,7 @@ class InProcessPixelPipeline:
             raise ValueError("uploaded image dimensions must stay within 32..2048")
         return image
 
-    def _prepare_canvas(self, image: Image.Image) -> Image.Image:
+    def _prepare_canvas(self, image: Image.Image) -> tuple[Image.Image, ProposalSourceFrame]:
         fitted = ImageOps.contain(
             image,
             (self.render_size, self.render_size),
@@ -93,9 +94,20 @@ class InProcessPixelPipeline:
         background = tuple(sorted(pixel[channel] for pixel in corners)[len(corners) // 2]
                            for channel in range(3))
         canvas = Image.new("RGB", (self.render_size, self.render_size), background)
-        canvas.paste(fitted, ((self.render_size - fitted.width) // 2,
-                              (self.render_size - fitted.height) // 2))
-        return canvas
+        offset = (
+            (self.render_size - fitted.width) // 2,
+            (self.render_size - fitted.height) // 2,
+        )
+        canvas.paste(fitted, offset)
+        return canvas, ProposalSourceFrame(
+            fit="contain",
+            source_width=image.width,
+            source_height=image.height,
+            x=float(offset[0]),
+            y=float(offset[1]),
+            width=float(fitted.width),
+            height=float(fitted.height),
+        )
 
     @staticmethod
     def _prompt(request: ProposalRequest) -> tuple[str, str]:
@@ -126,7 +138,7 @@ class InProcessPixelPipeline:
         seed: int,
     ) -> tuple[GeneratedProposal, float]:
         source_image = self._decode_source(source)
-        canvas = self._prepare_canvas(source_image)
+        canvas, canvas_source_frame = self._prepare_canvas(source_image)
         prompt, negative_prompt = self._prompt(request)
         strength = 0.38 if request.kind == "learned-pixelization" else 0.65
         confidence = 0.88 if request.kind == "learned-pixelization" else 0.80
@@ -147,12 +159,22 @@ class InProcessPixelPipeline:
         pixel_size = max(request.target_grid) * 2
         pixel_size = max(64, min(self.render_size // 4, pixel_size))
         generated = generated.resize((pixel_size, pixel_size), Image.Resampling.NEAREST)
+        source_frame = canvas_source_frame.scaled(
+            (self.render_size, self.render_size),
+            generated.size,
+        )
+        source_frame = ProposalSourceFrame.from_wire(
+            source_frame.to_wire(),
+            proposal_size=generated.size,
+            source_size=source_image.size,
+        )
         elapsed_ms = (time.perf_counter() - started) * 1000
         return GeneratedProposal(
             proposal_id=f"{request.kind}-{seed}",
             image=generated,
             confidence=confidence,
             seed=seed,
+            source_frame=source_frame,
         ), elapsed_ms
 
 
@@ -228,11 +250,16 @@ class PixelProposalEngine:
             width = int(result["width"])
             height = int(result["height"])
             image = Image.frombytes("RGBA", (width, height), image_data)
+            source_frame = ProposalSourceFrame.from_wire(
+                result.get("sourceFrame"),
+                proposal_size=(width, height),
+            )
             return GeneratedProposal(
                 proposal_id=str(result["id"]),
                 image=image,
                 confidence=float(result["confidence"]),
                 seed=int(result["seed"]),
+                source_frame=source_frame,
             ), float(result["elapsedMs"])
 
     def generate(self, source: bytes, request: ProposalRequest) -> tuple[list[GeneratedProposal], float]:
@@ -249,6 +276,7 @@ class PixelProposalEngine:
                     image=proposal.image,
                     confidence=round(max(0.5, proposal.confidence - index * 0.08), 4),
                     seed=proposal.seed,
+                    source_frame=proposal.source_frame,
                 )
             proposals.append(proposal)
             elapsed_ms += worker_ms

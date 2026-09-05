@@ -8,6 +8,7 @@ from PIL import Image
 
 from pixel_proposal_sidecar.app import create_app
 from pixel_proposal_sidecar.contracts import MODEL_IDENTITY
+from pixel_proposal_sidecar.contracts import contain_source_frame
 from pixel_proposal_sidecar.engine import GeneratedProposal
 
 
@@ -24,6 +25,7 @@ class FakeEngine:
             image=output,
             confidence=0.87,
             seed=123,
+            source_frame=contain_source_frame((uploaded.width, uploaded.height), output.size),
         )], 12.5
 
 
@@ -66,6 +68,15 @@ class ProposalApiTests(unittest.TestCase):
         self.assertEqual(body["capabilities"], ["generative-proposal"])
         proposal = body["learnedProposals"][0]
         self.assertEqual(proposal["targetGrid"], {"width": 48, "height": 48})
+        self.assertEqual(proposal["sourceFrame"], {
+            "fit": "contain",
+            "sourceWidth": 64,
+            "sourceHeight": 48,
+            "x": 0.0,
+            "y": 12.0,
+            "width": 96.0,
+            "height": 72.0,
+        })
         self.assertEqual(len(base64.b64decode(proposal["image"]["rgbaBase64"])), 96 * 96 * 4)
 
     def test_rejects_model_identity_drift(self) -> None:

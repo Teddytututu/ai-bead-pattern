@@ -5,11 +5,14 @@ import type { AICapability, ModelManifest } from './model-catalog.js'
 import { validateModelManifest } from './model-catalog.js'
 import {
   hydrateImageAnalysis,
+  hydrateInstanceProposal,
+  hydrateProposalSourceFrame,
   type AIModelProvider,
   type LearnedProposal,
   type ModelProviderRequest,
   type ModelProviderResult,
   type PreferenceFeatures,
+  type RegionalPreferenceComparison,
   type ProviderHealth,
   validateLearnedProposal,
   validatePreferenceFeatures,
@@ -178,7 +181,12 @@ function optionalString(value: unknown, label: string): string | undefined {
   return value === undefined ? undefined : nonEmpty(value, label)
 }
 
-function hydrateProposal(value: unknown, modelId: string, index: number): LearnedProposal {
+function hydrateProposal(
+  value: unknown,
+  modelId: string,
+  index: number,
+  sourceImage: PixelImage,
+): LearnedProposal {
   const input = objectValue(value, `learnedProposals[${index}]`)
   const image = objectValue(input.image, `learnedProposals[${index}].image`)
   const width = finite(image.width, `learnedProposals[${index}].image.width`)
@@ -208,18 +216,24 @@ function hydrateProposal(value: unknown, modelId: string, index: number): Learne
   }
   const paletteId = optionalString(input.paletteId, `learnedProposals[${index}].paletteId`)
   const styleId = optionalString(input.styleId, `learnedProposals[${index}].styleId`)
+  const proposalImage = {
+    width,
+    height,
+    data: decodeRgba(image.rgbaBase64, width, height),
+  }
   const proposal: LearnedProposal = {
     id: nonEmpty(input.id, `learnedProposals[${index}].id`),
     kind,
-    image: { width, height, data: decodeRgba(image.rgbaBase64, width, height) },
+    image: proposalImage,
     confidence: unit(input.confidence, `learnedProposals[${index}].confidence`),
     modelId,
     ...(targetGrid === undefined ? {} : { targetGrid }),
     ...(paletteId === undefined ? {} : { paletteId }),
     ...(styleId === undefined ? {} : { styleId }),
     ...(seed === undefined ? {} : { seed }),
+    sourceFrame: hydrateProposalSourceFrame(input.sourceFrame, proposalImage, sourceImage),
   }
-  validateLearnedProposal(proposal)
+  validateLearnedProposal(proposal, sourceImage)
   return proposal
 }
 
@@ -238,6 +252,45 @@ function hydrateFeatures(value: unknown, modelId: string): PreferenceFeatures {
     throw new RangeError('Preference feature scope is invalid')
   }
   const candidateId = optionalString(input.candidateId, 'preferenceFeatures.candidateId')
+  let regionalComparisons: readonly RegionalPreferenceComparison[] | undefined
+  if (input.regionalComparisons !== undefined) {
+    if (Array.isArray(input.regionalComparisons) === false || input.regionalComparisons.length > 16) {
+      throw new RangeError('preferenceFeatures.regionalComparisons must be a bounded array')
+    }
+    regionalComparisons = input.regionalComparisons.map((entry, index) => {
+      const comparison = objectValue(entry, `preferenceFeatures.regionalComparisons[${index}]`)
+      const view = nonEmpty(
+        comparison.view,
+        `preferenceFeatures.regionalComparisons[${index}].view`,
+      )
+      if (view !== 'global' && view !== 'subject' && view !== 'head' && view !== 'critical-local') {
+        throw new RangeError(`preferenceFeatures.regionalComparisons[${index}].view is invalid`)
+      }
+      return {
+        view,
+        identitySimilarity: unit(
+          comparison.identitySimilarity,
+          `preferenceFeatures.regionalComparisons[${index}].identitySimilarity`,
+        ),
+        patchCorrespondence: unit(
+          comparison.patchCorrespondence,
+          `preferenceFeatures.regionalComparisons[${index}].patchCorrespondence`,
+        ),
+        criticalPatchRetention: unit(
+          comparison.criticalPatchRetention,
+          `preferenceFeatures.regionalComparisons[${index}].criticalPatchRetention`,
+        ),
+        regionalCoverage: unit(
+          comparison.regionalCoverage,
+          `preferenceFeatures.regionalComparisons[${index}].regionalCoverage`,
+        ),
+        confidence: unit(
+          comparison.confidence,
+          `preferenceFeatures.regionalComparisons[${index}].confidence`,
+        ),
+      }
+    })
+  }
   const result: PreferenceFeatures = {
     modelId,
     names,
@@ -245,6 +298,7 @@ function hydrateFeatures(value: unknown, modelId: string): PreferenceFeatures {
     confidence: unit(input.confidence, 'preferenceFeatures.confidence'),
     ...(scopeValue === undefined ? {} : { scope: scopeValue }),
     ...(candidateId === undefined ? {} : { candidateId }),
+    ...(regionalComparisons === undefined ? {} : { regionalComparisons }),
   }
   validatePreferenceFeatures(result)
   return result
@@ -298,10 +352,20 @@ export class HttpVisionProvider implements AIModelProvider {
   async analyze(request: ModelProviderRequest): Promise<ModelProviderResult> {
     validateProviderRequest(request, this.manifest)
     request.signal?.throwIfAborted()
-    const image = await encodePng(request.image)
+    const [image, referenceImage] = await Promise.all([
+      encodePng(request.image),
+      request.referenceImage === undefined ? Promise.resolve(undefined) : encodePng(request.referenceImage),
+    ])
     request.signal?.throwIfAborted()
     const form = new FormData()
     form.append('image', new Blob([Uint8Array.from(image)], { type: 'image/png' }), 'input.png')
+    if (referenceImage !== undefined) {
+      form.append(
+        'referenceImage',
+        new Blob([Uint8Array.from(referenceImage)], { type: 'image/png' }),
+        'reference.png',
+      )
+    }
     form.append('request', JSON.stringify({
       schemaVersion,
       capabilities: request.capabilities,
@@ -315,7 +379,11 @@ export class HttpVisionProvider implements AIModelProvider {
       ...(request.paletteId === undefined ? {} : { paletteId: request.paletteId }),
       ...(request.styleId === undefined ? {} : { styleId: request.styleId }),
       ...(request.prompt === undefined ? {} : { prompt: request.prompt }),
+      ...(request.imageTypeHint === undefined ? {} : { imageTypeHint: request.imageTypeHint }),
+      ...(request.instancePrompt === undefined ? {} : { instancePrompt: request.instancePrompt }),
+      ...(request.instancePrompts === undefined ? {} : { instancePrompts: request.instancePrompts }),
       ...(request.sourceId === undefined ? {} : { sourceId: request.sourceId }),
+      ...(request.candidateId === undefined ? {} : { candidateId: request.candidateId }),
     }))
     const controller = new AbortController()
     const forwardAbort = () => controller.abort(request.signal?.reason)
@@ -348,6 +416,10 @@ export class HttpVisionProvider implements AIModelProvider {
       if (Array.isArray(proposalValues) === false || proposalValues.length > 32) {
         throw new RangeError('Vision provider learned proposals must be a bounded array')
       }
+      const instanceValues = input.instanceProposals === undefined ? [] : input.instanceProposals
+      if (Array.isArray(instanceValues) === false || instanceValues.length > 64) {
+        throw new RangeError('Vision provider instance proposals must be a bounded array')
+      }
       const warningValues = warnings(input.warnings)
       const result: ModelProviderResult = {
         providerId: this.manifest.providerId,
@@ -356,9 +428,14 @@ export class HttpVisionProvider implements AIModelProvider {
         confidence: unit(input.confidence, 'Vision provider confidence'),
         elapsedMs: Math.max(0, performance.now() - startedAt),
         ...(input.analysis === undefined ? {} : { analysis: hydrateImageAnalysis(input.analysis) }),
+        ...(instanceValues.length === 0 ? {} : {
+          instanceProposals: instanceValues.map((entry, index) =>
+            hydrateInstanceProposal(entry, request.image, index),
+          ),
+        }),
         ...(proposalValues.length === 0 ? {} : {
           learnedProposals: proposalValues.map((entry, index) =>
-            hydrateProposal(entry, this.manifest.modelId, index),
+            hydrateProposal(entry, this.manifest.modelId, index, request.image),
           ),
         }),
         ...(input.preferenceFeatures === undefined ? {} : {
@@ -366,7 +443,7 @@ export class HttpVisionProvider implements AIModelProvider {
         }),
         ...(warningValues === undefined ? {} : { warnings: warningValues }),
       }
-      validateProviderResult(result, this, request.capabilities, request.image)
+      validateProviderResult(result, this, request.capabilities, request.image, request)
       return result
     } finally {
       clearTimeout(timeout)

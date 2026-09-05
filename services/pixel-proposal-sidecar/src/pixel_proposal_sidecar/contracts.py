@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+from math import isfinite
 from typing import Any, Literal, Mapping
 
 SCHEMA_VERSION = "ai-gateway-provider-v1"
@@ -35,6 +36,123 @@ def _optional_text(value: Any, label: str, maximum: int) -> str | None:
     if not isinstance(value, str) or not value.strip() or len(value) > maximum:
         raise ValueError(f"{label} must contain bounded text")
     return value.strip()
+
+
+def _positive_integer(value: Any, label: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+        raise ValueError(f"{label} must be a positive integer")
+    return value
+
+
+def _finite_number(value: Any, label: str) -> float:
+    if (not isinstance(value, (int, float)) or isinstance(value, bool)
+            or not isfinite(value)):
+        raise ValueError(f"{label} must be finite")
+    return float(value)
+
+
+@dataclass(frozen=True)
+class ProposalSourceFrame:
+    fit: Literal["contain"]
+    source_width: int
+    source_height: int
+    x: float
+    y: float
+    width: float
+    height: float
+
+    def to_wire(self) -> dict[str, Any]:
+        return {
+            "fit": self.fit,
+            "sourceWidth": self.source_width,
+            "sourceHeight": self.source_height,
+            "x": self.x,
+            "y": self.y,
+            "width": self.width,
+            "height": self.height,
+        }
+
+    def scaled(self, from_size: tuple[int, int], to_size: tuple[int, int]) -> "ProposalSourceFrame":
+        from_width, from_height = from_size
+        to_width, to_height = to_size
+        scale_x = to_width / from_width
+        scale_y = to_height / from_height
+        return ProposalSourceFrame(
+            fit="contain",
+            source_width=self.source_width,
+            source_height=self.source_height,
+            x=self.x * scale_x,
+            y=self.y * scale_y,
+            width=self.width * scale_x,
+            height=self.height * scale_y,
+        )
+
+    @classmethod
+    def from_wire(
+        cls,
+        value: Any,
+        *,
+        proposal_size: tuple[int, int],
+        source_size: tuple[int, int] | None = None,
+    ) -> "ProposalSourceFrame":
+        body = _record(value, "proposal source frame")
+        if body.get("fit") != "contain":
+            raise ValueError("proposal source frame fit must use contain")
+        source_width = _positive_integer(body.get("sourceWidth"), "source width")
+        source_height = _positive_integer(body.get("sourceHeight"), "source height")
+        if source_size is not None and (source_width, source_height) != source_size:
+            raise ValueError("proposal source dimensions differ from the uploaded image")
+        proposal_width = _positive_integer(proposal_size[0], "proposal width")
+        proposal_height = _positive_integer(proposal_size[1], "proposal height")
+        frame = cls(
+            fit="contain",
+            source_width=source_width,
+            source_height=source_height,
+            x=_finite_number(body.get("x"), "source frame x"),
+            y=_finite_number(body.get("y"), "source frame y"),
+            width=_finite_number(body.get("width"), "source frame width"),
+            height=_finite_number(body.get("height"), "source frame height"),
+        )
+        if frame.x < 0 or frame.y < 0 or frame.width <= 0 or frame.height <= 0:
+            raise ValueError("proposal source frame must have positive in-bounds geometry")
+        if (frame.x + frame.width > proposal_width + 1e-6
+                or frame.y + frame.height > proposal_height + 1e-6):
+            raise ValueError("proposal source frame must stay inside the proposal image")
+        expected = contain_source_frame(
+            (source_width, source_height),
+            (proposal_width, proposal_height),
+        )
+        tolerance = max(0.01, max(proposal_width, proposal_height) / 512)
+        if any(abs(actual - target) > tolerance for actual, target in (
+            (frame.x, expected.x),
+            (frame.y, expected.y),
+            (frame.width, expected.width),
+            (frame.height, expected.height),
+        )):
+            raise ValueError("proposal source frame must describe a centered contain mapping")
+        return frame
+
+
+def contain_source_frame(
+    source_size: tuple[int, int],
+    proposal_size: tuple[int, int],
+) -> ProposalSourceFrame:
+    source_width = _positive_integer(source_size[0], "source width")
+    source_height = _positive_integer(source_size[1], "source height")
+    proposal_width = _positive_integer(proposal_size[0], "proposal width")
+    proposal_height = _positive_integer(proposal_size[1], "proposal height")
+    scale = min(proposal_width / source_width, proposal_height / source_height)
+    width = source_width * scale
+    height = source_height * scale
+    return ProposalSourceFrame(
+        fit="contain",
+        source_width=source_width,
+        source_height=source_height,
+        x=(proposal_width - width) / 2,
+        y=(proposal_height - height) / 2,
+        width=width,
+        height=height,
+    )
 
 
 @dataclass(frozen=True)

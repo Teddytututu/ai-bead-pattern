@@ -68,6 +68,7 @@ def create_app(engine: PixelProposalEngine | None = None) -> FastAPI:
                 **({} if proposal_request.style_id is None else {
                     "styleId": proposal_request.style_id,
                 }),
+                "sourceFrame": proposal.source_frame.to_wire(),
                 "image": {
                     "width": proposal.image.width,
                     "height": proposal.image.height,

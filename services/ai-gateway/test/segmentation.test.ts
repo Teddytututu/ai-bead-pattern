@@ -33,7 +33,7 @@ describe('rembg HTTP segmentation provider', () => {
       const form = init?.body as FormData
       assert.equal(form.get('model'), 'birefnet-general-lite')
       assert.equal(form.get('om'), 'true')
-      assert.equal(form.get('ppm'), 'true')
+      assert.equal(form.get('ppm'), 'false')
       assert.ok(form.get('file') instanceof Blob)
       return new Response(Uint8Array.from(output), {
         status: 200,
@@ -67,6 +67,22 @@ describe('rembg HTTP segmentation provider', () => {
     )
     assert.ok(result.analysis.importanceMap!.weights[2]! > result.analysis.subjectMask!.values[2]!)
     assert.ok((result.analysis.confidence ?? 0) > 0.5)
+  })
+
+  it('enables rembg morphology only when the caller requests it', async () => {
+    const output = await maskPng(2, 2, [0, 64, 160, 255])
+    const provider = new RembgHttpSegmentationProvider({
+      fetch: async (_input, init) => {
+        const form = init?.body as FormData
+        assert.equal(form.get('ppm'), 'true')
+        return new Response(Uint8Array.from(output), {
+          status: 200,
+          headers: { 'content-type': 'image/png' },
+        })
+      },
+    })
+
+    await provider.segment({ ...request(), postProcessMask: true })
   })
 
   it('rejects a mask whose dimensions differ from the source image', async () => {
@@ -168,7 +184,32 @@ describe('rembg HTTP segmentation provider', () => {
     )
   })
 
-  it('builds the automatic crop from the dominant connected subject component', async () => {
+  it('retains every significant connected subject component in the automatic crop', async () => {
+    const values = new Array(20 * 10).fill(0)
+    for (let y = 2; y <= 7; y += 1) {
+      for (let x = 2; x <= 5; x += 1) values[y * 20 + x] = 255
+    }
+    for (let y = 3; y <= 6; y += 1) {
+      for (let x = 14; x <= 16; x += 1) values[y * 20 + x] = 255
+    }
+    const output = await maskPng(20, 10, values)
+    const provider = new RembgHttpSegmentationProvider({
+      cropPaddingRatio: 0,
+      fetch: async () => new Response(Uint8Array.from(output), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      }),
+    })
+
+    const result = await provider.segment({ ...request(20, 10), imageTypeHint: 'portrait' })
+
+    assert.deepEqual(result.analysis.suggestedCrop, { x: 2, y: 2, width: 15, height: 6 })
+    assert.equal(result.analysis.subjectMask!.values[2 * 20 + 2], 1)
+    assert.equal(result.analysis.subjectMask!.values[3 * 20 + 14], 1)
+    assert.equal(result.analysis.subjectMask!.values[4 * 20 + 10], 0)
+  })
+
+  it('filters tiny disconnected mask fragments before building the automatic crop', async () => {
     const values = new Array(100).fill(0)
     for (let y = 2; y <= 8; y += 1) {
       for (let x = 3; x <= 6; x += 1) values[y * 10 + x] = 255
@@ -183,10 +224,35 @@ describe('rembg HTTP segmentation provider', () => {
       }),
     })
 
-    const result = await provider.segment(request(10, 10))
+    const result = await provider.segment({ ...request(10, 10), imageTypeHint: 'portrait' })
 
     assert.deepEqual(result.analysis.suggestedCrop, { x: 3, y: 2, width: 4, height: 7 })
     assert.equal(result.analysis.subjectMask!.values[90], 0)
+  })
+
+  it('keeps a single subject mask and its soft boundary stable', async () => {
+    const values = new Array(8 * 8).fill(0)
+    for (let y = 1; y <= 6; y += 1) {
+      for (let x = 2; x <= 5; x += 1) values[y * 8 + x] = 255
+    }
+    values[3 * 8 + 1] = 96
+    values[4 * 8 + 6] = 64
+    const output = await maskPng(8, 8, values)
+    const provider = new RembgHttpSegmentationProvider({
+      cropPaddingRatio: 0,
+      fetch: async () => new Response(Uint8Array.from(output), {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      }),
+    })
+
+    const result = await provider.segment({ ...request(8, 8), imageTypeHint: 'portrait' })
+
+    assert.deepEqual(result.analysis.suggestedCrop, { x: 2, y: 1, width: 4, height: 6 })
+    assert.deepEqual(
+      [...result.analysis.subjectMask!.values].map((value) => Math.round(value * 255)),
+      values,
+    )
   })
 
   it('probes the real rembg API documentation endpoint with bounded health metadata', async () => {
