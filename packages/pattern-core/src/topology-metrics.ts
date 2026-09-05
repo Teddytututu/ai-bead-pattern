@@ -491,6 +491,20 @@ export function projectTopologyReference(
     || model.binaryMask.length !== model.width * model.height) {
     throw new RangeError('Topology source model dimensions must align')
   }
+  // A very large source projected onto a small bead grid has no resolvable
+  // centerline detail. The area mask already carries the observable shape;
+  // retaining that projection avoids materializing million-cell medial graphs
+  // while keeping topology analysis active for normal and high-resolution grids.
+  if (model.width * model.height > 512 * 512 && width * height <= 64 * 64) {
+    return {
+      mask: Uint8Array.from(areaMask, (value) => Number(value >= 0.5)),
+      addedCells: [],
+      projectedSkeletonCells: 0,
+      sourceHoleWitnesses: [],
+      collapsedHoleCount: 0,
+      pathConflictCount: 0,
+    }
+  }
   const mask = Uint8Array.from(areaMask, (value) => Number(value >= 0.5))
   const reservedHoles = analyzeFourConnectedHoles(mask, width, height).enclosedMask
   const graph = buildMedialGraph(model, {

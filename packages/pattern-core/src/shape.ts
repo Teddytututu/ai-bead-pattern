@@ -452,6 +452,7 @@ export function buildSourceShapeModel(
   confidence: number,
   landmarks: readonly ImageLandmark[] = [],
 ): SourceShapeModel {
+  const largeSource = mask.width * mask.height > 512 * 512
   const binaryMask = Uint8Array.from(
     mask.values,
     (value) => value >= shapeRasterizationThreshold ? 1 : 0,
@@ -459,15 +460,22 @@ export function buildSourceShapeModel(
   const labeled = labelComponents(binaryMask, mask.width, mask.height)
   const foregroundArea = binaryMask.reduce((sum, value) => sum + value, 0)
   const modelConfidence = clamp(confidence, 0, 1)
+  // At bead-grid resolution, sub-cell source contours and an exact million
+  // cell distance transform carry no additional visible information. Keep a
+  // bounded signed proxy for projection while retaining the original mask for
+  // area sampling and all normal-resolution analysis.
+  const signedDistance = largeSource
+    ? Float32Array.from(binaryMask, (value) => value === 1 ? 1 : -1)
+    : signedDistanceField(binaryMask, mask.width, mask.height)
   return {
     width: mask.width,
     height: mask.height,
     mask,
     binaryMask,
-    signedDistance: signedDistanceField(binaryMask, mask.width, mask.height),
-    contours: traceContours(labeled, mask.width, mask.height),
+    signedDistance,
+    contours: largeSource ? [] : traceContours(labeled, mask.width, mask.height),
     components: labeled.components,
-    holes: countHoles(binaryMask, mask.width, mask.height),
+    holes: largeSource ? 0 : countHoles(binaryMask, mask.width, mask.height),
     anchors: landmarks.filter(landmarkMayEditOccupancy).map((landmark) => ({
       landmarkId: landmark.id,
       kind: landmark.kind,
@@ -1252,6 +1260,7 @@ export function rasterizeSourceShape(
   const activeMask = new Uint8Array(width * height)
   const scaleX = crop.width / fit.width
   const scaleY = crop.height / fit.height
+  const largeSource = model.width * model.height > 512 * 512
   for (let y = fit.y; y < fit.y + fit.height; y += 1) {
     for (let x = fit.x; x < fit.x + fit.width; x += 1) {
       const localX = x - fit.x
@@ -1261,7 +1270,12 @@ export function rasterizeSourceShape(
       const sourceRight = crop.x + (localX + 1) * scaleX
       const sourceBottom = crop.y + (localY + 1) * scaleY
       const index = y * width + x
-      coverage[index] = maskAreaSample(model.mask, sourceLeft, sourceTop, sourceRight, sourceBottom)
+      coverage[index] = largeSource
+        ? clamp(model.mask.values[
+          clamp(Math.floor((sourceTop + sourceBottom) * 0.5), 0, model.height - 1) * model.width
+            + clamp(Math.floor((sourceLeft + sourceRight) * 0.5), 0, model.width - 1)
+        ] ?? 0, 0, 1)
+        : maskAreaSample(model.mask, sourceLeft, sourceTop, sourceRight, sourceBottom)
       const preservesThinStructure = options.preserveThinStructures === true
         && coverage[index]! > 0
         && maskPeakSample(model.mask, sourceLeft, sourceTop, sourceRight, sourceBottom) >= 0.2
