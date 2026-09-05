@@ -1,6 +1,6 @@
 import { rgbDistance, rgbToLab, type PreparedColor } from '../color.js'
 import { applyArtDirectionImportance, enforceTileSeams, planPixelArtDirection } from '../art-direction.js'
-import { subjectMaskTrust } from '../analysis-evidence.js'
+import { normalizeEvidenceProvenance, subjectMaskTrust } from '../analysis-evidence.js'
 import { countIsolatedCells, countThinStripes, optimizeGrid } from '../grid.js'
 import { identityAppearanceSimilarity } from '../identity-similarity.js'
 import { applyStyle, resizePixels, samplePixelsAtSourceMapping, type ResizedPixels } from '../image.js'
@@ -53,18 +53,39 @@ function metadata(
   totalBeads: number,
   generatedAt: number,
 ): PatternMetadata {
+  const evidence = request.analysis
+  const provenance = [
+    ...(evidence?.provenance ?? []),
+    ...(evidence?.subjectMaskEvidence?.provenance ?? []),
+    ...(evidence?.semanticRegions ?? []).flatMap((region) => region.provenance ?? []),
+    ...(evidence?.landmarks ?? []).flatMap((landmark) => landmark.provenance ?? []),
+  ]
+  const modelProvenance = normalizeEvidenceProvenance(provenance)
+    .filter((entry) => entry.origin === 'model')
+  const modelEntry = modelProvenance[0]
+  const modelEvidence = modelProvenance.length > 0
+    || Object.keys(evidence?.modelVersions ?? {}).length > 0
+    || evidence?.subjectMaskEvidence?.source === 'ai'
+    || evidence?.subjectMaskEvidence?.source === 'ai+manual'
   const result: PatternMetadata = {
     sourceWidth: request.image.width,
     sourceHeight: request.image.height,
     totalBeads,
     generatedAt,
     algorithmVersion: version,
-    aiEnhanced: Boolean(request.options.aiEnhancement && request.analysis !== undefined),
+    aiEnhanced: modelEvidence,
     style,
     baseline,
     engine: 'baseline',
     outlineMode: request.options.structure?.outlineMode
       ?? ((request.options.structure?.valueLevels ?? 3) === 4 ? 'selective' : 'off'),
+  }
+  if (modelEntry?.provider !== undefined) result.aiProvider = modelEntry.provider
+  if (modelEntry?.model !== undefined) result.aiModel = modelEntry.model
+  if (result.aiProvider === undefined || result.aiModel === undefined) {
+    const [name, version] = Object.entries(evidence?.modelVersions ?? {})[0] ?? []
+    if (result.aiProvider === undefined && name !== undefined) result.aiProvider = name
+    if (result.aiModel === undefined && version !== undefined) result.aiModel = version
   }
   if (request.options.beadDiameterMm !== undefined) {
     result.beadDiameterMm = request.options.beadDiameterMm
@@ -124,7 +145,7 @@ export function generateCandidate(
       size.height,
       resizeMethod,
       request.options.backgroundRgb,
-      baseline === 'mvp' && request.image.width * request.image.height <= 512 * 512 ? {
+      baseline === 'mvp' ? {
         source: context.sourceGuidance,
         importanceStrength: Math.max(0, structureOptions.importanceStrength ?? 4),
         edgeStrength: Math.max(0, structureOptions.edgeStrength ?? 1.25),
@@ -241,7 +262,28 @@ export function generateCandidate(
   const featureSymmetryError = symmetryErrors.length === 0
     ? 0
     : symmetryErrors.reduce((sum, value) => sum + value, 0) / symmetryErrors.length
-  const structurePlanKey = `${size.width}x${size.height}:${context.occupancyMode}:${shapeRasterization === undefined ? 'full' : 'shape'}`
+  const structurePlanKey = stableHash(stableSerialize({
+    generationId,
+    size,
+    style,
+    baseline,
+    occupancyMode: context.occupancyMode,
+    shape: shapeRasterization === undefined ? 'full' : 'shape',
+    resizeMethod,
+    preserveThinStructures: context.preserveThinStructures,
+    structure: structureOptions,
+    artDirection: {
+      profile: artDirection.profile.id,
+      generation: artDirection.generation,
+      lightDirection: artDirection.lightDirection,
+      depthOfFieldStrength: artDirection.scene.depthOfFieldStrength,
+    },
+    evidence: {
+      modelVersions: request.analysis?.modelVersions,
+      subjectRevision: request.analysis?.subjectMaskEvidence?.revision,
+      provenance: normalizeEvidenceProvenance(request.analysis?.provenance),
+    },
+  }))
   const structurePlan = baseline === 'mvp'
     ? context.structurePlanCache.has(structurePlanKey)
       ? context.structurePlanCache.get(structurePlanKey)
@@ -515,6 +557,9 @@ export function generateCandidate(
     importance: weights,
     protectedCells: protectedSet,
     ...(request.palette.inventory === undefined ? {} : { inventory: request.palette.inventory }),
+    ...(request.palette.substituteColorIds === undefined
+      ? {}
+      : { substituteColorIds: request.palette.substituteColorIds }),
   })
   const finalColorIds = inventoryRepair.colorIds
   const counts = materialCounts(finalColorIds, selectedPalette, activeMask)

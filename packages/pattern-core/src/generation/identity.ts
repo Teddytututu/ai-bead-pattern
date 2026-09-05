@@ -74,6 +74,12 @@ export async function generationFingerprint(
       provenance: normalizeEvidenceProvenance(landmark.provenance),
     }))
   const subjectMaskEvidence = analysis?.subjectMaskEvidence
+  const options = request.options.styles === undefined
+    ? request.options
+    : {
+      ...request.options,
+      styles: [...request.options.styles].sort(),
+    }
   const identity = {
     engine: 'baseline',
     version,
@@ -106,7 +112,7 @@ export async function generationFingerprint(
       landmarks,
       provenance: normalizeEvidenceProvenance(analysis.provenance),
     },
-    options: request.options,
+    options,
   }
   return (await sha256Text(stableSerialize(identity))).slice(0, 32)
 }

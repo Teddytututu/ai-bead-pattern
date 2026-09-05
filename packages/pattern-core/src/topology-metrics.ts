@@ -117,6 +117,23 @@ export const topologyAgreementSchema = Object.freeze({
 const minimumThinBranchAspectRatio = 1.6
 const maximumProjectedDiameterInCells = 1.25
 
+// Candidate variants share the same source model and crop. Keep one source
+// medial graph per model/crop pair; target masks remain candidate-specific.
+const sourceGraphCache = new WeakMap<SourceShapeModel, Map<string, MedialGraph>>()
+function sourceGraphFor(model: SourceShapeModel, crop: CropRect): MedialGraph {
+  const key = [crop.x, crop.y, crop.width, crop.height].join(':')
+  let byCrop = sourceGraphCache.get(model)
+  if (byCrop === undefined) {
+    byCrop = new Map<string, MedialGraph>()
+    sourceGraphCache.set(model, byCrop)
+  }
+  const cached = byCrop.get(key)
+  if (cached !== undefined) return cached
+  const graph = buildMedialGraph(model, { crop, minimumSpurGeodesicLength: 0 })
+  byCrop.set(key, graph)
+  return graph
+}
+
 interface PreparedTopology {
   binaryMask: Uint8Array
   graph: MedialGraph
@@ -491,26 +508,9 @@ export function projectTopologyReference(
     || model.binaryMask.length !== model.width * model.height) {
     throw new RangeError('Topology source model dimensions must align')
   }
-  // A very large source projected onto a small bead grid has no resolvable
-  // centerline detail. The area mask already carries the observable shape;
-  // retaining that projection avoids materializing million-cell medial graphs
-  // while keeping topology analysis active for normal and high-resolution grids.
-  if (model.width * model.height > 512 * 512 && width * height <= 64 * 64) {
-    return {
-      mask: Uint8Array.from(areaMask, (value) => Number(value >= 0.5)),
-      addedCells: [],
-      projectedSkeletonCells: 0,
-      sourceHoleWitnesses: [],
-      collapsedHoleCount: 0,
-      pathConflictCount: 0,
-    }
-  }
   const mask = Uint8Array.from(areaMask, (value) => Number(value >= 0.5))
   const reservedHoles = analyzeFourConnectedHoles(mask, width, height).enclosedMask
-  const graph = buildMedialGraph(model, {
-    crop,
-    minimumSpurGeodesicLength: 0,
-  })
+  const graph = sourceGraphFor(model, crop)
   const sourcePixelsPerCell = Math.max(crop.width / fit.width, crop.height / fit.height)
   const croppedSourceMask = sourceMaskWithinCrop(model, crop)
   const sourceLabels = labelEightConnectedComponents(croppedSourceMask, model.width, model.height)

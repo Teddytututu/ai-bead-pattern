@@ -21,6 +21,27 @@ function evaluateCandidates(candidates: readonly PatternCandidate[]): CandidateE
   }
 }
 
+/** Yield between heavyweight candidates in both Node and browser runtimes. */
+export function yieldToRuntime(): Promise<void> {
+  const runtime = globalThis as typeof globalThis & {
+    setTimeout?: (callback: () => void, delay?: number) => unknown
+  }
+  if (typeof runtime.setTimeout === 'function') {
+    return new Promise((resolve) => {
+      runtime.setTimeout!(resolve, 0)
+    })
+  }
+  return Promise.resolve()
+}
+
+export function resolveShapeRefinementIterations(
+  sourceArea: number,
+  canvasCount: number,
+  requested: number | undefined,
+): number {
+  return requested ?? (sourceArea > 512 * 512 && canvasCount > 1 ? 1 : 2)
+}
+
 export class DeterministicPatternAlgorithm {
   readonly version: string
   readonly engine: AlgorithmEngine
@@ -66,14 +87,14 @@ export class DeterministicPatternAlgorithm {
     const shapeCache = analysisShape === undefined
       ? undefined
       : new ShapeVariantCache(analysisShape, request.analysis?.landmarks ?? [])
-    const requestedShapeRefinementIterations = request.options.structure?.shapeRefinementIterations ?? 2
-    // Keep multi-canvas analysis responsive for large uploads. The SDF, contour,
-    // topology, and landmark passes remain active; boundary-energy rewrites are
-    // reserved for smaller sources where they provide the most visible gain.
-    const shapeRefinementIterations = request.image.width * request.image.height > 512 * 512
-      && sizes.length > 1
-      ? 0
-      : requestedShapeRefinementIterations
+    const requestedShapeRefinementIterations = request.options.structure?.shapeRefinementIterations
+    // Explicit budgets always win. The adaptive default keeps multi-canvas large
+    // uploads responsive while retaining one refinement pass for boundary quality.
+    const shapeRefinementIterations = resolveShapeRefinementIterations(
+      request.image.width * request.image.height,
+      sizes.length,
+      requestedShapeRefinementIterations,
+    )
     const shapeVariants = new Map<string, ShapeRasterization>()
     const shapePlanningStartedAt = performance.now()
     if (shapeCache !== undefined) {
@@ -159,7 +180,7 @@ export class DeterministicPatternAlgorithm {
           }, generationId, this.version, this.#clock))
           // Give the runtime a collection point between heavyweight candidate
           // passes so large uploads keep a bounded live heap.
-          await new Promise<void>((resolve) => setImmediate(resolve))
+          await yieldToRuntime()
         }
       }
     }

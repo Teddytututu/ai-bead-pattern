@@ -1,6 +1,6 @@
 import { colorDistance, rgbToLab, type PreparedColor } from '../color.js'
 import { gridCellForSourcePoint, resizePixels, type CanvasFit } from '../image.js'
-import { landmarkEffectiveConfidence, landmarkGridRadiusCells } from '../landmarks.js'
+import { landmarkEvidenceReliability, landmarkGridRadiusCells } from '../landmarks.js'
 import { scoreCraftQuality } from '../candidate-evaluation.js'
 import type { PetPoseEvaluation } from '../pet-pose.js'
 import { type ResolvedFeaturePlacement } from '../planning/index.js'
@@ -54,7 +54,9 @@ export function valueOrderAccuracy(
   palette: readonly PreparedColor[],
   activeMask: Uint8Array,
 ): number {
-  if (valuePlan === undefined || roleIdsByCell === undefined) return 0
+  // An absent plan carries no directional evidence. Keep the dimension
+  // neutral so missing analysis does not masquerade as a failed hierarchy.
+  if (valuePlan === undefined || roleIdsByCell === undefined) return 0.5
   const colorsById = new Map(palette.map((color) => [color.id, color]))
   const lightnessByRole = new Map<string, { total: number; count: number }>()
   for (let cell = 0; cell < activeMask.length; cell += 1) {
@@ -99,7 +101,9 @@ export function paletteRoleConsistency(
   activeMask: Uint8Array,
   excludedCells: ReadonlySet<number>,
 ): number {
-  if (palettePlan === undefined || roleIdsByCell === undefined) return 0
+  // Palette-role supervision is optional; a neutral score preserves the
+  // contribution balance until an explicit role plan is available.
+  if (palettePlan === undefined || roleIdsByCell === undefined) return 0.5
   let matches = 0
   let total = 0
   for (let cell = 0; cell < activeMask.length; cell += 1) {
@@ -308,7 +312,7 @@ export function preferredFeaturePaletteColorIds(
   ])
   const landmarks = [...(request.analysis?.landmarks ?? [])]
     .filter((landmark) => landmark.priority === 'hard'
-      && landmarkEffectiveConfidence(landmark) >= 0.5
+      && landmarkEvidenceReliability(landmark) >= 0.5
       && kindOrder.has(landmark.kind))
     .sort((first, second) => kindOrder.get(first.kind)! - kindOrder.get(second.kind)!)
   const preferred = new Map<string, string>()
@@ -337,7 +341,7 @@ export function featureVisibility(
   featurePlacements: readonly ResolvedFeaturePlacement[],
 ): FeatureVisibilityResult {
   const landmarks = (analysis?.landmarks ?? []).filter((landmark) =>
-    landmarkEffectiveConfidence(landmark) > 0
+    landmarkEvidenceReliability(landmark) > 0
       && landmark.x >= crop.x && landmark.y >= crop.y
       && landmark.x < crop.x + crop.width && landmark.y < crop.y + crop.height,
   )
@@ -361,7 +365,7 @@ export function featureVisibility(
   ]))
   const evaluated = landmarks.map((landmark) => {
     const profile = featureProfiles[landmark.kind]
-    const effectiveConfidence = landmarkEffectiveConfidence(landmark)
+    const effectiveConfidence = landmarkEvidenceReliability(landmark)
     const placement = placementByFeatureId.get(landmark.id)
     const templateAware = placement !== undefined && landmark.carrierRegionId !== undefined
     const [centerX, centerY] = (templateAware ? placement?.center : undefined)
@@ -601,26 +605,31 @@ export function scoreCandidate(
     0,
     1,
   )
-  const identity = feature.confidence > 0
-    ? petPose.available
-      ? clamp(
-        featureProtection * 0.3
-          + hardFeatureCompleteness * 0.2
-          + identityAppearance * 0.25
-          + petPose.score * 0.25,
-        0,
-        1,
-      )
-      : clamp(
-        featureProtection * 0.45
-          + hardFeatureCompleteness * 0.25
-          + identityAppearance * 0.3,
-        0,
-        1,
-      )
-    : petPose.available
-      ? clamp(identityAppearance * 0.55 + petPose.score * 0.3 + 0.15, 0, 1)
-      : clamp(identityAppearance * 0.7 + 0.15, 0, 1)
+  const rawIdentity = petPose.available
+    ? clamp(
+      featureProtection * 0.3
+        + hardFeatureCompleteness * 0.2
+        + identityAppearance * 0.25
+        + petPose.score * 0.25,
+      0,
+      1,
+    )
+    : clamp(
+      featureProtection * 0.45
+        + hardFeatureCompleteness * 0.25
+        + identityAppearance * 0.3,
+      0,
+      1,
+    )
+  const identityEvidence = clamp(
+    feature.confidence * 0.65 + (petPose.available ? petPose.confidence * 0.35 : 0),
+    0,
+    1,
+  )
+  // Identity is a geometry-sensitive dimension. When landmarks and pose
+  // evidence are unavailable, keep it neutral instead of granting a fixed
+  // positive prior from appearance correlation alone.
+  const identity = clamp(0.5 + (rawIdentity - 0.5) * identityEvidence, 0, 1)
   const valueHierarchy = clamp(valueOrderAccuracy, 0, 1)
   const pixelClusters = clamp(1 - (
     isolatedCells * 2 + thinStripes + fragmentedArcSegments + smallComponents * 2 + singleCellBands

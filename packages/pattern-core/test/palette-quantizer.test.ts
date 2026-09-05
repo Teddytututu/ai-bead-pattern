@@ -73,4 +73,39 @@ describe('palette quantizer', () => {
     assert.deepEqual(result.colorIds, ['red', 'gray', 'gray'])
     assert.deepEqual(result.edits.map((edit) => [edit.x, edit.y, edit.reason]), [[1, 0, 'inventory']])
   })
+
+  it('keeps distinct full precision distance matrices in a shared cache', () => {
+    const cache = new Map()
+    const input: Parameters<typeof quantizePalette>[0] = {
+      pixels: [[128, 128, 128]],
+      pixelLabs: [[53, 0, 0]],
+      weights: [1],
+      colors: [colors[1]!],
+      maximumColors: 1,
+      baseline: 'mvp' as const,
+      distanceMethod: 'delta-e-2000' as const,
+      distanceMatrixCache: cache,
+    }
+    quantizePalette(input)
+    quantizePalette({ ...input, pixelLabs: [[53.0004, 0, 0]] })
+    assert.equal(cache.size, 2)
+  })
+
+  it('uses a globally feasible assignment when nearest colours exceed stock', () => {
+    const result = quantizePalette({
+      pixels: [[255, 0, 0], [255, 0, 0], [128, 128, 128]],
+      pixelLabs: [[53, 80, 67], [53, 80, 67], [53, 0, 0]],
+      weights: [3, 1, 1],
+      colors,
+      maximumColors: 3,
+      baseline: 'mvp',
+      distanceMethod: 'delta-e-2000',
+      inventory: { red: 1, gray: 1, blue: 1 },
+    })
+    const usage = result.colorIds.reduce<Record<string, number>>((counts, id) => {
+      counts[id] = (counts[id] ?? 0) + 1
+      return counts
+    }, {})
+    assert.deepEqual(usage, { red: 1, gray: 1, blue: 1 })
+  })
 })
