@@ -24,9 +24,33 @@ function pixelAt(image: PixelImage, x: number, y: number, backgroundRgb: RGB): R
   const safeY = clamp(y, 0, image.height - 1)
   const index = (safeY * image.width + safeX) * 4
   const alpha = (image.data[index + 3] ?? 255) / 255
-  return [0, 1, 2].map((channel) => Math.round(
-    (image.data[index + channel] ?? 0) * alpha + backgroundRgb[channel]! * (1 - alpha),
-  )) as unknown as RGB
+  return [
+    Math.round((image.data[index] ?? 0) * alpha + backgroundRgb[0]! * (1 - alpha)),
+    Math.round((image.data[index + 1] ?? 0) * alpha + backgroundRgb[1]! * (1 - alpha)),
+    Math.round((image.data[index + 2] ?? 0) * alpha + backgroundRgb[2]! * (1 - alpha)),
+  ]
+}
+
+/** Pack a source pixel for allocation-free area sampling hot loops. */
+function packedPixelAt(image: PixelImage, x: number, y: number, backgroundRgb: RGB): number {
+  const safeX = clamp(x, 0, image.width - 1)
+  const safeY = clamp(y, 0, image.height - 1)
+  const index = (safeY * image.width + safeX) * 4
+  const alpha = (image.data[index + 3] ?? 255) / 255
+  const red = Math.round((image.data[index] ?? 0) * alpha + backgroundRgb[0]! * (1 - alpha))
+  const green = Math.round((image.data[index + 1] ?? 0) * alpha + backgroundRgb[1]! * (1 - alpha))
+  const blue = Math.round((image.data[index + 2] ?? 0) * alpha + backgroundRgb[2]! * (1 - alpha))
+  return (red | (green << 8) | (blue << 16)) >>> 0
+}
+
+function packedRed(pixel: number): number { return pixel & 0xff }
+function packedGreen(pixel: number): number { return (pixel >>> 8) & 0xff }
+function packedBlue(pixel: number): number { return (pixel >>> 16) & 0xff }
+function packedLuminance(pixel: number): number {
+  return packedRed(pixel) * 0.2126 + packedGreen(pixel) * 0.7152 + packedBlue(pixel) * 0.0722
+}
+function unpackPixel(pixel: number): RGB {
+  return [packedRed(pixel), packedGreen(pixel), packedBlue(pixel)]
 }
 
 function alphaAt(image: PixelImage, x: number, y: number): number {
@@ -47,9 +71,9 @@ function median(values: number[]): number {
     : values[middle]!
 }
 
-function withMedianChroma(pixels: readonly RGB[], targetLuminance: number): RGB {
-  const blueOffsets = pixels.map((pixel) => pixel[2] - luminance(pixel))
-  const redOffsets = pixels.map((pixel) => pixel[0] - luminance(pixel))
+function withMedianChroma(pixels: readonly number[], targetLuminance: number): RGB {
+  const blueOffsets = pixels.map((pixel) => packedBlue(pixel) - packedLuminance(pixel))
+  const redOffsets = pixels.map((pixel) => packedRed(pixel) - packedLuminance(pixel))
   const blue = targetLuminance + median(blueOffsets)
   const red = targetLuminance + median(redOffsets)
   const green = (targetLuminance - red * 0.2126 - blue * 0.0722) / 0.7152
@@ -96,10 +120,10 @@ function areaSample(
     for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
       const overlapX = Math.max(0, Math.min(sourceRight, sourceX + 1) - Math.max(sourceLeft, sourceX))
       const weight = overlapX * overlapY
-      const pixel = pixelAt(image, sourceX, sourceY, backgroundRgb)
-      totals[0] += pixel[0] * weight
-      totals[1] += pixel[1] * weight
-      totals[2] += pixel[2] * weight
+      const pixel = packedPixelAt(image, sourceX, sourceY, backgroundRgb)
+      totals[0] += packedRed(pixel) * weight
+      totals[1] += packedGreen(pixel) * weight
+      totals[2] += packedBlue(pixel) * weight
       totalWeight += weight
     }
   }
@@ -132,10 +156,10 @@ function guidedAreaSample(
   let sampleCount = 0
   let peakScore = -1
   let peakImportance = 0
-  let peakPixel: RGB | undefined
+  let peakPixel: number | undefined
   let peakForegroundScore = -1
   let peakForegroundAlpha = 0
-  let peakForegroundPixel: RGB | undefined
+  let peakForegroundPixel: number | undefined
   for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
     const overlapY = Math.max(0, Math.min(sourceBottom, sourceY + 1) - Math.max(sourceTop, sourceY))
     for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
@@ -148,10 +172,10 @@ function guidedAreaSample(
       const edge = guidance.source.edge[index] ?? 0
       const score = importance * guidance.importanceStrength + edge * guidance.edgeStrength
       const weight = overlap * (1 + score)
-      const pixel = pixelAt(image, sourceX, sourceY, backgroundRgb)
-      totals[0] += pixel[0] * weight
-      totals[1] += pixel[1] * weight
-      totals[2] += pixel[2] * weight
+      const pixel = packedPixelAt(image, sourceX, sourceY, backgroundRgb)
+      totals[0] += packedRed(pixel) * weight
+      totals[1] += packedGreen(pixel) * weight
+      totals[2] += packedBlue(pixel) * weight
       totalWeight += weight
       importanceTotal += importance
       sampleCount += 1
@@ -163,9 +187,9 @@ function guidedAreaSample(
       if (guidance.preserveThinStructures === true) {
         const alpha = alphaAt(image, sourceX, sourceY)
         const contrast = Math.hypot(
-          pixel[0] - backgroundRgb[0],
-          pixel[1] - backgroundRgb[1],
-          pixel[2] - backgroundRgb[2],
+          packedRed(pixel) - backgroundRgb[0],
+          packedGreen(pixel) - backgroundRgb[1],
+          packedBlue(pixel) - backgroundRgb[2],
         )
         const foregroundScore = alpha * (contrast + score * 64)
         if (foregroundScore > peakForegroundScore) {
@@ -178,11 +202,11 @@ function guidedAreaSample(
   }
   if (peakForegroundPixel !== undefined && peakForegroundAlpha >= 0.2
     && peakForegroundScore >= 12) {
-    return peakForegroundPixel
+    return unpackPixel(peakForegroundPixel)
   }
   const averageImportance = importanceTotal / Math.max(1, sampleCount)
   if (peakPixel !== undefined && peakImportance >= 0.85 && peakImportance - averageImportance >= 0.25) {
-    return peakPixel
+    return unpackPixel(peakPixel)
   }
   return [
     Math.round(totals[0]! / totalWeight),
@@ -211,18 +235,18 @@ function cellAwareSample(
   )
   const baseLightness = luminance(base)
   const supportByBucket = new Uint32Array(12)
-  const patchPixels: RGB[] = []
+  const patchPixels: number[] = []
   let sampleCount = 0
   for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
     for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
-      const pixel = pixelAt(image, sourceX, sourceY, backgroundRgb)
+      const pixel = packedPixelAt(image, sourceX, sourceY, backgroundRgb)
       patchPixels.push(pixel)
-      const bucket = clamp(Math.round(luminance(pixel) / 24), 0, supportByBucket.length - 1)
+      const bucket = clamp(Math.round(packedLuminance(pixel) / 24), 0, supportByBucket.length - 1)
       supportByBucket[bucket] = (supportByBucket[bucket] ?? 0) + 1
       sampleCount += 1
     }
   }
-  const orderedLightness = patchPixels.map(luminance).sort((first, second) => first - second)
+  const orderedLightness = patchPixels.map(packedLuminance).sort((first, second) => first - second)
   const medianLightness = orderedLightness[Math.floor((orderedLightness.length - 1) * 0.5)] ?? baseLightness
   const minimumLightness = orderedLightness[0] ?? medianLightness
   const maximumLightness = orderedLightness.at(-1) ?? medianLightness
@@ -249,7 +273,7 @@ function cellAwareSample(
   let interiorDetailSupport = 0
   for (let sourceY = firstSampleY; sourceY <= lastSampleY; sourceY += 1) {
     for (let sourceX = firstSampleX; sourceX <= lastSampleX; sourceX += 1) {
-      const value = luminance(pixelAt(image, sourceX, sourceY, backgroundRgb))
+      const value = packedLuminance(packedPixelAt(image, sourceX, sourceY, backgroundRgb))
       const carriesDetail = polarityScore >= 0
         ? value <= detailThreshold
         : value >= detailThreshold
@@ -264,20 +288,20 @@ function cellAwareSample(
       polarityScore >= 0 ? supportedDark : supportedBright,
     )
   }
-  let best: { pixel: RGB; score: number; edge: number } | undefined
+  let best: { pixel: number; score: number; edge: number } | undefined
   for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
     for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {
       const safeX = clamp(sourceX, 0, image.width - 1)
       const safeY = clamp(sourceY, 0, image.height - 1)
       const index = safeY * image.width + safeX
-      const pixel = pixelAt(image, sourceX, sourceY, backgroundRgb)
+      const pixel = packedPixelAt(image, sourceX, sourceY, backgroundRgb)
       const edge = guidance.source.edge[index] ?? 0
       const importance = guidance.source.importance[index] ?? 0
-      const bucket = clamp(Math.round(luminance(pixel) / 24), 0, supportByBucket.length - 1)
+      const bucket = clamp(Math.round(packedLuminance(pixel) / 24), 0, supportByBucket.length - 1)
       const support = (supportByBucket[bucket - 1] ?? 0)
         + supportByBucket[bucket]!
         + (supportByBucket[bucket + 1] ?? 0)
-      const colorDistance = Math.abs(luminance(pixel) - baseLightness) / 255
+      const colorDistance = Math.abs(packedLuminance(pixel) - baseLightness) / 255
       const supportRatio = support / Math.max(1, sampleCount)
       const score = edge * 1.8 + importance * 1.15
         + supportRatio * 0.55 - colorDistance * 0.65
@@ -291,7 +315,7 @@ function cellAwareSample(
   const selectedEdge = best.edge
   if (selectedEdge < edgeThreshold) return base
   const amount = clamp(0.58 + selectedEdge * 0.3, 0.58, 0.86)
-  const selectedLightness = baseLightness * (1 - amount) + luminance(best.pixel) * amount
+  const selectedLightness = baseLightness * (1 - amount) + packedLuminance(best.pixel) * amount
   return withMedianChroma(patchPixels, selectedLightness)
 }
 

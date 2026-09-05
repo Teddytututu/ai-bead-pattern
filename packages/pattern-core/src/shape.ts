@@ -459,12 +459,13 @@ export function buildSourceShapeModel(
   const labeled = labelComponents(binaryMask, mask.width, mask.height)
   const foregroundArea = binaryMask.reduce((sum, value) => sum + value, 0)
   const modelConfidence = clamp(confidence, 0, 1)
+  const signedDistance = signedDistanceField(binaryMask, mask.width, mask.height)
   return {
     width: mask.width,
     height: mask.height,
     mask,
     binaryMask,
-    signedDistance: signedDistanceField(binaryMask, mask.width, mask.height),
+    signedDistance,
     contours: traceContours(labeled, mask.width, mask.height),
     components: labeled.components,
     holes: countHoles(binaryMask, mask.width, mask.height),
@@ -479,6 +480,62 @@ export function buildSourceShapeModel(
     foregroundArea,
     confidence: modelConfidence,
   }
+}
+
+// The model owns a source snapshot throughout generation. Cache only the summed
+// area table; every resolution still receives its exact fractional coverage.
+const maskIntegrals = new WeakMap<SourceShapeModel, Float64Array>()
+
+function sourceMaskIntegral(model: SourceShapeModel): Float64Array {
+  const cached = maskIntegrals.get(model)
+  if (cached !== undefined) return cached
+  const stride = model.width + 1
+  const integral = new Float64Array(stride * (model.height + 1))
+  for (let y = 0; y < model.height; y += 1) {
+    let rowSum = 0
+    for (let x = 0; x < model.width; x += 1) {
+      rowSum += model.mask.values[y * model.width + x] ?? 0
+      integral[(y + 1) * stride + x + 1] = integral[y * stride + x + 1]! + rowSum
+    }
+  }
+  maskIntegrals.set(model, integral)
+  return integral
+}
+
+function integralAt(
+  integral: Float64Array, width: number, height: number, x: number, y: number,
+): number {
+  const left = Math.floor(x)
+  const top = Math.floor(y)
+  const right = Math.min(width, left + 1)
+  const bottom = Math.min(height, top + 1)
+  const tx = x - left
+  const ty = y - top
+  const stride = width + 1
+  const upper = integral[top * stride + left]! * (1 - tx) + integral[top * stride + right]! * tx
+  const lower = integral[bottom * stride + left]! * (1 - tx) + integral[bottom * stride + right]! * tx
+  return upper * (1 - ty) + lower * ty
+}
+
+function integralAreaSample(
+  mask: BinaryMask,
+  integral: Float64Array,
+  left: number,
+  top: number,
+  right: number,
+  bottom: number,
+): number {
+  // Preserve the public sampler's edge-extension behavior for external crops.
+  if (left < 0 || top < 0 || right > mask.width || bottom > mask.height) {
+    return maskAreaSample(mask, left, top, right, bottom)
+  }
+  const area = (right - left) * (bottom - top)
+  if (area <= 0) return 0
+  const sum = integralAt(integral, mask.width, mask.height, right, bottom)
+    - integralAt(integral, mask.width, mask.height, left, bottom)
+    - integralAt(integral, mask.width, mask.height, right, top)
+    + integralAt(integral, mask.width, mask.height, left, top)
+  return clamp(sum / area, 0, 1)
 }
 
 function maskAreaSample(
@@ -1252,6 +1309,7 @@ export function rasterizeSourceShape(
   const activeMask = new Uint8Array(width * height)
   const scaleX = crop.width / fit.width
   const scaleY = crop.height / fit.height
+  const integral = sourceMaskIntegral(model)
   for (let y = fit.y; y < fit.y + fit.height; y += 1) {
     for (let x = fit.x; x < fit.x + fit.width; x += 1) {
       const localX = x - fit.x
@@ -1261,7 +1319,9 @@ export function rasterizeSourceShape(
       const sourceRight = crop.x + (localX + 1) * scaleX
       const sourceBottom = crop.y + (localY + 1) * scaleY
       const index = y * width + x
-      coverage[index] = maskAreaSample(model.mask, sourceLeft, sourceTop, sourceRight, sourceBottom)
+      coverage[index] = integralAreaSample(
+        model.mask, integral, sourceLeft, sourceTop, sourceRight, sourceBottom,
+      )
       const preservesThinStructure = options.preserveThinStructures === true
         && coverage[index]! > 0
         && maskPeakSample(model.mask, sourceLeft, sourceTop, sourceRight, sourceBottom) >= 0.2

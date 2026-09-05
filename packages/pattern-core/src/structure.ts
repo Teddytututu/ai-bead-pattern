@@ -18,12 +18,13 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
-function sourceRgb(image: PixelImage, index: number, background: RGB): RGB {
+function sourceLuminance(image: PixelImage, index: number, background: RGB): number {
   const offset = index * 4
   const alpha = (image.data[offset + 3] ?? 255) / 255
-  return [0, 1, 2].map((channel) => Math.round(
-    (image.data[offset + channel] ?? 0) * alpha + background[channel]! * (1 - alpha),
-  )) as unknown as RGB
+  const red = Math.round((image.data[offset] ?? 0) * alpha + background[0]! * (1 - alpha))
+  const green = Math.round((image.data[offset + 1] ?? 0) * alpha + background[1]! * (1 - alpha))
+  const blue = Math.round((image.data[offset + 2] ?? 0) * alpha + background[2]! * (1 - alpha))
+  return red * 0.2126 + green * 0.7152 + blue * 0.0722
 }
 
 function luminance(rgb: RGB): number {
@@ -46,7 +47,7 @@ export function buildSourceGuidance(
   const subjectMask = resolvedSubjectMask(analysis)
   const maskTrust = subjectMaskTrust(analysis)
   for (let index = 0; index < total; index += 1) {
-    lightness[index] = luminance(sourceRgb(image, index, background))
+    lightness[index] = sourceLuminance(image, index, background)
   }
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {

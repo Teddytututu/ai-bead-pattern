@@ -363,31 +363,46 @@ function thinByDistanceOrder(
   const deletionLut = closedHoleCount(source, width, height) > 0
     ? closedHolePreservingDeletionLut
     : foregroundPreservingDeletionLut
-  const order = Array.from(source, (value, index) => value === 1 ? index : -1)
-    .filter((index) => index >= 0)
-    .sort((first, second) =>
-      (signedDistance[first] ?? 0) - (signedDistance[second] ?? 0)
-      || candidates[first]! - candidates[second]!
-      || backgroundNeighborCount(source, width, height, first)
-        - backgroundNeighborCount(source, width, height, second)
-      || first - second)
+  // Compute stable tie-break values once, instead of allocating neighbors in
+  // every sort comparison. Compact surviving pixels after each ordered pass.
+  const cornerness = new Uint8Array(source.length)
+  const pixels: number[] = []
+  for (let index = 0; index < source.length; index += 1) {
+    if (source[index] === 0) continue
+    pixels.push(index)
+    cornerness[index] = backgroundNeighborCount(source, width, height, index)
+  }
+  const order = Uint32Array.from(pixels).sort((first, second) =>
+    (signedDistance[first] ?? 0) - (signedDistance[second] ?? 0)
+    || candidates[first]! - candidates[second]!
+    || cornerness[first]! - cornerness[second]!
+    || first - second)
+  let activeLength = order.length
   let changed = true
   while (changed) {
     changed = false
-    for (const index of order) {
-      if (skeleton[index] === 0 || protectedPixels.has(index)) continue
+    let retained = 0
+    for (let position = 0; position < activeLength; position += 1) {
+      const index = order[position]!
       const pattern = neighborPattern(skeleton, width, height, index)
-      if (deletionLut[pattern] !== 1) continue
-      skeleton[index] = 0
-      changed = true
+      if (protectedPixels.has(index) === false && deletionLut[pattern] === 1) {
+        skeleton[index] = 0
+        changed = true
+      } else {
+        order[retained++] = index
+      }
     }
+    activeLength = retained
   }
   return skeleton
 }
 
 function adjacencyFor(skeleton: Uint8Array, width: number, height: number): readonly number[][] {
-  return Array.from({ length: skeleton.length }, (_, index) =>
-    skeleton[index] === 1 ? activeNeighbors(skeleton, width, height, index) : [])
+  const adjacency: number[][] = new Array(skeleton.length)
+  for (let index = 0; index < skeleton.length; index += 1) {
+    if (skeleton[index] === 1) adjacency[index] = activeNeighbors(skeleton, width, height, index)
+  }
+  return adjacency
 }
 
 function connectedGroups(indices: readonly number[], adjacency: readonly number[][]): number[][] {
@@ -495,8 +510,10 @@ function compressSkeleton(
   height: number,
 ): { nodes: MutableNode[]; branches: RawBranch[] } {
   const adjacency = adjacencyFor(skeleton, width, height)
-  const active = Array.from(skeleton, (value, index) => value === 1 ? index : -1)
-    .filter((index) => index >= 0)
+  const active: number[] = []
+  for (let index = 0; index < skeleton.length; index += 1) {
+    if (skeleton[index] === 1) active.push(index)
+  }
   const junctionPixels = active.filter((index) => (adjacency[index]?.length ?? 0) >= 3)
   const nodes: MutableNode[] = []
   const pixelToNode = new Int32Array(skeleton.length)
@@ -578,10 +595,9 @@ function compressSkeleton(
       }
     }
   }
-  for (let index = 0; index < nodes.length; index += 1) {
-    nodes[index]!.degree = branches.reduce((degree, branch) => degree
-      + Number(branch.fromNode === index)
-      + Number(branch.toNode === index), 0)
+  for (const branch of branches) {
+    nodes[branch.fromNode]!.degree += 1
+    nodes[branch.toNode]!.degree += 1
   }
   return { nodes, branches }
 }
@@ -663,6 +679,7 @@ function pruneShortSpurs(
   snapDistance: number,
 ): { skeleton: Uint8Array; prunedSpurCount: number } {
   const skeleton = source.slice()
+  if (minimumLength === 0) return { skeleton, prunedSpurCount: 0 }
   const preservedClosedHoleCount = closedHoleCount(source, width, height)
   let prunedSpurCount = 0
   let changed = true
@@ -768,7 +785,12 @@ export function buildMedialGraph(
   )
   const landmarks = options.landmarks ?? []
   const source = activeCrop(model, options.crop)
-  const activeSignedDistance = options.crop === undefined
+  const cropCoversSource = options.crop === undefined || (
+    options.crop.x <= 0 && options.crop.y <= 0
+    && options.crop.x + options.crop.width >= model.width
+    && options.crop.y + options.crop.height >= model.height
+  )
+  const activeSignedDistance = cropCoversSource
     ? model.signedDistance
     : signedDistanceField(source, model.width, model.height)
   const candidateMask = ridgeCandidates(source, activeSignedDistance, model.width, model.height)

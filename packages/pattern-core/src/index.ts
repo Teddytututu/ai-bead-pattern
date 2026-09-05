@@ -2,7 +2,14 @@ export {
   createPatternAlgorithm,
   type PatternAlgorithm,
   type PatternAlgorithmConfig,
+  type PreferenceRankOverride,
 } from './algorithm.js'
+export {
+  createPatternWorkerHandler,
+  type PatternWorkerEndpoint,
+  type PatternWorkerRequest,
+  type PatternWorkerResponse,
+} from './worker.js'
 export {
   colorDistance,
   deltaE76,

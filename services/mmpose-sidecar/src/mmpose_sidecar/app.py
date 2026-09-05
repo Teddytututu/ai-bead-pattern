@@ -71,6 +71,15 @@ def create_app(engine: Engine | None = None) -> FastAPI:
                 result.scores[index:index + 1],
             ))
         confidence = pose_confidence(result.scores)
+        observed_count = sum(
+            landmark["observationState"] == "observed" for landmark in landmarks
+        )
+        inferred_count = sum(
+            landmark["observationState"] == "inferred" for landmark in landmarks
+        )
+        missing_count = sum(
+            landmark["observationState"] == "missing" for landmark in landmarks
+        )
         provenance = [{
             "origin": "model",
             "provider": PROVIDER_ID,
@@ -95,6 +104,9 @@ def create_app(engine: Engine | None = None) -> FastAPI:
             },
             "warnings": [
                 f"instanceCount={len(pose_request.instances)}",
+                f"landmarksObserved={observed_count}",
+                f"landmarksInferred={inferred_count}",
+                f"landmarksMissing={missing_count}",
                 f"device={result.device}",
                 f"inferenceMs={result.inference_ms:.1f}",
             ],

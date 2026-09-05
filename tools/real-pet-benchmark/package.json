@@ -1,0 +1,15 @@
+{
+  "name": "@ai-bead-pattern/real-pet-benchmark",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fetch": "node fetch-oxford-pet.mjs",
+    "run": "node run.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@ai-bead-pattern/pattern-core": "workspace:*",
+    "sharp": "^0.35.3"
+  }
+}

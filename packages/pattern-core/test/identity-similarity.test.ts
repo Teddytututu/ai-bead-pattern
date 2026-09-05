@@ -42,4 +42,18 @@ describe('identity appearance similarity', () => {
       > identityAppearanceSimilarity(source, bodyPreserved, activeMask, 2, 2, importance) + 0.25,
     )
   })
+
+  it('penalizes chromatic identity swaps with the same luminance layout', () => {
+    const source: RGB[] = [
+      [210, 45, 45], [45, 210, 80],
+      [210, 45, 45], [45, 210, 80],
+    ]
+    const hueSwapped: RGB[] = source.map(([red, green, blue]) => [green, red, blue] as RGB)
+    const activeMask = new Uint8Array(4).fill(1)
+
+    assert.ok(
+      identityAppearanceSimilarity(source, source, activeMask, 2, 2)
+        > identityAppearanceSimilarity(source, hueSwapped, activeMask, 2, 2) + 0.12,
+    )
+  })
 })

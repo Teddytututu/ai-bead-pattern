@@ -56,16 +56,27 @@ def landmarks_from_ap10k(
 ) -> list[dict]:
     if keypoints.shape != (1, 17, 2) or scores.shape != (1, 17):
         raise ValueError("AP-10K output must contain one 17-keypoint instance")
-    provenance = [{
+    model_provenance = {
         "origin": "model",
         "provider": PROVIDER_ID,
         "model": MODEL_IDENTITY["modelId"],
         "version": MODEL_IDENTITY["weightRevision"],
-    }]
+    }
+    threshold_provenance = {
+        "origin": "heuristic",
+        "provider": "mmpose-observation-gate",
+        "version": "confidence-threshold-v1",
+    }
     landmarks: list[dict] = []
     for index, definition in enumerate(AP10K_LANDMARKS):
         confidence = float(np.clip(scores[0, index], 0.0, 1.0))
         state = observation_state(confidence)
+        # Keep the model as the origin of every coordinate. The threshold gate is
+        # recorded separately whenever a low-confidence coordinate is exposed as
+        # inferred, so downstream fusion can discount derived evidence explicitly.
+        provenance = [model_provenance]
+        if state == "inferred":
+            provenance.append(threshold_provenance)
         landmark = {
             "id": f"{instance_id}:{definition.name}",
             "kind": definition.kind,

@@ -455,6 +455,26 @@ describe('preference learning and bounded generation feedback', () => {
     assert.equal(ranking.rankedCandidateIds[0], 'clear')
     assert.ok(model.learnedWeights.identityFeatures > 0)
   })
+
+  it('shrinks sparse learned weights toward the declared baseline at ranking time', () => {
+    const baseline = fitPreferenceModelV2([])
+    const sparse = {
+      ...baseline,
+      learnedWeights: {
+        ...baseline.learnedWeights,
+        identityFeatures: 0.6,
+      },
+      comparisonCount: 0,
+    }
+    const ranking = rankPreferenceCandidates([candidate('a'), candidate('b')], sparse, {
+      subjectKind: 'person',
+      grid: { width: 32, height: 32 },
+      style: 'faithful',
+      paletteId: 'perler-standard',
+    })
+    assert.ok(ranking.weights.identityFeatures < sparse.learnedWeights.identityFeatures)
+    assert.equal(ranking.weights.identityFeatures, BASELINE_PREFERENCE_WEIGHTS.identityFeatures)
+  })
 })
 
 describe('active sampling and frozen evaluation', () => {

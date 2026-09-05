@@ -592,14 +592,25 @@ function resolveWeights(
   context: PreferenceModelContext,
 ): { weights: PreferenceFeatureVector; keys: readonly string[] } {
   const keys = stratumKeys(context).filter((key) => model.strata[key] !== undefined)
-  if (keys.length === 0) return { weights: model.learnedWeights, keys }
+  // Shrink learned weights toward the declared baseline until the model has
+  // enough independent comparisons. This keeps a small feedback batch from
+  // dominating deterministic ranking and makes uncertainty operational.
+  const globalEvidence = model.comparisonCount / (model.comparisonCount + 24)
+  const shrink = (learned: PreferenceFeatureVector, evidence: number): PreferenceFeatureVector =>
+    normalizeWeights(Object.fromEntries(PREFERENCE_FEATURES.map((name) => [
+      name,
+      model.baselineWeights[name] * (1 - evidence) + learned[name] * evidence,
+    ])) as Record<PreferenceFeatureName, number>)
+  if (keys.length === 0) return { weights: shrink(model.learnedWeights, clamp(globalEvidence, 0, 1)), keys }
   const totalSamples = keys.reduce((sum, key) => sum + model.strata[key]!.sampleCount, 0)
-  return {
-    weights: normalizeWeights(Object.fromEntries(PREFERENCE_FEATURES.map((name) => [
+  const stratumWeights = normalizeWeights(Object.fromEntries(PREFERENCE_FEATURES.map((name) => [
       name,
       keys.reduce((sum, key) => sum + model.strata[key]!.weights[name]
         * model.strata[key]!.sampleCount, 0) / totalSamples,
-    ])) as Record<PreferenceFeatureName, number>),
+    ])) as Record<PreferenceFeatureName, number>)
+  const stratumEvidence = clamp(totalSamples / (totalSamples + 16), 0, 1)
+  return {
+    weights: shrink(stratumWeights, stratumEvidence),
     keys,
   }
 }
