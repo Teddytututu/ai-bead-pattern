@@ -471,7 +471,13 @@ export function generateCandidate(
         ?? artDirection.generation.edgeProtection, 0, 1),
       iterations: Math.max(0, Math.floor(request.options.optimization?.localSearchIterations ?? 2)),
       distanceMethod,
-    })
+      ...(palettePlanning === undefined ? {} : {
+        allowedColorIdsByCell: valuePlanning!.roleIdsByCell.map((roleId) => roleId === undefined
+          ? undefined
+          : new Set(palettePlanning.plan.allowedColorIdsByRole[roleId] ?? [])),
+      }),
+      ...(request.palette.inventory === undefined ? {} : { inventory: request.palette.inventory }),
+      })
     : { colorIds: assigned.colorIds, changedCells: 0 }
   const paletteEdits = paletteOptimization.colorIds.flatMap((colorId, index) => {
     const fromColorId = featureColors.colorIds[index]

@@ -7,6 +7,7 @@ import { buildSourceShapeModel, type ShapeRasterization } from './shape.js'
 import { ShapeVariantCache } from './planning/shape-variant-cache.js'
 import { buildSourceGuidance } from './structure.js'
 import type { AlgorithmEngine, CandidateEvaluation, GenerationTiming, PatternCandidate, PatternGenerationRequest, PatternGenerationResult, PatternAdaptationRequest, PatternAdaptationResult } from './types.js'
+import type { PatternAlgorithmConfig, PreferenceRankOverride } from './algorithm.js'
 import { validateRequest } from './generation/validation.js'
 import { shouldPreserveThinAlphaStructures } from './generation/evidence.js'
 import { generationFingerprint } from './generation/identity.js'
@@ -46,11 +47,13 @@ export class DeterministicPatternAlgorithm {
   readonly version: string
   readonly engine: AlgorithmEngine
   readonly #clock: () => number
+  readonly #preferenceRanker: ((candidates: readonly PatternCandidate[]) => PreferenceRankOverride | undefined) | undefined
 
-  constructor(config: { version?: string; clock?: () => number }) {
+  constructor(config: PatternAlgorithmConfig) {
     this.engine = 'baseline'
     this.version = config.version ?? '0.7.0-preference-learning'
     this.#clock = config.clock ?? Date.now
+    this.#preferenceRanker = config.preferenceRanker
   }
 
   async generate(request: PatternGenerationRequest): Promise<PatternGenerationResult> {
@@ -194,12 +197,26 @@ export class DeterministicPatternAlgorithm {
         : 0)
       || second.score.total - first.score.total
       || first.id.localeCompare(second.id))
+    const preference = this.#preferenceRanker?.(candidates)
+    if (preference !== undefined) {
+      candidates.sort((first, second) => Number(second.valid) - Number(first.valid)
+        || (preference.scores[second.id] ?? 0) - (preference.scores[first.id] ?? 0)
+        || second.score.total - first.score.total
+        || first.id.localeCompare(second.id))
+    }
     const maximumCandidates = Math.max(1, Math.floor(request.options.maxCandidates ?? 5))
     const ranked = candidates.slice(0, maximumCandidates)
     const validCandidates = ranked.filter((candidate) => candidate.valid)
     const rejectedCandidates = ranked.filter((candidate) => candidate.valid === false)
     const recommended = validCandidates[0]
     const evaluation = evaluateCandidates(ranked)
+    if (preference !== undefined) {
+      evaluation.version = 2
+      evaluation.learnedRankedCandidateIds = [...ranked].sort((a, b) =>
+        (preference.scores[b.id] ?? 0) - (preference.scores[a.id] ?? 0)).map((candidate) => candidate.id)
+      evaluation.finalRankedCandidateIds = ranked.map((candidate) => candidate.id)
+      evaluation.selectedModel = preference.model
+    }
     const timing = (): GenerationTiming => {
       const phaseTotal = shapeModelMs + shapePlanningMs + canvasPlanningMs + candidateGenerationMs
       return {

@@ -108,4 +108,38 @@ describe('palette quantizer', () => {
     }, {})
     assert.deepEqual(usage, { red: 1, gray: 1, blue: 1 })
   })
+
+  it('solves constrained cells globally instead of consuming a scarce colour greedily', () => {
+    const result = quantizePalette({
+      pixels: [[255, 0, 0], [128, 128, 128]],
+      pixelLabs: [[53, 80, 67], [53, 0, 0]],
+      weights: [1, 1],
+      colors,
+      maximumColors: 2,
+      baseline: 'mvp',
+      distanceMethod: 'delta-e-2000',
+      inventory: { red: 1, gray: 1, blue: 0 },
+      allowedColorIdsByCell: [new Set(['red', 'gray']), new Set(['red'])],
+    })
+    assert.deepEqual(result.colorIds, ['gray', 'red'])
+  })
+
+  it('isolates cache entries when edit penalties or substitutions change', () => {
+    const cache = new Map()
+    const base: Parameters<typeof quantizePalette>[0] = {
+      pixels: [[255, 0, 0]],
+      pixelLabs: [[53, 80, 67]],
+      weights: [1],
+      colors: [colors[0]!, colors[1]!],
+      maximumColors: 2,
+      baseline: 'mvp' as const,
+      distanceMethod: 'delta-e-2000' as const,
+      initialColorIds: ['gray'],
+      distanceMatrixCache: cache,
+    }
+    quantizePalette({ ...base, editPenalty: 1 })
+    quantizePalette({ ...base, editPenalty: 2 })
+    quantizePalette({ ...base, editPenalty: 2, substituteColorIds: { gray: ['red'] } })
+    assert.equal(cache.size, 3)
+  })
 })

@@ -108,7 +108,9 @@ function distance(input: PaletteQuantizationInput, pixelIndex: number, color: Pr
   const initial = input.initialColorIds?.[pixelIndex]
   const changed = input.editPenalty !== undefined && initial !== undefined && initial !== color.id
   const substitute = initial !== undefined && input.substituteColorIds?.[initial]?.includes(color.id) === true
-  return base + (changed ? input.editPenalty! * Math.max(0.05, input.weights[pixelIndex] ?? 1) : 0)
+  // Importance is applied by the assignment objective.  Keeping the edit
+  // penalty unweighted here avoids multiplying importance twice.
+  return base + (changed ? input.editPenalty! : 0)
     - (substitute && input.editPenalty !== undefined ? input.editPenalty * 0.25 : 0)
 }
 
@@ -136,7 +138,12 @@ function matrixCacheKey(
       hash2 = Math.imul(hash2, 0x85ebca6b)
     }
   }
+  const addId = (value: string | undefined): void => {
+    for (let index = 0; index < (value?.length ?? 0); index += 1) add(value!.charCodeAt(index))
+    add(value?.length ?? -1)
+  }
   for (const color of colors) {
+    addId(color.id)
     for (const channel of color.lab) add(channel)
   }
   for (const lab of input.pixelLabs) {
@@ -146,6 +153,22 @@ function matrixCacheKey(
     for (const pixel of input.pixels) {
       add(pixel[0]); add(pixel[1]); add(pixel[2])
     }
+  }
+  for (const value of input.weights) add(value)
+  for (const value of input.initialColorIds ?? []) addId(value)
+  add(input.editPenalty === undefined ? -1 : input.editPenalty)
+  for (const value of input.requiredColorIds ?? []) addId(value)
+  for (const value of input.lockedColorIdsByCell ?? []) addId(value)
+  for (const allowed of input.allowedColorIdsByCell ?? []) {
+    for (const value of [...(allowed ?? [])].sort()) addId(value)
+    add(allowed?.size ?? -1)
+  }
+  for (const [from, targets] of Object.entries(input.substituteColorIds ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+    addId(from)
+    for (const target of targets) addId(target)
+  }
+  for (const [colorId, quantity] of Object.entries(input.inventory ?? {}).sort(([a], [b]) => a.localeCompare(b))) {
+    addId(colorId); add(quantity)
   }
   return `${input.baseline}:${input.distanceMethod}:${input.pixelLabs.length}:${hash >>> 0}:${hash2 >>> 0}`
 }
@@ -303,11 +326,101 @@ function assignColorsGlobally(
   const colorIndexById = new Map(colors.map((color, index) => [color.id, index]))
   const active = Array.from({ length: input.pixels.length }, (_value, index) => index)
     .filter((index) => input.activeMask?.[index] !== 0)
+
+  // Small constrained grids are solved exactly.  This path is also used by
+  // regression tests and by feature patches, where a single bead can change
+  // the preferred assignment.  Larger grids use the scalable residual repair
+  // path below after obtaining a feasible assignment.
+  if (active.length <= 12) {
+    const order = [...active].sort((a, b) => {
+      const aLocked = input.lockedColorIdsByCell?.[a] !== undefined ? 0 : 1
+      const bLocked = input.lockedColorIdsByCell?.[b] !== undefined ? 0 : 1
+      if (aLocked !== bLocked) return aLocked - bLocked
+      const aChoices = candidateOrder(input, a, colors, matrix, Object.fromEntries(
+        colors.map((color) => [color.id, Number.POSITIVE_INFINITY]),
+      )).length
+      const bChoices = candidateOrder(input, b, colors, matrix, Object.fromEntries(
+        colors.map((color) => [color.id, Number.POSITIVE_INFINITY]),
+      )).length
+      return aChoices - bChoices || a - b
+    })
+    const capacity = new Map(colors.map((color) => [color.id, stock(input.inventory, color.id)]))
+    const assignment = new Array<string | undefined>(input.pixels.length)
+    let bestCost = Number.POSITIVE_INFINITY
+    let best: string[] | undefined
+    const search = (position: number, cost: number): void => {
+      if (cost > bestCost + 1e-9) return
+      if (position === order.length) {
+        bestCost = cost
+        best = Array.from({ length: input.pixels.length }, (_value, index) =>
+          assignment[index] ?? colors[0]!.id)
+        return
+      }
+      const index = order[position]!
+      const candidates = candidateOrder(input, index, colors, matrix, Object.fromEntries(capacity))
+      for (const color of candidates) {
+        const available = capacity.get(color.id) ?? 0
+        if (available <= 0) continue
+        const colorIndex = colors.indexOf(color)
+        const nextCost = cost + matrix[colorIndex]![index]! * Math.max(0, input.weights[index] ?? 1)
+        capacity.set(color.id, available - 1)
+        assignment[index] = color.id
+        search(position + 1, nextCost)
+        assignment[index] = undefined
+        capacity.set(color.id, available)
+      }
+    }
+    search(0, 0)
+    if (best === undefined) throw new RangeError('Palette inventory cannot cover all active cells')
+    return best
+  }
+
+  // Feasibility-first assignment avoids greedy dead ends such as a flexible
+  // cell consuming the only color available to a constrained neighbour.
+  const occupants = new Map<string, number[]>()
+  const feasible = new Array<string | undefined>(input.pixels.length)
+  const tryAssign = (index: number, seen: Set<number>): boolean => {
+    if (seen.has(index)) return false
+    seen.add(index)
+    const remaining = Object.fromEntries(colors.map((color) => {
+      const used = occupants.get(color.id)?.length ?? 0
+      return [color.id, stock(input.inventory, color.id) - used]
+    }))
+    for (const color of candidateOrder(input, index, colors, matrix, remaining)) {
+      const list = occupants.get(color.id) ?? []
+      const limit = stock(input.inventory, color.id)
+      if (list.length < limit) {
+        feasible[index] = color.id
+        list.push(index)
+        occupants.set(color.id, list)
+        return true
+      }
+      for (const occupant of [...list]) {
+        const old = feasible[occupant]
+        const oldList = occupants.get(color.id)!
+        oldList.splice(oldList.indexOf(occupant), 1)
+        if (tryAssign(occupant, seen)) {
+          feasible[index] = color.id
+          oldList.push(index)
+          return true
+        }
+        oldList.push(occupant)
+        feasible[occupant] = old
+      }
+    }
+    return false
+  }
+  for (const index of [...active].sort((a, b) => a - b)) {
+    if (!tryAssign(index, new Set())) {
+      throw new RangeError('Palette inventory cannot cover all active cells')
+    }
+  }
+  for (const index of active) colorIds[index] = feasible[index]!
+  // Seed remaining counts from the feasible assignment.  The residual pass
+  // below then performs cheap exchanges for large images.
   for (const index of active) {
-    const candidate = candidateOrder(input, index, colors, matrix, remaining)[0]
-    if (candidate === undefined) throw new RangeError('Palette inventory cannot cover all active cells')
-    colorIds[index] = candidate.id
-    remaining[candidate.id] = remaining[candidate.id]! - 1
+    const id = colorIds[index]!
+    remaining[id] = (remaining[id] ?? 0) - 1
   }
   const finite = colors.some((color) => Number.isFinite(stock(input.inventory, color.id)))
   if (finite) {

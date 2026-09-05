@@ -19,6 +19,8 @@ interface PaletteOptimizationInput {
   edgeProtection: number
   iterations: number
   distanceMethod: ColorDistanceMethod
+  allowedColorIdsByCell?: readonly (ReadonlySet<string> | undefined)[]
+  inventory?: Readonly<Record<string, number>>
 }
 
 const offsets = [[-1, 0], [1, 0], [0, -1], [0, 1]] as const
@@ -33,6 +35,10 @@ export function optimizePaletteAssignments(input: PaletteOptimizationInput): Pal
   }
   const colorIds = [...input.initialColorIds]
   const colorsById = new Map(input.colors.map((color) => [color.id, color]))
+  const usage = new Map<string, number>()
+  for (let index = 0; index < colorIds.length; index += 1) {
+    if (input.activeMask[index] === 1) usage.set(colorIds[index]!, (usage.get(colorIds[index]!) ?? 0) + 1)
+  }
   for (let iteration = 0; iteration < input.iterations; iteration += 1) {
     let iterationChanges = 0
     for (let y = 0; y < input.height; y += 1) {
@@ -41,9 +47,17 @@ export function optimizePaletteAssignments(input: PaletteOptimizationInput): Pal
         if (input.activeMask[index] !== 1) continue
         const protectedCell = input.protectedCells.has(index)
         if (protectedCell) continue
+        const allowed = input.allowedColorIdsByCell?.[index]
         let bestId = colorIds[index]!
         let bestEnergy = Number.POSITIVE_INFINITY
         for (const candidate of input.colors) {
+          if (allowed !== undefined && !allowed.has(candidate.id)) continue
+          if (input.inventory !== undefined) {
+            const used = usage.get(candidate.id) ?? 0
+            if (Number.isFinite(input.inventory[candidate.id])
+              && used >= input.inventory[candidate.id]!
+              && candidate.id !== colorIds[index]) continue
+          }
           const dataWeight = 0.75 + (input.importance[index] ?? 1) * 0.55
           let energy = colorDistance(
             input.pixelLabs[index]!,
@@ -72,7 +86,10 @@ export function optimizePaletteAssignments(input: PaletteOptimizationInput): Pal
           }
         }
         if (bestId !== colorIds[index]) {
+          const previousId = colorIds[index]!
           colorIds[index] = bestId
+          usage.set(previousId, (usage.get(previousId) ?? 1) - 1)
+          usage.set(bestId, (usage.get(bestId) ?? 0) + 1)
           iterationChanges += 1
         }
       }

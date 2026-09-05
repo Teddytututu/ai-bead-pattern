@@ -78,8 +78,8 @@
       ]
     },
     {
-      "sampleId": "oxford-pet-american_bulldog_1",
-      "imageId": "american_bulldog_1",
+      "sampleId": "oxford-pet-american_bulldog_3",
+      "imageId": "american_bulldog_3",
       "category": "pet",
       "subjectKind": "pet",
       "breedGroup": "american-bulldog",
@@ -88,10 +88,10 @@
       "sourceDataset": "Oxford-IIIT Pet Dataset",
       "sourceUrl": "https://www.robots.ox.ac.uk/~vgg/data/pets/",
       "license": "CC BY-SA 4.0 (dataset documentation; verify image-level terms before redistribution)",
-      "imageArchivePath": "images/american_bulldog_1.jpg",
-      "trimapArchivePath": "trimap/american_bulldog_1.png",
-      "localPath": "images/american_bulldog_1.jpg",
-      "trimapPath": "trimaps/american_bulldog_1.png",
+      "imageArchivePath": "images/american_bulldog_3.jpg",
+      "trimapArchivePath": "trimap/american_bulldog_3.png",
+      "localPath": "images/american_bulldog_3.jpg",
+      "trimapPath": "trimaps/american_bulldog_3.png",
       "sha256": null,
       "trimapSha256": null,
       "evaluationDimensions": [
@@ -510,8 +510,8 @@
       ]
     },
     {
-      "sampleId": "oxford-pet-british_shorthair_1",
-      "imageId": "British_Shorthair_1",
+      "sampleId": "oxford-pet-british_shorthair_3",
+      "imageId": "British_Shorthair_3",
       "category": "pet",
       "subjectKind": "pet",
       "breedGroup": "british-shorthair",
@@ -520,10 +520,10 @@
       "sourceDataset": "Oxford-IIIT Pet Dataset",
       "sourceUrl": "https://www.robots.ox.ac.uk/~vgg/data/pets/",
       "license": "CC BY-SA 4.0 (dataset documentation; verify image-level terms before redistribution)",
-      "imageArchivePath": "images/British_Shorthair_1.jpg",
-      "trimapArchivePath": "trimap/British_Shorthair_1.png",
-      "localPath": "images/British_Shorthair_1.jpg",
-      "trimapPath": "trimaps/British_Shorthair_1.png",
+      "imageArchivePath": "images/British_Shorthair_3.jpg",
+      "trimapArchivePath": "trimap/British_Shorthair_3.png",
+      "localPath": "images/British_Shorthair_3.jpg",
+      "trimapPath": "trimaps/British_Shorthair_3.png",
       "sha256": null,
       "trimapSha256": null,
       "evaluationDimensions": [
