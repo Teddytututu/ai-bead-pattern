@@ -7,12 +7,12 @@ const exportPath = resolve(process.argv[3] ?? batchPath.replace(/ab-batch\.label
 const featurePath = resolve(process.argv[4] ?? resolve(batchPath, '..', 'preference-export.jsonl'))
 const batch = JSON.parse(await readFile(batchPath, 'utf8'))
 const features = (await readFile(featurePath, 'utf8')).trim().split('\n').filter(Boolean).map(JSON.parse)
-const byCandidate = new Map(features.map((entry) => [entry.candidate.id, entry]))
+const byCandidate = new Map(features.map((entry) => [`${entry.source.id}:${entry.candidate.id}`, entry]))
 const records = []
 for (const pair of batch.pairs) {
   if (!['a', 'b', 'tie'].includes(pair.choice)) continue
-  const a = byCandidate.get(pair.candidateA.id)
-  const b = byCandidate.get(pair.candidateB.id)
+  const a = byCandidate.get(`${pair.source.id}:${pair.candidateA.id}`)
+  const b = byCandidate.get(`${pair.source.id}:${pair.candidateB.id}`)
   if (!a || !b) throw new Error(`Missing preference export for ${pair.pairId}`)
   const now = new Date().toISOString()
   records.push({
