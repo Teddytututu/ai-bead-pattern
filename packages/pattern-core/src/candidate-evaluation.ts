@@ -40,6 +40,72 @@ function clampUnit(value: number): number {
   return Math.max(0, Math.min(1, value))
 }
 
+export interface CraftQualityInput {
+  totalCells: number
+  maxColors: number
+  uniqueColors: number
+  isolatedCells: number
+  orthogonalBridgeCells: number
+  fragileOrthogonalBridgeCells: number
+  craftComponentsBeforeBridging: number
+  craftComponentsAfterBridging: number
+  referenceComponents: number
+}
+
+export interface CraftQualityScore {
+  craftEase: number
+  craftCost: number
+}
+
+function count(value: number, label: string): number {
+  const parsed = finite(value, label)
+  if (parsed < 0 || Number.isInteger(parsed) === false) {
+    throw new RangeError(`${label} must be a non-negative integer`)
+  }
+  return parsed
+}
+
+export function scoreCraftQuality(input: CraftQualityInput): CraftQualityScore {
+  const totalCells = count(input.totalCells, 'Craft total cells')
+  const maxColors = count(input.maxColors, 'Craft maximum colors')
+  const uniqueColors = count(input.uniqueColors, 'Craft unique colors')
+  const isolatedCells = count(input.isolatedCells, 'Craft isolated cells')
+  const bridgeCells = count(input.orthogonalBridgeCells, 'Craft bridge cells')
+  const fragileBridgeCells = count(
+    input.fragileOrthogonalBridgeCells,
+    'Craft fragile bridge cells',
+  )
+  const componentsBefore = count(
+    input.craftComponentsBeforeBridging,
+    'Craft components before bridging',
+  )
+  const componentsAfter = count(
+    input.craftComponentsAfterBridging,
+    'Craft components after bridging',
+  )
+  const referenceComponents = count(input.referenceComponents, 'Craft reference components')
+  if (maxColors === 0) throw new RangeError('Craft maximum colors must be positive')
+  if (fragileBridgeCells > bridgeCells) {
+    throw new RangeError('Craft fragile bridge cells must be a subset of bridge cells')
+  }
+
+  const occupiedCells = Math.max(1, totalCells)
+  const baseEase = 1
+    - uniqueColors / maxColors * 0.25
+    - isolatedCells / occupiedCells
+  const bridgePressure = clampUnit((bridgeCells + fragileBridgeCells * 2) / occupiedCells)
+  const requiredMerges = Math.max(0, componentsBefore - referenceComponents)
+  const unresolvedMerges = Math.max(0, componentsAfter - referenceComponents)
+  const unresolvedPressure = requiredMerges > 0
+    ? clampUnit(unresolvedMerges / requiredMerges)
+    : Number(unresolvedMerges > 0)
+  const craftEase = clampUnit(baseEase - bridgePressure * 0.28 - unresolvedPressure * 0.22)
+  return {
+    craftEase,
+    craftCost: 1 - craftEase,
+  }
+}
+
 function validateCandidateScore(candidateId: string, score: CandidateScore): void {
   for (const [name, value] of Object.entries(score)) {
     unit(value, `Candidate ${candidateId} score ${name}`)
@@ -181,17 +247,55 @@ function neuralScore(
     entry.candidateId === undefined || entry.candidateId === candidateId)
   if (entries.length === 0) return 0.5
   const weighted = entries.reduce((sum, entry) => {
-    const mean = entry.values.reduce((featureSum, value) => featureSum + clampUnit(value), 0)
-      / entry.values.length
-    return sum + mean * entry.confidence
+    const values = entry.values.map(clampUnit)
+    const semanticIndex = entry.names.findIndex((name) =>
+      name === 'semanticRetention'
+      || name === 'identitySimilarity'
+      || name === 'identity-similarity')
+    const score = semanticIndex < 0
+      ? values.reduce((featureSum, value) => featureSum + value, 0) / values.length
+      : (() => {
+          const semantic = values[semanticIndex]!
+          const supporting = values.filter((_, index) => index !== semanticIndex)
+          const support = supporting.length === 0
+            ? semantic
+            : supporting.reduce((featureSum, value) => featureSum + value, 0) / supporting.length
+          return Math.min(semantic * 0.78 + support * 0.22, semantic + 0.12)
+        })()
+    return sum + score * entry.confidence
   }, 0)
   const confidence = entries.reduce((sum, entry) => sum + entry.confidence, 0)
   return confidence === 0 ? 0.5 : weighted / confidence
 }
 
-function rank(candidateIds: readonly string[], totals: Readonly<Record<string, number>>): readonly string[] {
+function validateCandidateValidity(
+  validity: Readonly<Record<string, boolean>> | undefined,
+  candidateIds: readonly string[],
+): Readonly<Record<string, boolean>> | undefined {
+  if (validity === undefined) return undefined
+  const known = new Set(candidateIds)
+  const normalized: Record<string, boolean> = {}
+  for (const candidateId of candidateIds) {
+    if (Object.hasOwn(validity, candidateId) === false || typeof validity[candidateId] !== 'boolean') {
+      throw new RangeError('Candidate validity must include a boolean for every candidate')
+    }
+    normalized[candidateId] = validity[candidateId]!
+  }
+  for (const candidateId of Object.keys(validity)) {
+    if (known.has(candidateId) === false) throw new RangeError('Candidate validity references an unknown candidate')
+  }
+  return normalized
+}
+
+function rank(
+  candidateIds: readonly string[],
+  totals: Readonly<Record<string, number>>,
+  validity?: Readonly<Record<string, boolean>>,
+): readonly string[] {
   return [...candidateIds].sort((first, second) =>
-    totals[second]! - totals[first]! || first.localeCompare(second))
+    Number(validity?.[second] ?? true) - Number(validity?.[first] ?? true)
+      || totals[second]! - totals[first]!
+      || first.localeCompare(second))
 }
 
 export function composeCandidateEvaluationV2(
@@ -203,6 +307,7 @@ export function composeCandidateEvaluationV2(
   }
   for (const candidateId of candidateIds) validateCandidateScore(candidateId, input.scores[candidateId]!)
   const knownCandidates = new Set(candidateIds)
+  const candidateValidity = validateCandidateValidity(input.candidateValidity, candidateIds)
   const features = (input.neuralPreferenceFeatures ?? [])
     .map((feature) => validateFeatures(feature, knownCandidates))
   const contributions = (input.providerContributions ?? []).map(validateContribution)
@@ -228,12 +333,12 @@ export function composeCandidateEvaluationV2(
     candidateId,
     candidateScores[candidateId]!.final,
   ]))
-  const finalRankedCandidateIds = rank(candidateIds, finalTotals)
+  const finalRankedCandidateIds = rank(candidateIds, finalTotals, candidateValidity)
   return {
     version: 2,
     rankedCandidateIds: finalRankedCandidateIds,
     scores: input.scores,
-    ruleRankedCandidateIds: rank(candidateIds, ruleTotals),
+    ruleRankedCandidateIds: rank(candidateIds, ruleTotals, candidateValidity),
     learnedRankedCandidateIds: preference?.rankedCandidateIds ?? [],
     finalRankedCandidateIds,
     candidateScores,
@@ -241,6 +346,7 @@ export function composeCandidateEvaluationV2(
     providerContributions: contributions,
     sourceWeights,
     appliedSourceWeights: applied,
+    ...(candidateValidity === undefined ? {} : { candidateValidity }),
     ...(preference === undefined ? {} : { selectedModel: preference.model }),
   }
 }

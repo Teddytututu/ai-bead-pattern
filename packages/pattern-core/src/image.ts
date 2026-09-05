@@ -222,6 +222,48 @@ function cellAwareSample(
       sampleCount += 1
     }
   }
+  const orderedLightness = patchPixels.map(luminance).sort((first, second) => first - second)
+  const medianLightness = orderedLightness[Math.floor((orderedLightness.length - 1) * 0.5)] ?? baseLightness
+  const minimumLightness = orderedLightness[0] ?? medianLightness
+  const maximumLightness = orderedLightness.at(-1) ?? medianLightness
+  const darkDistance = (medianLightness - minimumLightness) / 255
+  const brightDistance = (maximumLightness - medianLightness) / 255
+  const localContrast = darkDistance + brightDistance
+  // PixelOE polarity: a light local median with stronger dark deviation selects dark detail,
+  // while a dark local median with stronger bright deviation selects bright detail.
+  const polarityScore = (medianLightness / 255 - 0.5) * 10
+    + (darkDistance - brightDistance) * 3
+  const polarityConfidence = Math.min(1, Math.abs(polarityScore) / 2.4)
+    * Math.min(1, localContrast / 0.18)
+  const supportedDark = orderedLightness[Math.floor((orderedLightness.length - 1) * 0.15)]
+    ?? minimumLightness
+  const supportedBright = orderedLightness[Math.ceil((orderedLightness.length - 1) * 0.85)]
+    ?? maximumLightness
+  const detailThreshold = polarityScore >= 0
+    ? (supportedDark + medianLightness) / 2
+    : (supportedBright + medianLightness) / 2
+  const firstSampleX = Math.floor(sourceLeft)
+  const lastSampleX = Math.ceil(sourceRight) - 1
+  const firstSampleY = Math.floor(sourceTop)
+  const lastSampleY = Math.ceil(sourceBottom) - 1
+  let interiorDetailSupport = 0
+  for (let sourceY = firstSampleY; sourceY <= lastSampleY; sourceY += 1) {
+    for (let sourceX = firstSampleX; sourceX <= lastSampleX; sourceX += 1) {
+      const value = luminance(pixelAt(image, sourceX, sourceY, backgroundRgb))
+      const carriesDetail = polarityScore >= 0
+        ? value <= detailThreshold
+        : value >= detailThreshold
+      const interior = (sourceX > firstSampleX && sourceX < lastSampleX)
+        || (sourceY > firstSampleY && sourceY < lastSampleY)
+      if (carriesDetail && interior) interiorDetailSupport += 1
+    }
+  }
+  if (polarityConfidence >= 0.55 && interiorDetailSupport > 0) {
+    return withMedianChroma(
+      patchPixels,
+      polarityScore >= 0 ? supportedDark : supportedBright,
+    )
+  }
   let best: { pixel: RGB; score: number; edge: number } | undefined
   for (let sourceY = Math.floor(sourceTop); sourceY < Math.ceil(sourceBottom); sourceY += 1) {
     for (let sourceX = Math.floor(sourceLeft); sourceX < Math.ceil(sourceRight); sourceX += 1) {

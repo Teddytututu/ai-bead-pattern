@@ -12,11 +12,31 @@ export type OccupancyMode = 'full-frame' | 'subject-shape' | 'solid-background'
 export interface CanvasPlanScore {
   total: number
   feature: number
+  structuralScale?: number
+  topology?: number
   subject: number
   composition: number
   boundary: number
   beadCost: number
   buildTimeCost: number
+}
+
+export interface StructuralUnitBudget {
+  id: string
+  fromLandmarkId: string
+  toLandmarkId: string
+  measurement?: 'path-length' | 'cross-section' | 'gap'
+  sourceRegionId?: string
+  sourceSpanPixels?: number
+  projectedSpanCells?: number
+  reliability?: number
+  expectedVisible?: boolean
+  minimumCells: number
+  preferredCells: number
+  allocatedCells: number
+  confidence: number
+  hard: boolean
+  feasible: boolean
 }
 
 export interface FeatureBudget {
@@ -44,6 +64,8 @@ export interface CanvasPlan {
   estimatedWidthMm?: number
   estimatedHeightMm?: number
   featureBudgets: readonly FeatureBudget[]
+  structuralUnitBudgets?: readonly StructuralUnitBudget[]
+  topologyFeasible?: boolean
   feasible: boolean
   rejectionReasons: readonly string[]
   score: CanvasPlanScore
@@ -253,13 +275,67 @@ export function validateCanvasPlan(plan: CanvasPlan): void {
       throw new RangeError(`Feature budget ${budget.featureId} contrast must be non-negative`)
     }
   }
+  assertUniqueStrings(
+    (plan.structuralUnitBudgets ?? []).map((budget) => budget.id),
+    'Canvas structural unit budget ids',
+  )
+  for (const budget of plan.structuralUnitBudgets ?? []) {
+    if (budget.fromLandmarkId.trim().length === 0 || budget.toLandmarkId.trim().length === 0) {
+      throw new RangeError(`Canvas structural unit ${budget.id} requires endpoint ids`)
+    }
+    assertNonNegativeInteger(budget.minimumCells, `Canvas structural unit ${budget.id} minimum cells`)
+    assertNonNegativeInteger(budget.preferredCells, `Canvas structural unit ${budget.id} preferred cells`)
+    assertFinite(budget.allocatedCells, `Canvas structural unit ${budget.id} allocated cells`)
+    if (budget.allocatedCells < 0) {
+      throw new RangeError(`Canvas structural unit ${budget.id} allocated cells must be non-negative`)
+    }
+    if (budget.minimumCells > budget.preferredCells) {
+      throw new RangeError(`Canvas structural unit ${budget.id} must satisfy minimum <= preferred`)
+    }
+    assertUnitInterval(budget.confidence, `Canvas structural unit ${budget.id} confidence`)
+    if (budget.measurement !== undefined
+      && budget.measurement !== 'path-length'
+      && budget.measurement !== 'cross-section'
+      && budget.measurement !== 'gap') {
+      throw new RangeError(`Canvas structural unit ${budget.id} has an unknown measurement`)
+    }
+    if (budget.sourceRegionId !== undefined && budget.sourceRegionId.trim().length === 0) {
+      throw new RangeError(`Canvas structural unit ${budget.id} source region must be non-empty`)
+    }
+    for (const [label, value] of [
+      ['source span', budget.sourceSpanPixels],
+      ['projected span', budget.projectedSpanCells],
+    ] as const) {
+      if (value === undefined) continue
+      assertFinite(value, `Canvas structural unit ${budget.id} ${label}`)
+      if (value < 0) throw new RangeError(`Canvas structural unit ${budget.id} ${label} must be non-negative`)
+    }
+    if (budget.reliability !== undefined) {
+      assertUnitInterval(budget.reliability, `Canvas structural unit ${budget.id} reliability`)
+    }
+    if (budget.expectedVisible !== undefined && typeof budget.expectedVisible !== 'boolean') {
+      throw new RangeError(`Canvas structural unit ${budget.id} expected-visible flag must be boolean`)
+    }
+    if (typeof budget.hard !== 'boolean' || typeof budget.feasible !== 'boolean') {
+      throw new RangeError(`Canvas structural unit ${budget.id} flags must be boolean`)
+    }
+    if (budget.feasible && budget.allocatedCells < budget.minimumCells) {
+      throw new RangeError(`Canvas structural unit ${budget.id} has an infeasible allocation`)
+    }
+  }
   if (typeof plan.feasible !== 'boolean') {
     throw new RangeError('Canvas plan feasibility must be boolean')
   }
   assertUniqueStrings(plan.rejectionReasons, 'Canvas rejection reasons')
   const hardFeaturesFeasible = plan.featureBudgets.every((budget) => budget.hard === false || budget.feasible)
-  if (plan.feasible !== hardFeaturesFeasible) {
-    throw new RangeError('Canvas plan feasibility must match hard feature budgets')
+  const hardStructuralUnitsFeasible = (plan.structuralUnitBudgets ?? [])
+    .every((budget) => budget.hard === false || budget.feasible)
+  const topologyFeasible = plan.topologyFeasible ?? true
+  if (typeof topologyFeasible !== 'boolean') {
+    throw new RangeError('Canvas topology feasibility must be boolean')
+  }
+  if (plan.feasible !== (hardFeaturesFeasible && hardStructuralUnitsFeasible && topologyFeasible)) {
+    throw new RangeError('Canvas plan feasibility must match hard feature, structural, and topology budgets')
   }
   if (plan.feasible !== (plan.rejectionReasons.length === 0)) {
     throw new RangeError('Canvas rejection reasons must match feasibility')

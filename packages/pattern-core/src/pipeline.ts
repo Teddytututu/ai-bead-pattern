@@ -17,6 +17,7 @@ import {
   subjectMaskConfidence,
   subjectMaskTrust,
 } from './analysis-evidence.js'
+import { scoreCraftQuality } from './candidate-evaluation.js'
 import {
   countIsolatedCells,
   countThinStripes,
@@ -37,6 +38,12 @@ import {
   landmarkGridRadiusCells,
 } from './landmarks.js'
 import { optimizePaletteAssignments } from './palette-optimization.js'
+import {
+  assessPetInstanceIntegrity,
+  evaluatePetPoseStructure,
+  PetPoseProjectionCache,
+  type PetPoseEvaluation,
+} from './pet-pose.js'
 import { refineGridClusters } from './grid-refinement.js'
 import {
   planCanvases,
@@ -112,6 +119,7 @@ interface CandidateContext {
   shapeRasterization: ShapeRasterization | undefined
   occupancyMode: ResolvedOccupancyMode
   canvasPlan: CanvasPlan
+  petPoseProjectionCache: PetPoseProjectionCache
 }
 
 type ResolvedOccupancyMode = Extract<OccupancyMode, 'full-frame' | 'subject-shape'>
@@ -329,6 +337,11 @@ function validateRequest(request: PatternGenerationRequest): void {
     new Set(['auto', 'full-frame', 'subject-shape']),
     'occupancyMode',
   )
+  validateEnum(
+    request.options.structure?.outlineMode,
+    new Set(['off', 'selective', 'full']),
+    'outlineMode',
+  )
   if (request.options.structure?.shapeRefinementIterations !== undefined
     && (Number.isFinite(request.options.structure.shapeRefinementIterations) === false
       || request.options.structure.shapeRefinementIterations < 0
@@ -478,8 +491,26 @@ function validateRequest(request: PatternGenerationRequest): void {
       `Landmark ${landmark.id} kind`,
     )
     validateEnum(landmark.priority, new Set(['hard', 'soft']), `Landmark ${landmark.id} priority`)
+    if (landmark.observationState !== undefined) {
+      validateEnum(
+        landmark.observationState,
+        new Set(['observed', 'inferred', 'missing']),
+        `Landmark ${landmark.id} observation state`,
+      )
+    }
     if (landmark.affectsOccupancy !== undefined && typeof landmark.affectsOccupancy !== 'boolean') {
       throw new RangeError(`Landmark ${landmark.id} affectsOccupancy must be boolean`)
+    }
+    if (landmark.structuralRole !== undefined) {
+      validateEnum(
+        landmark.structuralRole,
+        new Set([
+          'eye-center', 'ear-tip', 'ear-root', 'nose-tip', 'mouth-corner', 'upper-jaw', 'lower-jaw',
+          'neck-base', 'shoulder', 'chest-center', 'back-middle', 'tail-root', 'hip',
+          'front-knee', 'front-paw', 'rear-knee', 'rear-paw', 'tail-tip',
+        ]),
+        `Landmark ${landmark.id} structural role`,
+      )
     }
     for (const regionId of [landmark.featureRegionId, landmark.carrierRegionId]) {
       if (regionId !== undefined && semanticRegionIds.has(regionId) === false) {
@@ -562,7 +593,7 @@ function validateRequest(request: PatternGenerationRequest): void {
     }
   }
   for (const [name, value] of Object.entries(request.options.structure ?? {})) {
-    if (name === 'occupancyMode') continue
+    if (name === 'occupancyMode' || name === 'outlineMode') continue
     if (value !== undefined && (typeof value !== 'number' || Number.isFinite(value) === false || value < 0)) {
       throw new RangeError(`Structure option ${name} must be a finite non-negative number`)
     }
@@ -750,6 +781,10 @@ function gridRegionIds(
     region.id.trim().toLowerCase() === 'subject'
       || region.label.trim().toLowerCase() === 'subject')
   const specificRegions = regions.filter((region) => fallbackRegions.includes(region) === false)
+  const referencedRegionIds = new Set((analysis?.landmarks ?? []).flatMap((landmark) => [
+    landmark.featureRegionId,
+    landmark.carrierRegionId,
+  ]).filter((regionId): regionId is string => regionId !== undefined))
   const subjectMask = resolvedSubjectMask(analysis)
   const structuralFallbackEnabled = analysis?.subjectMaskEvidence !== undefined
   const trustedSubjectMask = structuralFallbackEnabled
@@ -767,7 +802,11 @@ function gridRegionIds(
       for (const region of specificRegions) {
         const localSupport = region.mask.values[sourceY * region.mask.width + sourceX] ?? 0
         const score = localSupport * (0.5 + 0.5 * region.confidence)
-        if (score > bestScore) {
+        const currentRegionId = ids[index]
+        const explicitCarrierWinsTie = score === bestScore
+          && referencedRegionIds.has(region.id)
+          && (currentRegionId === undefined || referencedRegionIds.has(currentRegionId) === false)
+        if (score > bestScore || explicitCarrierWinsTie) {
           bestScore = score
           ids[index] = region.id
         }
@@ -1694,44 +1733,71 @@ function scoreCandidate(
   referenceMeanColorDistance: number,
   planMeanColorDistance: number,
   structure: number,
+  topology: number,
   feature: FeatureVisibilityResult,
   isolatedCells: number,
   thinStripes: number,
   uniqueColors: number,
   canvasPlanScore: number,
   identityAppearance: number,
+  petPose: PetPoseEvaluation,
   hardFeatureCompleteness: number,
   valueOrderAccuracy: number,
   fragmentedArcSegments: number,
   smallComponents: number,
   singleCellBands: number,
+  shapeDiagnostics: ShapeRasterization['diagnostics'] | undefined,
 ): CandidateScore {
   const sourceFidelity = 1 / (1 + (sourceMeanColorDistance * 0.35 + referenceMeanColorDistance * 0.65) / 15)
   const planFidelity = 1 / (1 + planMeanColorDistance / 15)
   const colorFidelity = planFidelity
   const featureProtection = feature.score
   const cleanliness = clamp(1 - (isolatedCells * 2 + thinStripes) / Math.max(1, totalCells), 0, 1)
-  const craftEase = clamp(
-    1 - uniqueColors / Math.max(1, maxColors) * 0.25 - isolatedCells / Math.max(1, totalCells),
+  const craftQuality = scoreCraftQuality({
+    totalCells,
+    maxColors,
+    uniqueColors,
+    isolatedCells,
+    orthogonalBridgeCells: shapeDiagnostics?.orthogonalBridgeCells ?? 0,
+    fragileOrthogonalBridgeCells: shapeDiagnostics?.fragileOrthogonalBridgeCells ?? 0,
+    craftComponentsBeforeBridging: shapeDiagnostics?.craftComponentsBeforeBridging ?? 0,
+    craftComponentsAfterBridging: shapeDiagnostics?.craftComponentsAfterBridging ?? 0,
+    referenceComponents: shapeDiagnostics?.referenceComponents ?? 0,
+  })
+  const craftEase = craftQuality.craftEase
+  const canvasFit = canvasPlanScore
+  const baseSilhouette = clamp(structure * 0.82 + canvasFit * 0.18, 0, 1)
+  const poseInfluence = petPose.available ? petPose.confidence * 0.2 : 0
+  const silhouette = clamp(
+    baseSilhouette * (1 - poseInfluence) + petPose.score * poseInfluence,
     0,
     1,
   )
-  const canvasFit = canvasPlanScore
-  const silhouette = clamp(structure * 0.82 + canvasFit * 0.18, 0, 1)
   const identity = feature.confidence > 0
-    ? clamp(
-      featureProtection * 0.45
-        + hardFeatureCompleteness * 0.25
-        + identityAppearance * 0.3,
-      0,
-      1,
-    )
-    : clamp(identityAppearance * 0.7 + 0.15, 0, 1)
+    ? petPose.available
+      ? clamp(
+        featureProtection * 0.3
+          + hardFeatureCompleteness * 0.2
+          + identityAppearance * 0.25
+          + petPose.score * 0.25,
+        0,
+        1,
+      )
+      : clamp(
+        featureProtection * 0.45
+          + hardFeatureCompleteness * 0.25
+          + identityAppearance * 0.3,
+        0,
+        1,
+      )
+    : petPose.available
+      ? clamp(identityAppearance * 0.55 + petPose.score * 0.3 + 0.15, 0, 1)
+      : clamp(identityAppearance * 0.7 + 0.15, 0, 1)
   const valueHierarchy = clamp(valueOrderAccuracy, 0, 1)
   const pixelClusters = clamp(1 - (
     isolatedCells * 2 + thinStripes + fragmentedArcSegments + smallComponents * 2 + singleCellBands
   ) / Math.max(1, totalCells), 0, 1)
-  const craftCost = 1 - craftEase
+  const craftCost = craftQuality.craftCost
   const styleBias: Record<PatternStyle, number> = {
     faithful: 0.015,
     cute: 0,
@@ -1756,6 +1822,7 @@ function scoreCandidate(
     silhouette,
     identity,
     identityAppearance,
+    poseStructure: petPose.score,
     valueHierarchy,
     pixelClusters,
     craftCost,
@@ -1763,6 +1830,7 @@ function scoreCandidate(
     sourceFidelity,
     planFidelity,
     structure,
+    topology,
     featureProtection,
     featureProtectionConfidence: feature.confidence,
     cleanliness,
@@ -1789,6 +1857,8 @@ function metadata(
     style,
     baseline,
     engine: 'baseline',
+    outlineMode: request.options.structure?.outlineMode
+      ?? ((request.options.structure?.valueLevels ?? 3) === 4 ? 'selective' : 'off'),
   }
   if (request.options.beadDiameterMm !== undefined) {
     result.beadDiameterMm = request.options.beadDiameterMm
@@ -2009,6 +2079,7 @@ function generateCandidate(
       pixelLabs: pixels.map(rgbToLab),
       activeMask,
       levels: valueLevels,
+      ...(structureOptions.outlineMode === undefined ? {} : { outlineMode: structureOptions.outlineMode }),
       minimumSemanticGaps: {
         eyeSkin: 16 * clamp(structureOptions.valueOrderStrength ?? 1, 0.25, 2),
         faceHair: 10 * clamp(structureOptions.valueOrderStrength ?? 1, 0.25, 2),
@@ -2078,10 +2149,16 @@ function generateCandidate(
     resized.fit,
     activeMask,
   )
+  const outlineRoleIds = new Set(valuePlanning?.plan.roles
+    .filter((role) => role.kind === 'outline')
+    .map((role) => role.id) ?? [])
+  const plannedOutlineCells = valuePlanning?.roleIdsByCell.flatMap((roleId, cell) =>
+    roleId !== undefined && outlineRoleIds.has(roleId) ? [cell] : []) ?? []
   const protectedSet = new Set([
     ...landmarkProtected,
     ...(shapeRasterization?.protectedCells ?? []),
     ...thinDetailCells,
+    ...plannedOutlineCells,
     ...featurePlacements.flatMap((placement) => placement.occupiedCells),
   ])
   const semanticFeatureIds = new Set((request.analysis?.landmarks ?? [])
@@ -2252,7 +2329,7 @@ function generateCandidate(
   const colorStructure = sourceBoundaryAgreement * 0.3
     + planBoundaryAgreement * 0.2
     + reference.boundaryAgreement * 0.5
-  const topologyAgreement = shapeRasterization === undefined
+  const coarseTopologyAgreement = shapeRasterization === undefined
     ? 1
     : 1 - clamp(
       Math.abs(shapeRasterization.diagnostics.referenceComponents - shapeRasterization.diagnostics.targetComponents) * 0.25
@@ -2260,11 +2337,19 @@ function generateCandidate(
       0,
       1,
     )
+  const topologyAgreement = shapeRasterization === undefined
+    ? 1
+    : clamp(
+      shapeRasterization.diagnostics.topologyScore * 0.8
+        + coarseTopologyAgreement * 0.2,
+      0,
+      1,
+    )
   const shapeStructure = shapeRasterization === undefined
     ? 1
-    : shapeRasterization.diagnostics.boundaryIoU * 0.4
-      + shapeRasterization.diagnostics.coverageIoU * 0.4
-      + topologyAgreement * 0.2
+    : shapeRasterization.diagnostics.boundaryIoU * 0.3
+      + shapeRasterization.diagnostics.coverageIoU * 0.25
+      + topologyAgreement * 0.45
   const structure = shapeRasterization === undefined
     ? colorStructure
     : colorStructure * 0.55 + shapeStructure * 0.45
@@ -2315,7 +2400,17 @@ function generateCandidate(
     activeMask,
     size.width,
     size.height,
+    Float32Array.from(weights),
   )
+  const petPose = evaluatePetPoseStructure({
+    analysis: request.analysis,
+    crop,
+    fit: resized.fit,
+    width: size.width,
+    height: size.height,
+    activeMask,
+    projectionCache: context.petPoseProjectionCache,
+  })
   const score = scoreCandidate(
     style,
     totalBeads,
@@ -2324,6 +2419,7 @@ function generateCandidate(
     reference.meanColorDistance,
     planMeanColorDistance,
     structure,
+    topologyAgreement,
     visibility,
     isolatedCells,
     thinStripes,
@@ -2332,23 +2428,55 @@ function generateCandidate(
       ? context.canvasPlan.score.total
       : 1 / (1 + totalBeads / 1024),
     identityAppearance,
+    petPose,
     hardFeatureCompleteness,
     finalValueOrderAccuracy,
     gridRefinement?.diagnosticsAfter.fragmentedArcSegments ?? 0,
     gridRefinement?.diagnosticsAfter.smallComponents ?? 0,
     gridRefinement?.diagnosticsAfter.singleCellBands ?? 0,
+    shapeRasterization?.diagnostics,
   )
   if (context.occupancyMode === 'full-frame' && subjectMaskTrust(request.analysis) >= 0.75) {
     score.total = clamp(score.total - 0.14, 0, 1)
   }
   const identityCritical = (request.analysis?.imageType ?? request.options.imageType) === 'pet'
     && visibility.confidence >= 0.45
-  const identityValid = identityCritical === false
-    || (score.identity >= 0.38 && hardFeatureCompleteness >= 0.6)
+  const petInstanceIntegrity = assessPetInstanceIntegrity(petPose)
+  const appliesPetPoseGate = petPose.available && petPose.confidence >= 0.45
+  const poseValid = appliesPetPoseGate === false || petPose.score >= 0.4
+  const requiredEarSpanCells = size.width >= 64 ? 4 : size.width >= 48 ? 3 : 2
+  const requiredMuzzleSeparationCells = size.width >= 48 ? 2 : 1
+  const maximumFrontVerticalRunRatio = size.width >= 64
+    ? 0.35
+    : size.width >= 48 ? 0.45 : size.width >= 32 ? 0.55 : 0.72
+  const earValid = appliesPetPoseGate === false
+    || (petPose.earConnected
+      && petPose.earSpanCells >= requiredEarSpanCells
+      && petPose.earStructure >= 0.55)
+  const muzzleValid = appliesPetPoseGate === false
+    || (petPose.muzzleStructure >= 0.55
+      && petPose.muzzleSeparationCells >= requiredMuzzleSeparationCells)
+  const frontColumnValid = appliesPetPoseGate === false
+    || petPose.frontVerticalRunRatio <= maximumFrontVerticalRunRatio
+  const semanticIdentityValid = (
+    identityCritical === false
+      || (score.identity >= 0.38
+        && hardFeatureCompleteness >= 0.6
+        && poseValid
+        && earValid
+        && muzzleValid
+        && frontColumnValid)
+  )
+  const identityValid = petInstanceIntegrity.valid && semanticIdentityValid
   const rejectionReasons = [...new Set([
     ...context.canvasPlan.rejectionReasons,
     ...visibility.rejectionReasons,
-    ...(identityValid ? [] : ['pet-identity-low-similarity']),
+    ...(poseValid ? [] : ['pet-pose-structure']),
+    ...(earValid ? [] : ['pet-ear-disconnected']),
+    ...(muzzleValid ? [] : ['pet-muzzle-collapsed']),
+    ...(frontColumnValid ? [] : ['pet-front-column']),
+    ...petInstanceIntegrity.rejectionReasons,
+    ...(semanticIdentityValid ? [] : ['pet-identity-low-similarity']),
   ])].sort()
   const artDirectionExecution = {
     enabled: explicitArtDirection,
@@ -2391,6 +2519,8 @@ function generateCandidate(
       priority: landmark.priority,
       sourceRadiusPx: landmark.sourceRadiusPx ?? landmark.radius ?? 0,
       gridRadiusCells: landmark.gridRadiusCells ?? landmark.radius ?? 0,
+      structuralRole: landmark.structuralRole,
+      observationState: landmark.observationState,
       featureRegionId: landmark.featureRegionId,
       carrierRegionId: landmark.carrierRegionId,
     })) ?? [],
@@ -2443,6 +2573,28 @@ function generateCandidate(
       hardFeatureCompleteness,
       featureCollisionCount,
       featureSymmetryError,
+      petPoseAvailable: petPose.available,
+      petPoseScore: petPose.score,
+      petPoseConfidence: petPose.confidence,
+      petLandmarkCoverage: petPose.landmarkCoverage,
+      petSkeletonContinuity: petPose.skeletonContinuity,
+      petTorsoAxisAgreement: petPose.torsoAxisAgreement,
+      petBoneRatio: petPose.boneRatio,
+      petGroundContact: petPose.groundContact,
+      petNegativeSpace: petPose.negativeSpace,
+      petTailPathQuality: petPose.tailPathQuality,
+      petBoundaryRhythm: petPose.boundaryRhythm,
+      petEarStructure: petPose.earStructure,
+      petEarSpanCells: petPose.earSpanCells,
+      petEarConnected: petPose.earConnected,
+      petMuzzleStructure: petPose.muzzleStructure,
+      petMuzzleSeparationCells: petPose.muzzleSeparationCells,
+      petFrontVerticalRunRatio: petPose.frontVerticalRunRatio,
+      petFrontChestScore: petPose.frontChestScore,
+      petInstanceCount: petPose.instanceCount,
+      petSubjectComponentRecall: petPose.subjectComponentRecall,
+      petWeakestInstanceIdentityCompleteness: petPose.weakestInstanceIdentityCompleteness,
+      petCrossInstanceCollisionRate: petPose.crossInstanceCollisionRate,
       sourceBoundaryAgreement,
       planBoundaryAgreement,
       referenceMeanColorDistance: reference.meanColorDistance,
@@ -2457,6 +2609,20 @@ function generateCandidate(
       subjectOccupancyRatio: shapeRasterization?.diagnostics.occupancyRatio ?? 1,
       silhouetteBoundaryIoU: shapeRasterization?.diagnostics.boundaryIoU ?? 1,
       subjectCoverageIoU: shapeRasterization?.diagnostics.coverageIoU ?? 1,
+      shapeTopologyCenterlinePrecision: shapeRasterization?.diagnostics.topologyCenterlinePrecision ?? 1,
+      shapeTopologyCenterlineRecall: shapeRasterization?.diagnostics.topologyCenterlineRecall ?? 1,
+      shapeTopologyClDice: shapeRasterization?.diagnostics.topologyClDice ?? 1,
+      shapeTopologyWeightedClDice: shapeRasterization?.diagnostics.topologyWeightedClDice ?? 1,
+      shapeTopologyEndpointF1: shapeRasterization?.diagnostics.topologyEndpointF1 ?? 1,
+      shapeTopologyJunctionF1: shapeRasterization?.diagnostics.topologyJunctionF1 ?? 1,
+      shapeTopologyBranchCountAgreement: shapeRasterization?.diagnostics.topologyBranchCountAgreement ?? 1,
+      shapeTopologyCycleCountAgreement: shapeRasterization?.diagnostics.topologyCycleCountAgreement ?? 1,
+      shapeTopologyComponentCountAgreement: shapeRasterization?.diagnostics.topologyComponentCountAgreement ?? 1,
+      shapeTopologyScore: shapeRasterization?.diagnostics.topologyScore ?? 1,
+      orthogonalBridgeCells: shapeRasterization?.diagnostics.orthogonalBridgeCells ?? 0,
+      fragileOrthogonalBridgeCells: shapeRasterization?.diagnostics.fragileOrthogonalBridgeCells ?? 0,
+      craftComponentsBeforeBridging: shapeRasterization?.diagnostics.craftComponentsBeforeBridging ?? 0,
+      craftComponentsAfterBridging: shapeRasterization?.diagnostics.craftComponentsAfterBridging ?? 0,
       shapeMeanBoundaryDistance: shapeRasterization?.diagnostics.meanBoundaryDistance ?? 0,
       referenceShapeComponents: shapeRasterization?.diagnostics.referenceComponents ?? 0,
       targetShapeComponents: shapeRasterization?.diagnostics.targetComponents ?? 0,
@@ -2614,6 +2780,7 @@ export class DeterministicPatternAlgorithm {
     )
     const distanceMethod = resolveDistanceMethod(request.options, baseline)
     const candidates: PatternCandidate[] = []
+    const petPoseProjectionCache = new PetPoseProjectionCache()
     const candidateGenerationStartedAt = performance.now()
     for (const size of sizes) {
       for (const occupancy of occupancyVariants) {
@@ -2634,6 +2801,7 @@ export class DeterministicPatternAlgorithm {
               : undefined,
             occupancyMode: occupancy.occupancyMode,
             canvasPlan: occupancy.canvasPlansBySize.get(`${size.width}x${size.height}`)!,
+            petPoseProjectionCache,
           }, generationId, this.version, this.#clock))
         }
       }

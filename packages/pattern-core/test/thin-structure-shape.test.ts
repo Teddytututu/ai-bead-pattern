@@ -3,10 +3,14 @@ import { describe, it } from 'node:test'
 
 import { fitCropToCanvas, gridCellForSourcePoint } from '../src/image.js'
 import { buildSourceShapeModel, rasterizeSourceShape } from '../src/shape.js'
-import type { BinaryMask, CropRect } from '../src/types.js'
+import type { BinaryMask, CropRect, ImageLandmark } from '../src/types.js'
 
 const sourceSize = 256
 const crop: CropRect = { x: 0, y: 0, width: sourceSize, height: sourceSize }
+
+function cell(width: number, x: number, y: number): number {
+  return y * width + x
+}
 
 function drawLine(
   values: Float32Array,
@@ -121,6 +125,116 @@ describe('transparent thin-structure rasterization', () => {
       assert.equal(raster.diagnostics.targetHoles, 1)
       assert.equal(raster.diagnostics.referenceComponents, 2)
       assert.equal(raster.diagnostics.referenceHoles, 1)
+      assert.equal(raster.diagnostics.craftComponentsAfterBridging, 2)
+      assert.ok(
+        raster.diagnostics.craftComponentsBeforeBridging
+          >= raster.diagnostics.craftComponentsAfterBridging,
+      )
+      assert.ok(raster.diagnostics.orthogonalBridgeCells >= 0)
+      assert.ok(
+        raster.diagnostics.orthogonalBridgeCells
+          <= raster.diagnostics.craftComponentsBeforeBridging
+            - raster.diagnostics.craftComponentsAfterBridging,
+      )
+      assert.ok(
+        raster.diagnostics.fragileOrthogonalBridgeCells
+          <= raster.diagnostics.orthogonalBridgeCells,
+      )
+      assert.ok(raster.diagnostics.shapeEdits >= raster.diagnostics.orthogonalBridgeCells)
     })
   }
+
+  it('keeps bridge cells and adopted endpoints through profile accessory trimming', () => {
+    const size = 7
+    const values = new Float32Array(size * size)
+    values[cell(size, 3, 3)] = 1
+    values[cell(size, 4, 4)] = 1
+    const subject: BinaryMask = { width: size, height: size, values }
+    const landmarks: readonly ImageLandmark[] = [
+      { id: 'eye', kind: 'eye', structuralRole: 'eye-center', x: 2, y: 3, confidence: 0.9, priority: 'soft', affectsOccupancy: false },
+      { id: 'nose', kind: 'nose', structuralRole: 'nose-tip', x: 3, y: 3, confidence: 0.9, priority: 'soft', affectsOccupancy: false },
+      { id: 'upper', kind: 'body', structuralRole: 'upper-jaw', x: 3, y: 3, confidence: 0.9, priority: 'soft', affectsOccupancy: false },
+      { id: 'lower', kind: 'body', structuralRole: 'lower-jaw', x: 3, y: 3, confidence: 0.9, priority: 'soft', affectsOccupancy: false },
+    ]
+    const localCrop: CropRect = { x: 0, y: 0, width: size, height: size }
+    const raster = rasterizeSourceShape(
+      buildSourceShapeModel(subject, 1, landmarks),
+      localCrop,
+      fitCropToCanvas(localCrop, size, size),
+      size,
+      size,
+      landmarks,
+      { preserveThinStructures: true, refinementIterations: 0 },
+    )
+
+    const bridge = cell(size, 4, 3)
+    const endpoint = cell(size, 4, 4)
+    assert.equal(raster.activeMask[bridge], 1)
+    assert.equal(raster.activeMask[endpoint], 1)
+    assert.ok(raster.protectedCells.has(bridge))
+    assert.ok(raster.protectedCells.has(endpoint))
+    assert.equal(raster.diagnostics.orthogonalBridgeCells, 1)
+    assert.equal(raster.diagnostics.craftComponentsAfterBridging, 1)
+  })
+
+  it('recomputes bridge articulation after a hard landmark adds alternate support', () => {
+    const size = 7
+    const values = new Float32Array(size * size)
+    values[cell(size, 3, 3)] = 1
+    values[cell(size, 4, 4)] = 1
+    const subject: BinaryMask = { width: size, height: size, values }
+    const landmarks: readonly ImageLandmark[] = [{
+      id: 'support',
+      kind: 'body',
+      x: 3,
+      y: 4,
+      confidence: 1,
+      priority: 'hard',
+      affectsOccupancy: true,
+    }]
+    const localCrop: CropRect = { x: 0, y: 0, width: size, height: size }
+    const raster = rasterizeSourceShape(
+      buildSourceShapeModel(subject, 1, landmarks),
+      localCrop,
+      fitCropToCanvas(localCrop, size, size),
+      size,
+      size,
+      landmarks,
+      { preserveThinStructures: true, refinementIterations: 0 },
+    )
+
+    assert.equal(raster.activeMask[cell(size, 3, 3)], 1)
+    assert.equal(raster.activeMask[cell(size, 4, 3)], 1)
+    assert.equal(raster.activeMask[cell(size, 3, 4)], 1)
+    assert.equal(raster.activeMask[cell(size, 4, 4)], 1)
+    assert.equal(raster.diagnostics.orthogonalBridgeCells, 1)
+    assert.equal(raster.diagnostics.fragileOrthogonalBridgeCells, 0)
+  })
+
+  it('publishes bridge reuse, rejection, topology, hole, and owner diagnostics', () => {
+    const size = 7
+    const values = new Float32Array(size * size)
+    values[cell(size, 3, 3)] = 1
+    values[cell(size, 4, 4)] = 1
+    const subject: BinaryMask = { width: size, height: size, values }
+    const localCrop: CropRect = { x: 0, y: 0, width: size, height: size }
+    const raster = rasterizeSourceShape(
+      buildSourceShapeModel(subject, 1),
+      localCrop,
+      fitCropToCanvas(localCrop, size, size),
+      size,
+      size,
+      [],
+      { preserveThinStructures: true, refinementIterations: 0 },
+    )
+
+    assert.equal(raster.diagnostics.rejectedOrthogonalLinks, 0)
+    assert.equal(raster.diagnostics.orthogonalBridgeReuseCount, 0)
+    assert.equal(raster.diagnostics.orthogonalBridgeSimplePointRejections, 0)
+    assert.equal(raster.diagnostics.orthogonalBridgeTopologyRejections, 0)
+    assert.equal(raster.diagnostics.orthogonalBridgeHoleRejections, 0)
+    assert.equal(raster.diagnostics.orthogonalBridgeOwnerRejections, 0)
+    assert.equal(raster.diagnostics.craftHolesBeforeBridging, 0)
+    assert.equal(raster.diagnostics.craftHolesAfterBridging, 0)
+  })
 })

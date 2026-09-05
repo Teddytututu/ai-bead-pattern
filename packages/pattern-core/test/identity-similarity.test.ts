@@ -20,4 +20,26 @@ describe('identity appearance similarity', () => {
       > identityAppearanceSimilarity(source, flattened, activeMask, 4, 4) + 0.35,
     )
   })
+
+  it('gives identity-critical cells more influence than broad body tone', () => {
+    const source: RGB[] = [
+      [20, 20, 20], [230, 230, 230],
+      [80, 80, 80], [160, 160, 160],
+    ]
+    const facePreserved: RGB[] = [
+      [20, 20, 20], [230, 230, 230],
+      [160, 160, 160], [80, 80, 80],
+    ]
+    const bodyPreserved: RGB[] = [
+      [230, 230, 230], [20, 20, 20],
+      [80, 80, 80], [160, 160, 160],
+    ]
+    const activeMask = new Uint8Array(4).fill(1)
+    const importance = new Float32Array([4, 4, 1, 1])
+
+    assert.ok(
+      identityAppearanceSimilarity(source, facePreserved, activeMask, 2, 2, importance)
+      > identityAppearanceSimilarity(source, bodyPreserved, activeMask, 2, 2, importance) + 0.25,
+    )
+  })
 })

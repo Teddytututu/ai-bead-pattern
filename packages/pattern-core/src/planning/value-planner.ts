@@ -6,7 +6,11 @@ import {
   type ValueRole,
   type ValueRoleKind,
 } from '../contracts.js'
-import type { Lab } from '../types.js'
+import type { Lab, OutlineMode } from '../types.js'
+import {
+  planContrastAwareOutline,
+  type OutlinePlanningDiagnostics,
+} from './outline-planner.js'
 
 export interface SemanticValueGaps {
   eyeSkin: number
@@ -38,6 +42,7 @@ export interface ValuePlanningInput {
   pixelLabs: readonly Lab[]
   activeMask: Uint8Array
   levels: 2 | 3 | 4
+  outlineMode?: OutlineMode
   minimumSemanticGaps?: Partial<SemanticValueGaps>
   lighting?: ValueLighting
   materialByRegionId?: Readonly<Record<string, MaterialValueKind>>
@@ -64,6 +69,7 @@ export interface ValuePlanningDiagnostics {
   minimumSemanticGap: number
   maximumLightingAdjustment: number
   maximumMaterialAdjustment: number
+  outline: OutlinePlanningDiagnostics
   groups: readonly ValueGroupDiagnostic[]
   semanticGaps: readonly SemanticGapDiagnostic[]
 }
@@ -114,6 +120,20 @@ const roleDefinitions: Readonly<Record<2 | 3 | 4, readonly RoleDefinition[]>> = 
     { kind: 'base', quantile: 0.65, importanceScale: 1 },
     { kind: 'light', quantile: 0.92, importanceScale: 0.82 },
   ],
+}
+
+const outlineRoleDefinition: RoleDefinition = {
+  kind: 'outline',
+  quantile: 0.04,
+  importanceScale: 0.95,
+}
+
+function resolvedRoleDefinitions(
+  levels: 2 | 3 | 4,
+  outlineMode: OutlineMode,
+): readonly RoleDefinition[] {
+  const tonal = roleDefinitions[levels].filter((definition) => definition.kind !== 'outline')
+  return outlineMode === 'off' ? tonal : [outlineRoleDefinition, ...tonal]
 }
 
 const defaultSemanticGaps: SemanticValueGaps = {
@@ -354,11 +374,57 @@ function valueGroups(input: ValuePlanningInput): readonly ValueGroup[] {
     }))
 }
 
+function buildOutlineImportance(
+  input: ValuePlanningInput,
+  groups: readonly PlannedValueGroup[],
+): Float32Array {
+  const importance = new Float32Array(input.activeMask.length)
+  for (const group of groups) {
+    const regionalImportance = Math.min(0.8, group.importance * 0.8)
+    for (const cell of group.cells) importance[cell] = Math.max(importance[cell]!, regionalImportance)
+  }
+  for (const constraint of input.structurePlan.featureConstraints) {
+    const radius = Math.max(
+      0,
+      Math.ceil(Math.sqrt(Math.max(1, constraint.maximumCells)) / 2 + constraint.allowedShiftCells),
+    )
+    const minimumX = Math.max(0, Math.floor(constraint.targetCenter[0] - radius))
+    const maximumX = Math.min(input.structurePlan.width - 1, Math.ceil(constraint.targetCenter[0] + radius))
+    const minimumY = Math.max(0, Math.floor(constraint.targetCenter[1] - radius))
+    const maximumY = Math.min(input.structurePlan.height - 1, Math.ceil(constraint.targetCenter[1] + radius))
+    const featureImportance = constraint.hard ? 1 : 0.9
+    for (let y = minimumY; y <= maximumY; y += 1) {
+      for (let x = minimumX; x <= maximumX; x += 1) {
+        const cell = y * input.structurePlan.width + x
+        if (input.activeMask[cell] !== 1) continue
+        importance[cell] = Math.max(importance[cell]!, featureImportance)
+      }
+    }
+  }
+  return importance
+}
+
+function semanticOutlineRegionIds(structurePlan: StructurePlan): Int32Array {
+  const semanticIds = new Int32Array(structurePlan.regionIds.length).fill(-1)
+  const idBySourceRegion = new Map<string, number>()
+  for (const region of [...structurePlan.regions].sort((first, second) => first.id - second.id)) {
+    const sourceRegionId = region.sourceRegionId ?? region.label ?? `structure-region-${region.id}`
+    let semanticId = idBySourceRegion.get(sourceRegionId)
+    if (semanticId === undefined) {
+      semanticId = idBySourceRegion.size
+      idBySourceRegion.set(sourceRegionId, semanticId)
+    }
+    for (const cell of region.cellIndices) semanticIds[cell] = semanticId
+  }
+  return semanticIds
+}
+
 export function buildValuePlan(input: ValuePlanningInput): ValuePlanningResult {
   validateInput(input)
   const roleIdsByCell: Array<string | undefined> = new Array(input.activeMask.length)
   const plannedLabs = input.pixelLabs.map((lab) => [...lab] as Lab)
-  const definitions = roleDefinitions[input.levels]
+  const outlineMode = input.outlineMode ?? (input.levels === 4 ? 'selective' : 'off')
+  const definitions = resolvedRoleDefinitions(input.levels, outlineMode)
   let maximumLightingAdjustment = 0
   let maximumMaterialAdjustment = 0
   const groups: PlannedValueGroup[] = valueGroups(input).map((group) => {
@@ -399,20 +465,31 @@ export function buildValuePlan(input: ValuePlanningInput): ValuePlanningResult {
     ...input.minimumSemanticGaps,
   })
   const roles = groups.flatMap((group) => group.roles)
+  const outlineImportance = buildOutlineImportance(input, groups)
+  const outlinePlanning = planContrastAwareOutline({
+    width: input.structurePlan.width,
+    height: input.structurePlan.height,
+    activeMask: input.activeMask,
+    boundaryStrength: input.structurePlan.boundaryStrength,
+    regionIds: semanticOutlineRegionIds(input.structurePlan),
+    pixelLabs: input.pixelLabs,
+    importance: outlineImportance,
+    mode: outlineMode,
+    ...(input.lighting === undefined ? {} : { lightDirection: input.lighting.direction }),
+  })
   for (const group of groups) {
     const meanA = group.cells.reduce((sum, cell) => sum + input.pixelLabs[cell]![1], 0) / group.cells.length
     const meanB = group.cells.reduce((sum, cell) => sum + input.pixelLabs[cell]![2], 0) / group.cells.length
     for (const cell of group.cells) {
       const sourceLightness = input.pixelLabs[cell]![0]
-      let role = group.roles.reduce((best, candidate) =>
+      const tonalRoles = group.roles.filter((candidate) => candidate.kind !== 'outline')
+      let role = tonalRoles.reduce((best, candidate) =>
         Math.abs(candidate.targetLightness - sourceLightness)
           < Math.abs(best.targetLightness - sourceLightness)
           ? candidate
           : best)
       const outline = group.roles.find((candidate) => candidate.kind === 'outline')
-      if (outline !== undefined
-        && input.structurePlan.boundaryStrength[cell]! >= 0.65
-        && sourceLightness <= group.roles.find((candidate) => candidate.kind === 'base')!.targetLightness) {
+      if (outline !== undefined && outlinePlanning.mask[cell] === 1) {
         role = outline
       }
       roleIdsByCell[cell] = role.id
@@ -441,6 +518,7 @@ export function buildValuePlan(input: ValuePlanningInput): ValuePlanningResult {
       : Math.min(...semanticGaps.map((gap) => gap.actual)),
     maximumLightingAdjustment,
     maximumMaterialAdjustment,
+    outline: outlinePlanning.diagnostics,
     groups: groups.map((group) => ({
       groupId: group.id,
       sourceRegionId: group.sourceRegionId,

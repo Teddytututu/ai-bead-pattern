@@ -193,6 +193,67 @@ describe('deterministic pattern algorithm', () => {
     assert.deepEqual(success(result).materialCounts, success(result).recommended.materialCounts)
   })
 
+  it('changes physical grid colors across off, selective, and full outline modes', async () => {
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    const size = 5
+    const source = image(size, size, Array.from({ length: size * size }, () => [160, 160, 160] as const))
+    const outlinePalette: MaterialPalette = {
+      id: 'outline-test',
+      name: 'Outline test palette',
+      colors: [
+        { id: 'ink', name: 'Ink', hex: '#202020', rgb: [32, 32, 32] },
+        { id: 'shadow', name: 'Shadow', hex: '#686868', rgb: [104, 104, 104] },
+        { id: 'base', name: 'Base', hex: '#a0a0a0', rgb: [160, 160, 160] },
+        { id: 'light', name: 'Light', hex: '#d0d0d0', rgb: [208, 208, 208] },
+      ],
+    }
+    const analysis = {
+      semanticRegions: [{
+        id: 'body',
+        label: 'body',
+        confidence: 1,
+        mask: { width: size, height: size, values: new Float32Array(size * size).fill(1) },
+      }],
+    }
+    const generate = async (outlineMode: 'off' | 'selective' | 'full') => candidate(
+      await algorithm.generate({
+        image: source,
+        palette: outlinePalette,
+        analysis,
+        options: {
+          canvas: { mode: 'fixed', size: { width: size, height: size } },
+          baseline: 'mvp',
+          maxColors: 4,
+          maxCandidates: 1,
+          styles: ['faithful'],
+          structure: { valueLevels: 3, outlineMode },
+          optimization: {
+            minRegionSize: 1,
+            isolatedPixelPenalty: 0,
+            stripePenalty: 0,
+            aliasPenalty: 0,
+            paletteCoherence: 0,
+            localSearchIterations: 0,
+          },
+        },
+      }),
+    )
+
+    const off = await generate('off')
+    const selective = await generate('selective')
+    const full = await generate('full')
+    const colorIds = (value: PatternCandidate) => value.pattern.cells.map((cell) => cell.colorId)
+    const changedCells = (first: PatternCandidate, second: PatternCandidate) => colorIds(first)
+      .filter((colorId, index) => colorId !== colorIds(second)[index]).length
+
+    assert.equal(off.pattern.metadata.outlineMode, 'off')
+    assert.equal(selective.pattern.metadata.outlineMode, 'selective')
+    assert.equal(full.pattern.metadata.outlineMode, 'full')
+    assert.ok(changedCells(off, selective) > 0)
+    assert.ok(changedCells(off, full) > 0)
+    assert.ok(changedCells(selective, full) > 0)
+  })
+
   it('produces stable cells for repeated input', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const source = image(2, 2, [
@@ -733,6 +794,87 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(output.metrics.targetShapeComponents, 1)
   })
 
+  it('charges orthogonal bridge cells and fragile bridge joints to craft ease', async () => {
+    const size = 128
+    const data = new Uint8ClampedArray(size * size * 4)
+    const maskValues = new Float32Array(size * size)
+    const drawLine = (startX: number, startY: number, endX: number, endY: number) => {
+      let x = startX
+      let y = startY
+      const deltaX = Math.abs(endX - startX)
+      const deltaY = -Math.abs(endY - startY)
+      const stepX = startX < endX ? 1 : -1
+      const stepY = startY < endY ? 1 : -1
+      let error = deltaX + deltaY
+      while (true) {
+        const index = y * size + x
+        data[index * 4 + 3] = 255
+        maskValues[index] = 1
+        if (x === endX && y === endY) break
+        const doubled = error * 2
+        if (doubled >= deltaY) {
+          error += deltaY
+          x += stepX
+        }
+        if (doubled <= deltaX) {
+          error += deltaX
+          y += stepY
+        }
+      }
+    }
+    drawLine(56, 12, 92, 48)
+    drawLine(92, 48, 56, 84)
+    drawLine(56, 84, 20, 48)
+    drawLine(20, 48, 56, 12)
+    drawLine(24, 108, 52, 108)
+    const result = await createPatternAlgorithm({ clock: () => 123 }).generate({
+      image: { width: size, height: size, data },
+      palette,
+      analysis: {
+        subjectMaskEvidence: {
+          mask: { width: size, height: size, values: maskValues },
+          confidence: 1,
+          source: 'ai',
+          revision: 'test-bridge-craft-cost-1',
+        },
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 32, height: 32 } },
+        maxColors: 2,
+        maxCandidates: 1,
+        styles: ['faithful'],
+        structure: { occupancyMode: 'subject-shape' },
+        optimization: { minRegionSize: 1 },
+      },
+    })
+
+    const output = candidate(result)
+    const bridgeLoad = output.metrics.orthogonalBridgeCells
+      + output.metrics.fragileOrthogonalBridgeCells * 2
+    const legacyCraftEase = Math.max(0, Math.min(1,
+      1 - output.metrics.uniqueColors / 2 * 0.25
+        - output.metrics.isolatedCells / Math.max(1, output.metrics.totalBeads),
+    ))
+    const identityWeight = 0.22 + 0.1 * output.score.featureProtectionConfidence
+    const colorWeight = 0.12
+    const craftWeight = 0.07
+    const totalWeight = 0.25 + identityWeight + 0.15 + 0.13 + colorWeight + craftWeight + 0.06
+    const legacyTotal = Math.max(0, Math.min(1, (
+      output.score.silhouette * 0.25
+        + output.score.identity * identityWeight
+        + output.score.valueHierarchy * 0.15
+        + output.score.pixelClusters * 0.13
+        + output.score.colorFidelity * colorWeight
+        + legacyCraftEase * craftWeight
+        + output.score.canvasFit * 0.06
+    ) / totalWeight + 0.015))
+
+    assert.ok(bridgeLoad > 0)
+    assert.ok(output.score.craftEase < legacyCraftEase)
+    assert.equal(output.score.craftCost, 1 - output.score.craftEase)
+    assert.ok(output.score.total < legacyTotal)
+  })
+
   it('keeps internal ink lines inside a white subject on a transparent background', async () => {
     const size = 128
     const data = new Uint8ClampedArray(size * size * 4)
@@ -816,6 +958,16 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(candidate(result).metrics.shapeApplied, true)
     assert.equal(candidate(result).metrics.targetShapeComponents, 1)
     assert.equal(candidate(result).metrics.referenceShapeComponents, 1)
+    assert.equal(candidate(result).metrics.shapeTopologyWeightedClDice, 1)
+    assert.equal(candidate(result).metrics.shapeTopologyEndpointF1, 1)
+    assert.equal(candidate(result).metrics.shapeTopologyBranchCountAgreement, 1)
+    assert.equal(candidate(result).metrics.shapeTopologyCycleCountAgreement, 1)
+    assert.equal(candidate(result).metrics.shapeTopologyComponentCountAgreement, 1)
+    assert.equal(candidate(result).metrics.orthogonalBridgeCells, 0)
+    assert.equal(candidate(result).metrics.fragileOrthogonalBridgeCells, 0)
+    assert.equal(candidate(result).metrics.craftComponentsBeforeBridging, 1)
+    assert.equal(candidate(result).metrics.craftComponentsAfterBridging, 1)
+    assert.equal(candidate(result).score.topology, 1)
   })
 
   it('compares full-frame and subject-shape candidates in automatic occupancy mode', async () => {
@@ -1979,6 +2131,9 @@ describe('deterministic pattern algorithm', () => {
     await assert.rejects(() => algorithm.generate(fixedRequest(source, {
       structure: { valueLevels: 5 as never },
     })), /valueLevels/)
+    await assert.rejects(() => algorithm.generate(fixedRequest(source, {
+      structure: { outlineMode: 'ink' as never },
+    })), /outlineMode/)
     await assert.rejects(() => algorithm.generate(fixedRequest(source, {
       structure: { occupancyMode: 'outline' as never },
     })), /occupancyMode/)

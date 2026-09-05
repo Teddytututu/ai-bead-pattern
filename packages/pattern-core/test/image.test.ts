@@ -36,6 +36,23 @@ function neutralPatchWithChromaticOutlier(): PixelImage {
   return { width, height, data }
 }
 
+function monochromeLinePatch(background: number, detail: number): PixelImage {
+  const width = 5
+  const height = 5
+  const data = new Uint8ClampedArray(width * height * 4)
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const value = x === 2 ? detail : background
+      const offset = (y * width + x) * 4
+      data[offset] = value
+      data[offset + 1] = value
+      data[offset + 2] = value
+      data[offset + 3] = 255
+    }
+  }
+  return { width, height, data }
+}
+
 function luminance(pixel: readonly [number, number, number]): number {
   return pixel[0] * 0.2126 + pixel[1] * 0.7152 + pixel[2] * 0.0722
 }
@@ -76,5 +93,31 @@ describe('cell-aware image sampling', () => {
 
     assert.ok(Math.max(...pixel) - Math.min(...pixel) <= 12)
     assert.ok(luminance(pixel) < 110)
+  })
+
+  it('keeps a dark line when a light patch collapses to one cell', () => {
+    const image = monochromeLinePatch(242, 18)
+    const crop = { x: 0, y: 0, width: image.width, height: image.height }
+    const cellAware = resizePixels(image, crop, 1, 1, 'cell-aware', [255, 255, 255], {
+      source: buildSourceGuidance(image, undefined),
+      importanceStrength: 1,
+      edgeStrength: 2,
+      preserveThinStructures: true,
+    })
+
+    assert.ok(luminance(cellAware.pixels[0]!) <= 70)
+  })
+
+  it('keeps a bright line when a dark patch collapses to one cell', () => {
+    const image = monochromeLinePatch(16, 236)
+    const crop = { x: 0, y: 0, width: image.width, height: image.height }
+    const cellAware = resizePixels(image, crop, 1, 1, 'cell-aware', [0, 0, 0], {
+      source: buildSourceGuidance(image, undefined, [0, 0, 0]),
+      importanceStrength: 1,
+      edgeStrength: 2,
+      preserveThinStructures: true,
+    })
+
+    assert.ok(luminance(cellAware.pixels[0]!) >= 180)
   })
 })

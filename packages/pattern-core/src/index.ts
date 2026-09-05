@@ -11,7 +11,64 @@ export {
 } from './color.js'
 export { optimizeGrid } from './grid.js'
 export { identityAppearanceSimilarity } from './identity-similarity.js'
-export { inferPetAnalysis, type PetAnalysisResult } from './pet-analysis.js'
+export { outlinePlannerSchema, planContrastAwareOutline } from './planning/outline-planner.js'
+export type {
+  OutlinePlanningDiagnostics,
+  OutlinePlanningInput,
+  OutlinePlanningResult,
+} from './planning/outline-planner.js'
+export { buildMedialGraph, medialGraphSchema } from './medial-graph.js'
+export type {
+  MedialEndpointRoleHit,
+  MedialGraph,
+  MedialGraphBranch,
+  MedialGraphNode,
+  MedialGraphNodeKind,
+  MedialGraphOptions,
+} from './medial-graph.js'
+export {
+  evaluateTopologyAgreement,
+  scoreTopologyAgreement,
+  topologyAgreementSchema,
+} from './topology-metrics.js'
+export type {
+  TopologyAgreementDiagnostics,
+  TopologyAgreementInput,
+  TopologyAgreementOptions,
+  TopologyMask,
+  TopologyNodeMatch,
+  TopologyShapeSummary,
+} from './topology-metrics.js'
+export {
+  inferPetAnalysis,
+  inferPetInstances,
+  type PetAnalysisResult,
+  type PetInstanceAnalysis,
+  type PetInstanceGroupAnalysis,
+} from './pet-analysis.js'
+export { planPetCompositionVariants } from './planning/pet-composition.js'
+export type {
+  PetCompositionPlanningInput,
+  PetCompositionStrategy,
+  PetCompositionVariant,
+} from './planning/pet-composition.js'
+export { compactPetLayout } from './planning/compact-pet-layout.js'
+export type {
+  CompactPetBackground,
+  CompactPetLayoutDiagnostics,
+  CompactPetLayoutInput,
+  CompactPetLayoutResult,
+  CompactPetPlacement,
+} from './planning/compact-pet-layout.js'
+export {
+  assessPetInstanceIntegrity,
+  evaluatePetPoseStructure,
+  petInstanceIntegrityPolicy,
+  petPoseSchema,
+  type PetInstanceIntegrityAssessment,
+  type PetInstanceIntegrityRejectionReason,
+  type PetPoseEvaluation,
+} from './pet-pose.js'
 export { adaptPattern } from './adaptation.js'
 export { composeCandidateEvaluationV2 } from './candidate-evaluation.js'
 export {
@@ -169,6 +226,7 @@ export type {
   ImportanceMap,
   Lab,
   LandmarkKind,
+  LandmarkObservationState,
   LandmarkPriority,
   MaterialColor,
   MaterialCount,
@@ -176,7 +234,9 @@ export type {
   MaterialPalette,
   MaterialSubstitutionMap,
   OptimizationOptions,
+  OutlineMode,
   StructureOptions,
+  StructuralRole,
   PatternCandidate,
   PatternCell,
   PatternGenerationRequest,

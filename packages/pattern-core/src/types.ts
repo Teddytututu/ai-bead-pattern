@@ -50,6 +50,7 @@ export type PatternStyle = 'faithful' | 'cute' | 'simple' | 'high-contrast' | 's
 export type BaselineMode = 'a0' | 'a1' | 'mvp'
 export type AlgorithmEngine = 'baseline'
 export type GridRefinementMode = 'fast' | 'quality'
+export type OutlineMode = 'off' | 'selective' | 'full'
 
 export interface GridSize {
   width: number
@@ -77,6 +78,8 @@ export interface StructureOptions {
   /** Multiplier for semantic eye/skin, face/hair, and subject/background lightness gaps. */
   valueOrderStrength?: number
   valueLevels?: 2 | 3 | 4
+  /** Contrast-aware bead-grid outline applied before physical palette assignment. */
+  outlineMode?: OutlineMode
   occupancyMode?: 'auto' | 'full-frame' | 'subject-shape'
   shapeRefinementIterations?: number
 }
@@ -175,7 +178,29 @@ export type LandmarkKind =
   | 'identity-mark'
   | 'custom'
 
+export type StructuralRole =
+  | 'eye-center'
+  | 'ear-tip'
+  | 'ear-root'
+  | 'nose-tip'
+  | 'mouth-corner'
+  | 'upper-jaw'
+  | 'lower-jaw'
+  | 'neck-base'
+  | 'shoulder'
+  | 'chest-center'
+  | 'back-middle'
+  | 'tail-root'
+  | 'hip'
+  | 'front-knee'
+  | 'front-paw'
+  | 'rear-knee'
+  | 'rear-paw'
+  | 'tail-tip'
+
 export type LandmarkPriority = 'hard' | 'soft'
+
+export type LandmarkObservationState = 'observed' | 'inferred' | 'missing'
 
 export interface ImageLandmark {
   id: string
@@ -197,6 +222,10 @@ export interface ImageLandmark {
   carrierRegionId?: string
   /** Allows a silhouette anchor to add occupied subject cells. Internal features leave this unset. */
   affectsOccupancy?: boolean
+  /** Canonical quadruped role used by scale, structure, and pose scoring. */
+  structuralRole?: StructuralRole
+  /** Evidence state controls whether a landmark may edit occupancy or only guide planning. */
+  observationState?: LandmarkObservationState
   provenance?: readonly EvidenceProvenance[]
 }
 
@@ -241,6 +270,7 @@ export interface PatternMetadata {
   aiEnhanced: boolean
   style: PatternStyle
   baseline: BaselineMode
+  outlineMode?: OutlineMode
   engine?: AlgorithmEngine
   aiProvider?: string
   aiModel?: string
@@ -290,6 +320,28 @@ export interface GenerationMetrics {
   hardFeatureCompleteness: number
   featureCollisionCount: number
   featureSymmetryError: number
+  petPoseAvailable: boolean
+  petPoseScore: number
+  petPoseConfidence: number
+  petLandmarkCoverage: number
+  petSkeletonContinuity: number
+  petTorsoAxisAgreement: number
+  petBoneRatio: number
+  petGroundContact: number
+  petNegativeSpace: number
+  petTailPathQuality: number
+  petBoundaryRhythm: number
+  petEarStructure: number
+  petEarSpanCells: number
+  petEarConnected: boolean
+  petMuzzleStructure: number
+  petMuzzleSeparationCells: number
+  petFrontVerticalRunRatio: number
+  petFrontChestScore: number
+  petInstanceCount: number
+  petSubjectComponentRecall: number
+  petWeakestInstanceIdentityCompleteness: number
+  petCrossInstanceCollisionRate: number
   sourceBoundaryAgreement: number
   planBoundaryAgreement: number
   referenceMeanColorDistance: number
@@ -304,6 +356,20 @@ export interface GenerationMetrics {
   subjectOccupancyRatio: number
   silhouetteBoundaryIoU: number
   subjectCoverageIoU: number
+  shapeTopologyCenterlinePrecision: number
+  shapeTopologyCenterlineRecall: number
+  shapeTopologyClDice: number
+  shapeTopologyWeightedClDice: number
+  shapeTopologyEndpointF1: number
+  shapeTopologyJunctionF1: number
+  shapeTopologyBranchCountAgreement: number
+  shapeTopologyCycleCountAgreement: number
+  shapeTopologyComponentCountAgreement: number
+  shapeTopologyScore: number
+  orthogonalBridgeCells: number
+  fragileOrthogonalBridgeCells: number
+  craftComponentsBeforeBridging: number
+  craftComponentsAfterBridging: number
   shapeMeanBoundaryDistance: number
   referenceShapeComponents: number
   targetShapeComponents: number
@@ -357,6 +423,7 @@ export interface GridClusterDiagnostics {
   colorSwitches: number
   localNoiseCells: number
   ditherPatterns: number
+  protectedDiagonalTransitions: number
 }
 
 export interface GenerationTiming {
@@ -373,6 +440,7 @@ export interface CandidateScore {
   silhouette: number
   identity: number
   identityAppearance?: number
+  poseStructure: number
   valueHierarchy: number
   pixelClusters: number
   craftCost: number
@@ -380,6 +448,7 @@ export interface CandidateScore {
   sourceFidelity: number
   planFidelity: number
   structure: number
+  topology?: number
   featureProtection: number
   featureProtectionConfidence: number
   cleanliness: number
@@ -486,10 +555,12 @@ export interface CandidateEvaluationV2 extends CandidateEvaluation {
   providerContributions: readonly CandidateProviderContribution[]
   sourceWeights: CandidateEvaluationSourceWeights
   appliedSourceWeights: CandidateEvaluationSourceWeights
+  candidateValidity?: Readonly<Record<string, boolean>>
 }
 
 export interface CandidateEvaluationV2Input {
   scores: Readonly<Record<string, CandidateScore>>
+  candidateValidity?: Readonly<Record<string, boolean>>
   selectedPreferenceRanking?: SelectedPreferenceRankingInput
   neuralPreferenceFeatures?: readonly CandidateNeuralPreferenceFeatures[]
   providerContributions?: readonly CandidateProviderContribution[]

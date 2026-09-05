@@ -31,6 +31,9 @@ importers:
 
   tools/auto-eval:
     dependencies:
+      '@ai-bead-pattern/ai-gateway':
+        specifier: workspace:*
+        version: link:../../services/ai-gateway
       '@ai-bead-pattern/pattern-core':
         specifier: workspace:*
         version: link:../../packages/pattern-core

@@ -6,12 +6,26 @@ import {
 import {
   landmarkEffectiveConfidence,
   landmarkGridRadiusCells,
+  landmarkMayEditOccupancy,
+  landmarkObservationState,
 } from './landmarks.js'
+import {
+  bridgeOrthogonalLinks,
+  fragileOrthogonalCells,
+  type OrthogonalConnectivityLink,
+} from './craft-connectivity.js'
+import { petOccupancyPathEdges } from './pet-structure.js'
+import {
+  evaluateTopologyAgreement,
+  projectTopologyReference,
+  scoreTopologyAgreement,
+} from './topology-metrics.js'
 import type {
   BinaryMask,
   CropRect,
   ImageLandmark,
   LandmarkKind,
+  StructuralRole,
 } from './types.js'
 
 export interface ShapePoint {
@@ -76,8 +90,36 @@ export interface ShapeDiagnostics {
   targetHoles: number
   boundaryIoU: number
   coverageIoU: number
+  topologyCenterlinePrecision: number
+  topologyCenterlineRecall: number
+  topologyClDice: number
+  topologyWeightedCenterlinePrecision: number
+  topologyWeightedCenterlineRecall: number
+  topologyWeightedClDice: number
+  topologyEndpointPrecision: number
+  topologyEndpointRecall: number
+  topologyEndpointF1: number
+  topologyJunctionPrecision: number
+  topologyJunctionRecall: number
+  topologyJunctionF1: number
+  topologyBranchCountAgreement: number
+  topologyCycleCountAgreement: number
+  topologyComponentCountAgreement: number
+  topologyScore: number
   meanBoundaryDistance: number
   occupancyRatio: number
+  orthogonalBridgeCells: number
+  fragileOrthogonalBridgeCells: number
+  craftComponentsBeforeBridging: number
+  craftComponentsAfterBridging: number
+  rejectedOrthogonalLinks: number
+  orthogonalBridgeReuseCount: number
+  orthogonalBridgeSimplePointRejections: number
+  orthogonalBridgeTopologyRejections: number
+  orthogonalBridgeHoleRejections: number
+  orthogonalBridgeOwnerRejections: number
+  craftHolesBeforeBridging: number
+  craftHolesAfterBridging: number
   shapeEdits: number
   energyBefore: number
   energyAfter: number
@@ -191,6 +233,15 @@ function labelComponents(
 }
 
 function countHoles(values: Uint8Array, width: number, height: number): number {
+  return countHolesWithConnectivity(values, width, height, surroundingOffsets)
+}
+
+function countHolesWithConnectivity(
+  values: Uint8Array,
+  width: number,
+  height: number,
+  connectivity: readonly (readonly [number, number])[],
+): number {
   const visited = new Uint8Array(values.length)
   const queue = new Int32Array(values.length)
   let holes = 0
@@ -206,7 +257,7 @@ function countHoles(values: Uint8Array, width: number, height: number): number {
       const x = index % width
       const y = Math.floor(index / width)
       touchesBorder ||= x === 0 || y === 0 || x === width - 1 || y === height - 1
-      for (const [offsetX, offsetY] of surroundingOffsets) {
+      for (const [offsetX, offsetY] of connectivity) {
         const nextX = x + offsetX
         const nextY = y + offsetY
         if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue
@@ -382,7 +433,7 @@ function squaredDistanceTransform(
   return output
 }
 
-function signedDistanceField(values: Uint8Array, width: number, height: number): Float32Array {
+export function signedDistanceField(values: Uint8Array, width: number, height: number): Float32Array {
   const distanceToInside = squaredDistanceTransform(values, width, height, 1)
   const distanceToOutside = squaredDistanceTransform(values, width, height, 0)
   return Float32Array.from(values, (value, index) => value === 1
@@ -417,12 +468,12 @@ export function buildSourceShapeModel(
     contours: traceContours(labeled, mask.width, mask.height),
     components: labeled.components,
     holes: countHoles(binaryMask, mask.width, mask.height),
-    anchors: landmarks.filter((landmark) => landmark.affectsOccupancy === true).map((landmark) => ({
+    anchors: landmarks.filter(landmarkMayEditOccupancy).map((landmark) => ({
       landmarkId: landmark.id,
       kind: landmark.kind,
       source: [landmark.x, landmark.y],
       minimumCells: anchorMinimumCells(landmark),
-      hard: landmark.priority === 'hard',
+      hard: landmark.priority === 'hard' && landmarkObservationState(landmark) === 'observed',
       confidence: landmarkEffectiveConfidence(landmark),
     })),
     foregroundArea,
@@ -477,61 +528,20 @@ function maskPeakSample(
 
 interface ThinStructureProjection {
   protectedCells: ReadonlySet<number>
+  bridgeCells: ReadonlySet<number>
+  bridgeEndpointCells: ReadonlySet<number>
+  fragileBridgeCells: ReadonlySet<number>
+  craftComponentsBeforeBridging: number
+  craftComponentsAfterBridging: number
+  rejectedOrthogonalLinks: number
+  orthogonalBridgeReuseCount: number
+  orthogonalBridgeSimplePointRejections: number
+  orthogonalBridgeTopologyRejections: number
+  orthogonalBridgeHoleRejections: number
+  orthogonalBridgeOwnerRejections: number
+  craftHolesBeforeBridging: number
+  craftHolesAfterBridging: number
   edits: number
-}
-
-function connectProjectedCells(
-  start: number,
-  end: number,
-  width: number,
-  height: number,
-  componentId: number,
-  owners: Int32Array,
-  activeMask: Uint8Array,
-  protectedCells: Set<number>,
-): number {
-  let x = start % width
-  let y = Math.floor(start / width)
-  const endX = end % width
-  const endY = Math.floor(end / width)
-  const deltaX = Math.abs(endX - x)
-  const deltaY = Math.abs(endY - y)
-  const stepX = x < endX ? 1 : -1
-  const stepY = y < endY ? 1 : -1
-  let horizontalSteps = 0
-  let verticalSteps = 0
-  let edits = 0
-
-  const claim = (): boolean => {
-    if (x < 0 || y < 0 || x >= width || y >= height) return false
-    const cell = y * width + x
-    const owner = owners[cell] ?? -1
-    if (owner >= 0 && owner !== componentId) return false
-    owners[cell] = componentId
-    if (activeMask[cell] === 0) {
-      activeMask[cell] = 1
-      edits += 1
-    }
-    protectedCells.add(cell)
-    return true
-  }
-
-  claim()
-  while (x !== endX || y !== endY) {
-    const canStepX = x !== endX
-    const canStepY = y !== endY
-    const horizontalProgress = deltaX === 0 ? 1 : horizontalSteps / deltaX
-    const verticalProgress = deltaY === 0 ? 1 : verticalSteps / deltaY
-    if (canStepX && (canStepY === false || horizontalProgress <= verticalProgress)) {
-      x += stepX
-      horizontalSteps += 1
-    } else {
-      y += stepY
-      verticalSteps += 1
-    }
-    if (claim() === false) break
-  }
-  return edits
 }
 
 function projectThinStructures(
@@ -541,6 +551,7 @@ function projectThinStructures(
   width: number,
   height: number,
   activeMask: Uint8Array,
+  topologyReferenceMask: Uint8Array,
 ): ThinStructureProjection {
   const sourceBoundary = boundaryMask(model.binaryMask, model.width, model.height)
   const sourceTopology = labelComponents(
@@ -554,6 +565,7 @@ function projectThinStructures(
   const owners = new Int32Array(activeMask.length)
   owners.fill(-1)
   const protectedCells = new Set<number>()
+  const links: OrthogonalConnectivityLink[] = []
   let edits = 0
 
   for (let sourceIndex = 0; sourceIndex < sourceBoundary.length; sourceIndex += 1) {
@@ -597,20 +609,38 @@ function projectThinStructures(
       const nextSource = nextY * model.width + nextX
       const end = projectedCells[nextSource] ?? -1
       if (end < 0 || sourceTopology.labels[nextSource] !== componentId) continue
-      edits += connectProjectedCells(
-        start,
-        end,
-        width,
-        height,
-        componentId,
-        owners,
-        activeMask,
-        protectedCells,
-      )
+      links.push({ start, end, componentId })
     }
   }
 
-  return { protectedCells, edits }
+  const bridge = bridgeOrthogonalLinks({
+    width,
+    height,
+    values: activeMask,
+    links,
+    holeReference: topologyReferenceMask,
+    componentOwners: owners,
+  })
+  activeMask.set(bridge.mask)
+  for (const cell of bridge.addedCells) protectedCells.add(cell)
+  edits += bridge.addedCells.length
+  return {
+    protectedCells,
+    bridgeCells: new Set(bridge.addedCells),
+    bridgeEndpointCells: new Set(bridge.bridgeEndpointCells),
+    fragileBridgeCells: new Set(bridge.fragileBridgeCells),
+    craftComponentsBeforeBridging: bridge.fourConnectedComponentsBefore,
+    craftComponentsAfterBridging: bridge.fourConnectedComponentsAfter,
+    rejectedOrthogonalLinks: bridge.rejectedLinks,
+    orthogonalBridgeReuseCount: bridge.bridgeReuseCount,
+    orthogonalBridgeSimplePointRejections: bridge.simplePointRejections,
+    orthogonalBridgeTopologyRejections: bridge.topologyRejections,
+    orthogonalBridgeHoleRejections: bridge.holeRejections,
+    orthogonalBridgeOwnerRejections: bridge.ownerRejections,
+    craftHolesBeforeBridging: bridge.holesBefore,
+    craftHolesAfterBridging: bridge.holesAfter,
+    edits,
+  }
 }
 
 function boundaryMask(values: Uint8Array, width: number, height: number): Uint8Array {
@@ -815,7 +845,9 @@ function shapeEnergy(
   }
   const topology = labelComponents(values, width, height)
   energy += Math.abs(topology.components.length - referenceComponents) * 1.5
-  energy += Math.abs(countHoles(values, width, height) - referenceHoles) * 1.5
+  energy += Math.abs(
+    countHolesWithConnectivity(values, width, height, orthogonalOffsets) - referenceHoles,
+  ) * 1.5
   return energy
 }
 
@@ -891,7 +923,8 @@ function allocateLandmarks(
   let edits = 0
   for (const landmark of landmarks) {
     const confidence = landmarkEffectiveConfidence(landmark)
-    if (landmark.affectsOccupancy !== true || landmark.priority !== 'hard' || confidence < 0.5) continue
+    if (landmarkMayEditOccupancy(landmark) === false
+      || landmark.priority !== 'hard' || confidence < 0.5) continue
     if (landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) continue
     const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
@@ -927,6 +960,282 @@ function allocateLandmarks(
     })
   }
   return { allocations, protectedCells, edits }
+}
+
+function structuralLandmarksByRole(
+  landmarks: readonly ImageLandmark[],
+): ReadonlyMap<StructuralRole, ImageLandmark> {
+  const result = new Map<StructuralRole, ImageLandmark>()
+  for (const landmark of landmarks) {
+    if (landmark.structuralRole === undefined || landmarkObservationState(landmark) === 'missing') continue
+    const current = result.get(landmark.structuralRole)
+    if (current === undefined
+      || landmarkEffectiveConfidence(landmark) > landmarkEffectiveConfidence(current)) {
+      result.set(landmark.structuralRole, landmark)
+    }
+  }
+  return result
+}
+
+function landmarkInstanceKey(landmark: ImageLandmark): string {
+  const separator = landmark.id.indexOf(':')
+  return separator > 0 ? landmark.id.slice(0, separator) : 'primary'
+}
+
+function structuralLandmarkGroupsByRole(
+  landmarks: readonly ImageLandmark[],
+): readonly ReadonlyMap<StructuralRole, ImageLandmark>[] {
+  const groups = new Map<string, ImageLandmark[]>()
+  for (const landmark of landmarks) {
+    const key = landmarkInstanceKey(landmark)
+    const group = groups.get(key) ?? []
+    group.push(landmark)
+    groups.set(key, group)
+  }
+  return [...groups.values()].map(structuralLandmarksByRole)
+}
+
+const inferredOccupancyPathRoles = new Set<StructuralRole>([
+  'neck-base',
+  'shoulder',
+  'chest-center',
+  'back-middle',
+  'tail-root',
+  'hip',
+  'front-knee',
+  'front-paw',
+  'rear-knee',
+  'rear-paw',
+  'tail-tip',
+])
+
+function maskSupportsCell(
+  activeMask: Uint8Array,
+  width: number,
+  height: number,
+  cell: number,
+  radius: number,
+): boolean {
+  const centerX = cell % width
+  const centerY = Math.floor(cell / width)
+  for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
+    for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
+      const x = centerX + offsetX
+      const y = centerY + offsetY
+      if (x < 0 || y < 0 || x >= width || y >= height) continue
+      if (activeMask[y * width + x] === 1) return true
+    }
+  }
+  return false
+}
+
+function structuralPathEndpointEligible(landmark: ImageLandmark): boolean {
+  const state = landmarkObservationState(landmark)
+  const confidence = landmarkEffectiveConfidence(landmark)
+  if (state === 'observed') {
+    return landmark.priority === 'hard'
+      && landmark.affectsOccupancy === true
+      && confidence >= 0.5
+  }
+  return state === 'inferred'
+    && landmark.structuralRole !== undefined
+    && inferredOccupancyPathRoles.has(landmark.structuralRole)
+    && landmark.affectsOccupancy === true
+    && confidence >= 0.6
+}
+
+function distanceToGridSegment(
+  x: number,
+  y: number,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+): number {
+  const deltaX = endX - startX
+  const deltaY = endY - startY
+  const squaredLength = deltaX * deltaX + deltaY * deltaY
+  if (squaredLength <= 1e-9) return Math.hypot(x - startX, y - startY)
+  const amount = clamp(
+    ((x - startX) * deltaX + (y - startY) * deltaY) / squaredLength,
+    0,
+    1,
+  )
+  return Math.hypot(x - (startX + deltaX * amount), y - (startY + deltaY * amount))
+}
+
+function supportedStructuralPath(
+  width: number,
+  height: number,
+  activeMask: Uint8Array,
+  start: number,
+  end: number,
+  maximumBridgeCells = 2,
+  corridorScale = 0.4,
+  maximumDetourRatio = Number.POSITIVE_INFINITY,
+): readonly number[] | undefined {
+  if (start < 0 || end < 0 || start >= activeMask.length || end >= activeMask.length) return undefined
+  const startX = start % width
+  const startY = Math.floor(start / width)
+  const endX = end % width
+  const endY = Math.floor(end / width)
+  const span = Math.hypot(endX - startX, endY - startY)
+  const corridorRadius = Math.max(1, Math.ceil(span * corridorScale))
+  const offsets = [
+    [0, -1], [-1, 0], [1, 0], [0, 1],
+    [-1, -1], [1, -1], [-1, 1], [1, 1],
+  ] as const
+
+  for (let bridgeLimit = 0; bridgeLimit <= maximumBridgeCells; bridgeLimit += 1) {
+    const stateCount = activeMask.length * (bridgeLimit + 1)
+    const parent = new Int32Array(stateCount)
+    parent.fill(-2)
+    const queue = new Int32Array(stateCount)
+    let head = 0
+    let tail = 0
+    const startState = start * (bridgeLimit + 1)
+    parent[startState] = -1
+    queue[tail++] = startState
+    let endState = -1
+    while (head < tail && endState < 0) {
+      const state = queue[head++]!
+      const cell = Math.floor(state / (bridgeLimit + 1))
+      const bridges = state % (bridgeLimit + 1)
+      if (cell === end) {
+        endState = state
+        break
+      }
+      const x = cell % width
+      const y = Math.floor(cell / width)
+      for (const [offsetX, offsetY] of offsets) {
+        const nextX = x + offsetX
+        const nextY = y + offsetY
+        if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue
+        if (distanceToGridSegment(nextX, nextY, startX, startY, endX, endY) > corridorRadius) continue
+        const next = nextY * width + nextX
+        const occupied = activeMask[next] === 1
+        const nextBridges = bridges + Number(occupied === false)
+        if (nextBridges > bridgeLimit) continue
+        const nextState = next * (bridgeLimit + 1) + nextBridges
+        if (parent[nextState] !== -2) continue
+        parent[nextState] = state
+        queue[tail++] = nextState
+      }
+    }
+    if (endState < 0) continue
+    const path: number[] = []
+    for (let state = endState; state >= 0; state = parent[state] ?? -1) {
+      path.push(Math.floor(state / (bridgeLimit + 1)))
+    }
+    path.reverse()
+    if (path.length > Math.max(3, Math.ceil(span * maximumDetourRatio) + 1)) continue
+    return path
+  }
+  return undefined
+}
+
+function connectStructuralLandmarkPaths(
+  model: SourceShapeModel,
+  landmarks: readonly ImageLandmark[],
+  crop: CropRect,
+  fit: CanvasFit,
+  width: number,
+  height: number,
+  activeMask: Uint8Array,
+): { protectedCells: ReadonlySet<number>; edits: number } {
+  const protectedCells = new Set<number>()
+  let edits = 0
+  for (const byRole of structuralLandmarkGroupsByRole(landmarks)) {
+    for (const [fromRole, toRole] of petOccupancyPathEdges) {
+      const from = byRole.get(fromRole)
+      const to = byRole.get(toRole)
+      if (from === undefined || to === undefined) continue
+      if (structuralPathEndpointEligible(from) === false
+        || structuralPathEndpointEligible(to) === false) continue
+      const [fromX, fromY] = gridCellForSourcePoint(crop, fit, from.x, from.y)
+      const [toX, toY] = gridCellForSourcePoint(crop, fit, to.x, to.y)
+      const fromCell = fromY * width + fromX
+      const toCell = toY * width + toX
+      const inferred = landmarkObservationState(from) === 'inferred'
+        || landmarkObservationState(to) === 'inferred'
+      if (inferred && (maskSupportsCell(activeMask, width, height, fromCell, 1) === false
+        || maskSupportsCell(activeMask, width, height, toCell, 1) === false)) continue
+      const path = supportedStructuralPath(
+        width,
+        height,
+        activeMask,
+        fromCell,
+        toCell,
+        inferred ? 1 : 2,
+        inferred ? 0.25 : 0.4,
+        inferred ? 1.7 : Number.POSITIVE_INFINITY,
+      )
+      if (path === undefined) continue
+      const connectedPath: number[] = []
+      for (let index = 0; index < path.length; index += 1) {
+        const cell = path[index]!
+        const previous = path[index - 1]
+        if (previous !== undefined) {
+          const previousX = previous % width
+          const previousY = Math.floor(previous / width)
+          const x = cell % width
+          const y = Math.floor(cell / width)
+          if (previousX !== x && previousY !== y) connectedPath.push(previousY * width + x)
+        }
+        connectedPath.push(cell)
+      }
+      for (const cell of connectedPath) {
+        if (activeMask[cell] === 0) {
+          activeMask[cell] = 1
+          edits += 1
+        }
+        protectedCells.add(cell)
+      }
+    }
+  }
+  return { protectedCells, edits }
+}
+
+function trimProfileAccessory(
+  landmarks: readonly ImageLandmark[],
+  crop: CropRect,
+  fit: CanvasFit,
+  width: number,
+  height: number,
+  activeMask: Uint8Array,
+  protectedCells: Set<number>,
+  semanticProtectedCells: ReadonlySet<number>,
+): { edits: number; removedCells: readonly number[] } {
+  let edits = 0
+  const removedCells: number[] = []
+  for (const byRole of structuralLandmarkGroupsByRole(landmarks)) {
+    const eye = byRole.get('eye-center')
+    const nose = byRole.get('nose-tip')
+    const upperJaw = byRole.get('upper-jaw')
+    const lowerJaw = byRole.get('lower-jaw')
+    if (eye === undefined || nose === undefined || upperJaw === undefined || lowerJaw === undefined) continue
+    const [eyeX] = gridCellForSourcePoint(crop, fit, eye.x, eye.y)
+    const [noseX] = gridCellForSourcePoint(crop, fit, nose.x, nose.y)
+    const [, upperY] = gridCellForSourcePoint(crop, fit, upperJaw.x, upperJaw.y)
+    const [, lowerY] = gridCellForSourcePoint(crop, fit, lowerJaw.x, lowerJaw.y)
+    const direction = noseX >= eyeX ? 1 : -1
+    const minimumY = Math.max(0, Math.min(upperY, lowerY) - 1)
+    const maximumY = Math.min(height - 1, Math.max(upperY, lowerY) + 1)
+    const maximumRun = Math.max(2, Math.abs(noseX - eyeX) + 1)
+    for (let y = minimumY; y <= maximumY; y += 1) {
+      for (let step = 1; step <= maximumRun; step += 1) {
+        const x = noseX + direction * step
+        if (x < 0 || x >= width) break
+        const cell = y * width + x
+        if (activeMask[cell] !== 1 || semanticProtectedCells.has(cell)) continue
+        activeMask[cell] = 0
+        protectedCells.delete(cell)
+        removedCells.push(cell)
+        edits += 1
+      }
+    }
+  }
+  return { edits, removedCells }
 }
 
 export function rasterizeSourceShape(
@@ -968,15 +1277,68 @@ export function rasterizeSourceShape(
     if (coverage[strongest]! > 0) activeMask[strongest] = 1
   }
 
+  const topologyReference = projectTopologyReference({
+    model,
+    crop,
+    fit,
+    width,
+    height,
+    areaMask: activeMask,
+  })
+  const topologyReferenceMask = topologyReference.mask
+  const referenceTopology = labelComponents(
+    topologyReferenceMask,
+    width,
+    height,
+    surroundingOffsets,
+  )
+  const referenceHoles = countHolesWithConnectivity(
+    topologyReferenceMask,
+    width,
+    height,
+    orthogonalOffsets,
+  )
   const thinProjection = options.preserveThinStructures === true
-    ? projectThinStructures(model, crop, fit, width, height, activeMask)
-    : { protectedCells: new Set<number>(), edits: 0 }
-  const referenceMask = activeMask.slice()
-  const referenceTopology = labelComponents(referenceMask, width, height)
-  const referenceHoles = countHoles(referenceMask, width, height)
+    ? projectThinStructures(
+      model,
+      crop,
+      fit,
+      width,
+      height,
+      activeMask,
+      topologyReferenceMask,
+    )
+    : {
+      protectedCells: new Set<number>(),
+      bridgeCells: new Set<number>(),
+      bridgeEndpointCells: new Set<number>(),
+      fragileBridgeCells: new Set<number>(),
+      craftComponentsBeforeBridging: labelComponents(activeMask, width, height).components.length,
+      craftComponentsAfterBridging: labelComponents(activeMask, width, height).components.length,
+      rejectedOrthogonalLinks: 0,
+      orthogonalBridgeReuseCount: 0,
+      orthogonalBridgeSimplePointRejections: 0,
+      orthogonalBridgeTopologyRejections: 0,
+      orthogonalBridgeHoleRejections: 0,
+      orthogonalBridgeOwnerRejections: 0,
+      craftHolesBeforeBridging: 0,
+      craftHolesAfterBridging: 0,
+      edits: 0,
+    }
   const projectedSdf = projectSignedDistance(model, crop, fit, width, height)
-  const contourAnchors = tracedContourAnchors(model, crop, fit, width, height, activeMask)
+  const contourAnchors = new Set(
+    tracedContourAnchors(model, crop, fit, width, height, activeMask),
+  )
   const allocation = allocateLandmarks(
+    landmarks,
+    crop,
+    fit,
+    width,
+    height,
+    activeMask,
+  )
+  const structuralPaths = connectStructuralLandmarkPaths(
+    model,
     landmarks,
     crop,
     fit,
@@ -988,8 +1350,14 @@ export function rasterizeSourceShape(
     ...thinProjection.protectedCells,
     ...(options.preserveThinStructures === true ? contourAnchors : []),
     ...allocation.protectedCells,
+    ...structuralPaths.protectedCells,
   ])
-  let shapeEdits = allocation.edits + thinProjection.edits
+  const trimProtectedCells = new Set([
+    ...allocation.protectedCells,
+    ...thinProjection.bridgeCells,
+    ...thinProjection.bridgeEndpointCells,
+  ])
+  let shapeEdits = allocation.edits + thinProjection.edits + structuralPaths.edits
   const energy = optimizeBoundaryEnergy(
     activeMask,
     coverage,
@@ -1003,8 +1371,50 @@ export function rasterizeSourceShape(
     Math.max(0, Math.floor(options.refinementIterations ?? 2)),
   )
   shapeEdits += energy.edits
+  const accessoryTrim = trimProfileAccessory(
+    landmarks,
+    crop,
+    fit,
+    width,
+    height,
+    activeMask,
+    protectedCells,
+    trimProtectedCells,
+  )
+  shapeEdits += accessoryTrim.edits
+  for (const cell of accessoryTrim.removedCells) contourAnchors.delete(cell)
+
+  const normalizedTopologyReference = topologyReferenceMask.slice()
+  trimProfileAccessory(
+    landmarks,
+    crop,
+    fit,
+    width,
+    height,
+    normalizedTopologyReference,
+    new Set<number>(),
+    trimProtectedCells,
+  )
+  const topology = evaluateTopologyAgreement({
+    referenceMask: { width, height, values: normalizedTopologyReference },
+    candidateMask: { width, height, values: activeMask },
+  })
 
   const target = labelComponents(activeMask, width, height)
+  const finalCraftComponents = labelComponents(
+    activeMask,
+    width,
+    height,
+    orthogonalOffsets,
+  ).components.length
+  const retainedBridgeCells = [...thinProjection.bridgeCells]
+    .filter((cell) => activeMask[cell] === 1)
+  const retainedFragileBridgeCells = fragileOrthogonalCells(
+    activeMask,
+    width,
+    height,
+    retainedBridgeCells,
+  )
   const boundaryBand = dilate(boundaryMask(activeMask, width, height), width, height)
   const occupied = activeMask.reduce((sum, value) => sum + value, 0)
   return {
@@ -1021,11 +1431,39 @@ export function rasterizeSourceShape(
       referenceComponents: referenceTopology.components.length,
       targetComponents: target.components.length,
       referenceHoles,
-      targetHoles: countHoles(activeMask, width, height),
+      targetHoles: countHolesWithConnectivity(activeMask, width, height, orthogonalOffsets),
       boundaryIoU: sdfBoundaryIoU(activeMask, projectedSdf, width, height),
       coverageIoU: coverageIoU(coverage, activeMask),
+      topologyCenterlinePrecision: topology.centerlinePrecision,
+      topologyCenterlineRecall: topology.centerlineRecall,
+      topologyClDice: topology.clDice,
+      topologyWeightedCenterlinePrecision: topology.weightedCenterlinePrecision,
+      topologyWeightedCenterlineRecall: topology.weightedCenterlineRecall,
+      topologyWeightedClDice: topology.weightedClDice,
+      topologyEndpointPrecision: topology.endpointPrecision,
+      topologyEndpointRecall: topology.endpointRecall,
+      topologyEndpointF1: topology.endpointF1,
+      topologyJunctionPrecision: topology.junctionPrecision,
+      topologyJunctionRecall: topology.junctionRecall,
+      topologyJunctionF1: topology.junctionF1,
+      topologyBranchCountAgreement: topology.branchCountAgreement,
+      topologyCycleCountAgreement: topology.cycleCountAgreement,
+      topologyComponentCountAgreement: topology.componentCountAgreement,
+      topologyScore: scoreTopologyAgreement(topology),
       meanBoundaryDistance: sdfMeanBoundaryDistance(activeMask, projectedSdf, width, height),
       occupancyRatio: occupied / Math.max(1, fit.width * fit.height),
+      orthogonalBridgeCells: retainedBridgeCells.length,
+      fragileOrthogonalBridgeCells: retainedFragileBridgeCells.length,
+      craftComponentsBeforeBridging: thinProjection.craftComponentsBeforeBridging,
+      craftComponentsAfterBridging: finalCraftComponents,
+      rejectedOrthogonalLinks: thinProjection.rejectedOrthogonalLinks,
+      orthogonalBridgeReuseCount: thinProjection.orthogonalBridgeReuseCount,
+      orthogonalBridgeSimplePointRejections: thinProjection.orthogonalBridgeSimplePointRejections,
+      orthogonalBridgeTopologyRejections: thinProjection.orthogonalBridgeTopologyRejections,
+      orthogonalBridgeHoleRejections: thinProjection.orthogonalBridgeHoleRejections,
+      orthogonalBridgeOwnerRejections: thinProjection.orthogonalBridgeOwnerRejections,
+      craftHolesBeforeBridging: thinProjection.craftHolesBeforeBridging,
+      craftHolesAfterBridging: thinProjection.craftHolesAfterBridging,
       shapeEdits,
       energyBefore: energy.before,
       energyAfter: energy.after,

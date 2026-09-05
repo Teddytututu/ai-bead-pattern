@@ -209,6 +209,58 @@ describe('feature planning pipeline integration', () => {
     ])
   })
 
+  it('prefers an explicitly referenced instance region over an overlapping aggregate region', async () => {
+    const source = portrait()
+    const subjectValues = new Float32Array(source.width * source.height).fill(1)
+    const faceValues = new Float32Array(source.width * source.height).fill(0)
+    for (let y = 2; y <= 12; y += 1) {
+      for (let x = 2; x <= 13; x += 1) faceValues[y * source.width + x] = 1
+    }
+    const result = await createPatternAlgorithm().generate({
+      image: source,
+      palette,
+      analysis: {
+        imageType: 'pet',
+        subjectMask: { width: source.width, height: source.height, values: subjectValues },
+        semanticRegions: [
+          {
+            id: 'pet-face',
+            label: 'pet faces',
+            mask: { width: source.width, height: source.height, values: faceValues },
+            confidence: 0.8,
+          },
+          {
+            id: 'pet-01:pet-face',
+            label: 'pet face',
+            mask: { width: source.width, height: source.height, values: faceValues },
+            confidence: 0.8,
+          },
+        ],
+        landmarks: [
+          { id: 'pet-01:left-eye-center', kind: 'eye', x: 5, y: 6, confidence: 1, priority: 'hard', symmetryGroup: 'pet-01:eyes', carrierRegionId: 'pet-01:pet-face' },
+          { id: 'pet-01:right-eye-center', kind: 'eye', x: 11, y: 6, confidence: 1, priority: 'hard', symmetryGroup: 'pet-01:eyes', carrierRegionId: 'pet-01:pet-face' },
+          { id: 'pet-01:nose-tip', kind: 'nose', x: 8, y: 9, confidence: 1, priority: 'hard', carrierRegionId: 'pet-01:pet-face' },
+        ],
+      },
+      options: {
+        canvas: { mode: 'fixed', size: { width: 16, height: 16 } },
+        structure: { occupancyMode: 'full-frame' },
+        optimization: { refinementMode: 'quality' },
+        maxColors: 3,
+        maxCandidates: 1,
+        styles: ['simple'],
+      },
+    })
+
+    const generated = candidate(result)
+    assert.deepEqual(generated.featurePlacements?.map((entry) => entry.featureId), [
+      'pet-01:left-eye-center',
+      'pet-01:nose-tip',
+      'pet-01:right-eye-center',
+    ])
+    assert.equal(generated.metrics.hardFeatureCompleteness, 1)
+  })
+
   it('keeps structural geometry active without flattening ordinary uploads into semantic color roles', async () => {
     const source = portrait()
     const subjectValues = new Float32Array(source.width * source.height).fill(1)

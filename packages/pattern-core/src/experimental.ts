@@ -26,6 +26,15 @@ export {
   rasterizeSourceShape,
   shapeRasterizationThreshold,
 } from './shape.js'
+export { buildMedialGraph, medialGraphSchema } from './medial-graph.js'
+export type {
+  MedialEndpointRoleHit,
+  MedialGraph,
+  MedialGraphBranch,
+  MedialGraphNode,
+  MedialGraphNodeKind,
+  MedialGraphOptions,
+} from './medial-graph.js'
 export { planCanvases } from './planning/canvas-planner.js'
 export type { CanvasPlanningInput } from './planning/canvas-planner.js'
 export {
@@ -62,6 +71,12 @@ export type {
 export { buildStructurePlan } from './planning/structure-planner.js'
 export type { StructurePlanningInput } from './planning/structure-planner.js'
 export { buildValuePlan } from './planning/value-planner.js'
+export { outlinePlannerSchema, planContrastAwareOutline } from './planning/outline-planner.js'
+export type {
+  OutlinePlanningDiagnostics,
+  OutlinePlanningInput,
+  OutlinePlanningResult,
+} from './planning/outline-planner.js'
 export type {
   MaterialValueKind,
   SemanticGapDiagnostic,

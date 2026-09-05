@@ -12,6 +12,16 @@ import type {
 } from './types.js'
 import type { ResolvedFeaturePlacement } from './planning/feature-placement.js'
 
+export const gridRefinementSchema = Object.freeze({
+  id: 'semantic-rag-branch-refinement-v2',
+  sources: Object.freeze([
+    'scikit-image/scikit-image@ee0a7a3ebd9ac8c2602f40e55bc015a3c8a81ae8',
+    'jni/skan@94ec591f4a2763795b84141d6a85cb6fd0ab6b2a',
+    'e-koch/FilFinder@bbb06edc167d177f61fccf600fb812fdf904ddb6',
+  ]),
+  licenses: Object.freeze(['BSD-3-Clause', 'BSD-3-Clause', 'MIT']),
+})
+
 export interface GridRefinementInput {
   colorIds: readonly string[]
   width: number
@@ -44,6 +54,9 @@ const surroundingClockwise = [
   [1, 1], [0, 1], [-1, 1], [-1, 0],
 ] as const
 const clusterArcWeight = 2.5
+const strongSemanticBoundary = 0.85
+const weakMergeBoundary = 0.65
+const weakBranchImportance = 0.45
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
@@ -121,6 +134,236 @@ function dataEnergy(
     * (0.65 + clamp(input.importance[cell] ?? 0, 0, 2) * 0.7)
 }
 
+function expandedProtectedCells(input: GridRefinementInput): ReadonlySet<number> {
+  const cells = new Set(input.protectedCells)
+  for (const placement of input.featurePlacements) {
+    for (const cell of placement.occupiedCells) cells.add(cell)
+  }
+  for (let cell = 0; cell < input.activeMask.length; cell += 1) {
+    if (input.activeMask[cell] === 1
+      && input.boundaryStrength[cell]! >= strongSemanticBoundary
+      && input.importance[cell]! >= 0.3) {
+      cells.add(cell)
+    }
+  }
+  return cells
+}
+
+function sameColorNeighbors(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+  cell: number,
+): number[] {
+  const x = cell % input.width
+  const y = Math.floor(cell / input.width)
+  const colorId = colorIds[cell]
+  const neighbors: number[] = []
+  for (const [offsetX, offsetY] of orthogonal) {
+    const nextX = x + offsetX
+    const nextY = y + offsetY
+    if (isActive(input, nextX, nextY) === false) continue
+    const next = cellIndex(nextX, nextY, input.width)
+    if (colorIds[next] === colorId) neighbors.push(next)
+  }
+  return neighbors.sort((first, second) => first - second)
+}
+
+function colorComponents(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+): number[][] {
+  const visited = new Uint8Array(colorIds.length)
+  const components: number[][] = []
+  for (let start = 0; start < colorIds.length; start += 1) {
+    if (input.activeMask[start] !== 1 || visited[start] === 1) continue
+    const queue = [start]
+    visited[start] = 1
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const cell = queue[cursor]!
+      for (const next of sameColorNeighbors(input, colorIds, cell)) {
+        if (visited[next] === 1) continue
+        visited[next] = 1
+        queue.push(next)
+      }
+    }
+    components.push(queue.sort((first, second) => first - second))
+  }
+  return components
+}
+
+function shortestPaths(
+  start: number,
+  component: ReadonlySet<number>,
+  adjacency: ReadonlyMap<number, readonly number[]>,
+): { distances: Map<number, number>; previous: Map<number, number> } {
+  const distances = new Map<number, number>([[start, 0]])
+  const previous = new Map<number, number>()
+  const queue = [start]
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const cell = queue[cursor]!
+    for (const next of adjacency.get(cell) ?? []) {
+      if (component.has(next) === false || distances.has(next)) continue
+      distances.set(next, distances.get(cell)! + 1)
+      previous.set(next, cell)
+      queue.push(next)
+    }
+  }
+  return { distances, previous }
+}
+
+function longestShortestPath(
+  componentCells: readonly number[],
+  adjacency: ReadonlyMap<number, readonly number[]>,
+): readonly number[] {
+  const endpoints = componentCells.filter((cell) => (adjacency.get(cell)?.length ?? 0) <= 1)
+    .sort((first, second) => first - second)
+  if (endpoints.length < 2) return []
+  const component = new Set(componentCells)
+  if (endpoints.length > 64) {
+    const firstDistances = shortestPaths(endpoints[0]!, component, adjacency).distances
+    const firstEnd = [...endpoints].sort((first, second) =>
+      (firstDistances.get(second) ?? -1) - (firstDistances.get(first) ?? -1)
+      || first - second)[0]!
+    const secondSearch = shortestPaths(firstEnd, component, adjacency)
+    const secondEnd = [...endpoints].sort((first, second) =>
+      (secondSearch.distances.get(second) ?? -1) - (secondSearch.distances.get(first) ?? -1)
+      || first - second)[0]!
+    const reversed = [secondEnd]
+    while (reversed.at(-1) !== firstEnd) {
+      const next = secondSearch.previous.get(reversed.at(-1)!)
+      if (next === undefined) return []
+      reversed.push(next)
+    }
+    return reversed.reverse()
+  }
+  let bestStart = endpoints[0]!
+  let bestEnd = endpoints[1]!
+  let bestDistance = -1
+  for (let startIndex = 0; startIndex < endpoints.length; startIndex += 1) {
+    const start = endpoints[startIndex]!
+    const { distances } = shortestPaths(start, component, adjacency)
+    for (let endIndex = startIndex + 1; endIndex < endpoints.length; endIndex += 1) {
+      const end = endpoints[endIndex]!
+      const distance = distances.get(end) ?? -1
+      if (distance > bestDistance
+        || (distance === bestDistance && (start < bestStart || (start === bestStart && end < bestEnd)))) {
+        bestDistance = distance
+        bestStart = start
+        bestEnd = end
+      }
+    }
+  }
+  const { previous } = shortestPaths(bestStart, component, adjacency)
+  const reversed = [bestEnd]
+  while (reversed.at(-1) !== bestStart) {
+    const next = previous.get(reversed.at(-1)!)
+    if (next === undefined) return []
+    reversed.push(next)
+  }
+  return reversed.reverse()
+}
+
+function semanticAnchorPath(
+  componentCells: readonly number[],
+  adjacency: ReadonlyMap<number, readonly number[]>,
+  semanticEndpointCells: ReadonlySet<number>,
+): readonly number[] {
+  const component = new Set(componentCells)
+  const anchors = componentCells.filter((cell) => semanticEndpointCells.has(cell))
+  if (anchors.length < 2) return []
+  let bestStart = anchors[0]!
+  let bestEnd = anchors[1]!
+  let bestDistance = -1
+  for (let startIndex = 0; startIndex < anchors.length; startIndex += 1) {
+    const start = anchors[startIndex]!
+    const { distances } = shortestPaths(start, component, adjacency)
+    for (let endIndex = startIndex + 1; endIndex < anchors.length; endIndex += 1) {
+      const end = anchors[endIndex]!
+      const distance = distances.get(end) ?? -1
+      if (distance > bestDistance
+        || (distance === bestDistance && (start < bestStart || (start === bestStart && end < bestEnd)))) {
+        bestDistance = distance
+        bestStart = start
+        bestEnd = end
+      }
+    }
+  }
+  if (bestDistance < 0) return []
+  const { previous } = shortestPaths(bestStart, component, adjacency)
+  const reversed = [bestEnd]
+  while (reversed.at(-1) !== bestStart) {
+    const next = previous.get(reversed.at(-1)!)
+    if (next === undefined) return []
+    reversed.push(next)
+  }
+  return reversed.reverse()
+}
+
+interface ColorTopologyGuidance {
+  protectedMainPathCells: ReadonlySet<number>
+  weakBranches: readonly (readonly number[])[]
+}
+
+function colorTopologyGuidance(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+  baseProtectedCells: ReadonlySet<number>,
+): ColorTopologyGuidance {
+  const protectedMainPathCells = new Set<number>()
+  const weakBranches: number[][] = []
+  const semanticEndpointCells = new Set(input.featurePlacements.flatMap((placement) =>
+    placement.roles
+      .filter(({ role }) => role === 'endpoint-dark')
+      .map(({ cell }) => cell)))
+  const maximumWeakBranchLength = Math.max(
+    1,
+    Math.min(4, Math.round(Math.min(input.width, input.height) / 16)),
+  )
+  for (const componentCells of colorComponents(input, colorIds)) {
+    if (componentCells.length < 3) continue
+    const adjacency = new Map(componentCells.map((cell) => [
+      cell,
+      sameColorNeighbors(input, colorIds, cell),
+    ]))
+    const anchoredPath = semanticAnchorPath(componentCells, adjacency, semanticEndpointCells)
+    const mainPath = anchoredPath.length >= 2
+      ? anchoredPath
+      : longestShortestPath(componentCells, adjacency)
+    if (mainPath.length < 2) continue
+    const mainPathSet = new Set(mainPath)
+    if (anchoredPath.length >= 2) {
+      for (const cell of anchoredPath) protectedMainPathCells.add(cell)
+    }
+    const endpoints = componentCells.filter((cell) => (adjacency.get(cell)?.length ?? 0) <= 1)
+      .sort((first, second) => first - second)
+    for (const endpoint of endpoints) {
+      if (mainPathSet.has(endpoint)) continue
+      const branch = [endpoint]
+      let previous = -1
+      let current = endpoint
+      let joinsMainPath = false
+      while (branch.length <= maximumWeakBranchLength) {
+        const nextCells = (adjacency.get(current) ?? []).filter((cell) => cell !== previous)
+        if (nextCells.length !== 1) break
+        const next = nextCells[0]!
+        if (mainPathSet.has(next)) {
+          joinsMainPath = true
+          break
+        }
+        branch.push(next)
+        previous = current
+        current = next
+      }
+      if (joinsMainPath === false || branch.length > maximumWeakBranchLength) continue
+      const weakEvidence = branch.every((cell) => baseProtectedCells.has(cell) === false
+        && input.importance[cell]! < weakBranchImportance
+        && input.boundaryStrength[cell]! < strongSemanticBoundary)
+      if (weakEvidence) weakBranches.push(branch)
+    }
+  }
+  return { protectedMainPathCells, weakBranches }
+}
+
 function colorIdAt(
   colorIds: readonly string[],
   cell: number,
@@ -164,6 +407,42 @@ function neighborArcPenalty(
   return Math.max(0, transitions - 2)
 }
 
+function isProtectedDiagonalTransition(
+  input: GridRefinementInput,
+  cells: readonly number[],
+  values: readonly string[],
+): boolean {
+  if (values[0] !== values[3] || values[1] !== values[2] || values[0] === values[1]) return false
+  const firstDiagonalProtected = input.protectedCells.has(cells[0]!)
+    && input.protectedCells.has(cells[3]!)
+  const secondDiagonalProtected = input.protectedCells.has(cells[1]!)
+    && input.protectedCells.has(cells[2]!)
+  return firstDiagonalProtected || secondDiagonalProtected
+}
+
+function belongsToProtectedDiagonalTransition(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+  cell: number,
+): boolean {
+  const x = cell % input.width
+  const y = Math.floor(cell / input.width)
+  for (let top = Math.max(0, y - 1); top <= Math.min(y, input.height - 2); top += 1) {
+    for (let left = Math.max(0, x - 1); left <= Math.min(x, input.width - 2); left += 1) {
+      const cells = [
+        cellIndex(left, top, input.width),
+        cellIndex(left + 1, top, input.width),
+        cellIndex(left, top + 1, input.width),
+        cellIndex(left + 1, top + 1, input.width),
+      ]
+      if (cells.some((entry) => input.activeMask[entry] !== 1)) continue
+      const values = cells.map((entry) => colorIds[entry]!)
+      if (isProtectedDiagonalTransition(input, cells, values)) return true
+    }
+  }
+  return false
+}
+
 function gridClusterDiagnostics(
   input: GridRefinementInput,
   colorIds: readonly string[],
@@ -174,6 +453,7 @@ function gridClusterDiagnostics(
   let colorSwitches = 0
   let localNoiseCells = 0
   let ditherPatterns = 0
+  let protectedDiagonalTransitions = 0
   for (let cell = 0; cell < colorIds.length; cell += 1) {
     if (input.activeMask[cell] !== 1) continue
     fragmentedArcSegments += neighborArcPenalty(input, colorIds, cell, cell, colorIds[cell]!)
@@ -215,7 +495,8 @@ function gridClusterDiagnostics(
       if (cells.some((cell) => input.activeMask[cell] !== 1)) continue
       const values = cells.map((cell) => colorIds[cell]!)
       if (values[0] === values[3] && values[1] === values[2] && values[0] !== values[1]) {
-        ditherPatterns += 1
+        if (isProtectedDiagonalTransition(input, cells, values)) protectedDiagonalTransitions += 1
+        else ditherPatterns += 1
       }
     }
   }
@@ -252,6 +533,7 @@ function gridClusterDiagnostics(
     colorSwitches,
     localNoiseCells,
     ditherPatterns,
+    protectedDiagonalTransitions,
   }
 }
 
@@ -367,7 +649,9 @@ function localEnergy(
       if (cells.some((entry) => input.activeMask[entry] !== 1)) continue
       const values = cells.map((entry) => entry === cell ? candidateId : colorIds[entry]!)
       if (values[0] === values[3] && values[1] === values[2] && values[0] !== values[1]) {
-        energy += input.mode === 'quality' ? 7 + ditherPressure * 12 : 3
+        if (isProtectedDiagonalTransition(input, cells, values) === false) {
+          energy += input.mode === 'quality' ? 7 + ditherPressure * 12 : 3
+        }
       }
     }
   }
@@ -427,7 +711,9 @@ function totalEnergy(
       if (cells.some((cell) => input.activeMask[cell] !== 1)) continue
       const values = cells.map((cell) => colorIds[cell]!)
       if (values[0] === values[3] && values[1] === values[2] && values[0] !== values[1]) {
-        energy += input.mode === 'quality' ? 7 : 3
+        if (isProtectedDiagonalTransition(input, cells, values) === false) {
+          energy += input.mode === 'quality' ? 7 : 3
+        }
       }
     }
   }
@@ -439,6 +725,103 @@ function totalEnergy(
     + violations.colorSwitches * 1.5
     + violations.localNoiseCells * 5
   return energy
+}
+
+interface GroupMergeEdit {
+  cells: readonly number[]
+  colorId: string
+  energy: number
+  defectCost: number
+}
+
+function weakBoundaryBetween(input: GridRefinementInput, first: number, second: number): boolean {
+  return Math.max(input.boundaryStrength[first]!, input.boundaryStrength[second]!) < weakMergeBoundary
+}
+
+function mergeTargetColors(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+  group: readonly number[],
+): readonly string[] {
+  const groupSet = new Set(group)
+  const currentId = colorIds[group[0]!]
+  const sharedBoundary = new Map<string, number>()
+  for (const cell of group) {
+    const x = cell % input.width
+    const y = Math.floor(cell / input.width)
+    for (const [offsetX, offsetY] of orthogonal) {
+      const nextX = x + offsetX
+      const nextY = y + offsetY
+      if (isActive(input, nextX, nextY) === false) continue
+      const next = cellIndex(nextX, nextY, input.width)
+      const nextId = colorIds[next]!
+      if (groupSet.has(next) || nextId === currentId || weakBoundaryBetween(input, cell, next) === false) continue
+      sharedBoundary.set(nextId, (sharedBoundary.get(nextId) ?? 0) + 1)
+    }
+  }
+  return [...sharedBoundary].sort((first, second) => second[1] - first[1]
+    || first[0].localeCompare(second[0])).map(([colorId]) => colorId)
+}
+
+function ragMergeGroups(
+  input: GridRefinementInput,
+  colorIds: readonly string[],
+  weakBranches: readonly (readonly number[])[],
+): readonly (readonly number[])[] {
+  const groups = colorComponents(input, colorIds)
+    .filter((component) => component.length <= 2)
+    .filter((component) => component.every((cell) => input.protectedCells.has(cell) === false
+      && input.importance[cell]! < 0.75
+      && input.boundaryStrength[cell]! < strongSemanticBoundary))
+  for (const branch of weakBranches) {
+    const currentId = colorIds[branch[0]!]
+    if (currentId === undefined || branch.some((cell) => colorIds[cell] !== currentId
+      || input.protectedCells.has(cell))) continue
+    groups.push([...branch])
+  }
+  const unique = new Map(groups.map((group) => [
+    [...group].sort((first, second) => first - second).join(':'),
+    [...group].sort((first, second) => first - second),
+  ]))
+  return [...unique.values()].sort((first, second) => first.length - second.length
+    || first[0]! - second[0]!)
+}
+
+function bestRagGroupMerge(
+  input: GridRefinementInput,
+  colorIds: string[],
+  colorsById: ReadonlyMap<string, PreparedColor>,
+  axis: number | undefined,
+  weakBranches: readonly (readonly number[])[],
+  acceptedEnergy: number,
+  acceptedDefectCost: number,
+): GroupMergeEdit | undefined {
+  let best: GroupMergeEdit | undefined
+  for (const group of ragMergeGroups(input, colorIds, weakBranches)) {
+    const originalIds = group.map((cell) => colorIds[cell]!)
+    if (new Set(originalIds).size !== 1) continue
+    for (const candidateId of mergeTargetColors(input, colorIds, group)) {
+      for (const cell of group) colorIds[cell] = candidateId
+      const diagnostics = gridClusterDiagnostics(input, colorIds)
+      const defectCost = visibleClusterDefectCost(diagnostics)
+      if (defectCost < acceptedDefectCost) {
+        const energy = totalEnergy(input, colorIds, colorsById, axis)
+        if (energy <= acceptedEnergy + 1e-6
+          && (best === undefined
+            || defectCost < best.defectCost
+            || (defectCost === best.defectCost && energy < best.energy - 1e-6)
+            || (defectCost === best.defectCost && Math.abs(energy - best.energy) <= 1e-6
+              && (group[0]! < best.cells[0]!
+                || (group[0] === best.cells[0] && candidateId.localeCompare(best.colorId) < 0))))) {
+          best = { cells: [...group], colorId: candidateId, energy, defectCost }
+        }
+      }
+      for (let index = 0; index < group.length; index += 1) {
+        colorIds[group[index]!] = originalIds[index]!
+      }
+    }
+  }
+  return best
 }
 
 function candidateColors(
@@ -499,7 +882,9 @@ function defectCellSeverity(
   cell: number,
   smallCells: ReadonlySet<number>,
 ): number {
-  if (input.activeMask[cell] !== 1 || input.protectedCells.has(cell)) return 0
+  if (input.activeMask[cell] !== 1
+    || input.protectedCells.has(cell)
+    || belongsToProtectedDiagonalTransition(input, colorIds, cell)) return 0
   const x = cell % input.width
   const y = Math.floor(cell / input.width)
   let support = 0
@@ -575,7 +960,25 @@ function bestSingleDefectEdit(
   return best
 }
 
-export function refineGridClusters(input: GridRefinementInput): GridRefinementResult {
+export function refineGridClusters(rawInput: GridRefinementInput): GridRefinementResult {
+  validateInput(rawInput)
+  const baseProtectedCells = expandedProtectedCells(rawInput)
+  const topologyInput: GridRefinementInput = {
+    ...rawInput,
+    protectedCells: baseProtectedCells,
+  }
+  const topologyGuidance = colorTopologyGuidance(
+    topologyInput,
+    rawInput.colorIds,
+    baseProtectedCells,
+  )
+  const input: GridRefinementInput = {
+    ...rawInput,
+    protectedCells: new Set([
+      ...baseProtectedCells,
+      ...topologyGuidance.protectedMainPathCells,
+    ]),
+  }
   validateInput(input)
   const preparedColors = prepareColors(input.colors)
   const colorsById = new Map(preparedColors.map((color) => [color.id, color]))
@@ -588,6 +991,24 @@ export function refineGridClusters(input: GridRefinementInput): GridRefinementRe
   let acceptedEnergy = energyBefore
   let acceptedDefectCost = visibleClusterDefectCost(diagnosticsBefore)
   let completedIterations = 0
+  if (input.mode === 'quality') {
+    for (let step = 0; step < 8; step += 1) {
+      const edit = bestRagGroupMerge(
+        input,
+        colorIds,
+        colorsById,
+        axis,
+        topologyGuidance.weakBranches,
+        acceptedEnergy,
+        acceptedDefectCost,
+      )
+      if (edit === undefined) break
+      for (const cell of edit.cells) colorIds[cell] = edit.colorId
+      acceptedEnergy = edit.energy
+      acceptedDefectCost = edit.defectCost
+      completedIterations += 1
+    }
+  }
   const maximumIterations = input.mode === 'quality' ? 4 : 1
   for (let iteration = 0; iteration < maximumIterations; iteration += 1) {
     const snapshot = [...colorIds]
@@ -595,7 +1016,9 @@ export function refineGridClusters(input: GridRefinementInput): GridRefinementRe
     if (iteration % 2 === 1) order.reverse()
     let changes = 0
     for (const cell of order) {
-      if (input.activeMask[cell] !== 1 || input.protectedCells.has(cell)) continue
+      if (input.activeMask[cell] !== 1
+        || input.protectedCells.has(cell)
+        || belongsToProtectedDiagonalTransition(input, colorIds, cell)) continue
       const currentId = colorIds[cell]!
       let bestId = currentId
       let bestEnergy = localEnergy(input, colorIds, colorsById, cell, currentId, axis)
