@@ -159,7 +159,9 @@ export class DeterministicPatternAlgorithm {
           }, generationId, this.version, this.#clock))
           // Give the runtime a collection point between heavyweight candidate
           // passes so large uploads keep a bounded live heap.
-          await new Promise<void>((resolve) => setImmediate(resolve))
+          // Yield through a browser-compatible timer. `setImmediate` exists in
+          // Node, while the same pipeline also runs directly in the demo page.
+          await new Promise<void>((resolve) => setTimeout(resolve, 0))
         }
       }
     }
