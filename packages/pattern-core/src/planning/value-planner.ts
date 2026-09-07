@@ -340,11 +340,11 @@ function valueGroups(input: ValuePlanningInput): readonly ValueGroup[] {
   for (const region of input.structurePlan.regions) {
     const cells = region.cellIndices.filter((cell) => input.activeMask[cell] === 1)
     if (cells.length === 0) continue
-    const meanA = cells.reduce((sum, cell) => sum + input.pixelLabs[cell]![1], 0) / cells.length
-    const meanB = cells.reduce((sum, cell) => sum + input.pixelLabs[cell]![2], 0) / cells.length
-    const chromaFamily = `${Math.floor((meanA + 128) / 32)}:${Math.floor((meanB + 128) / 32)}`
     const sourceRegionId = region.sourceRegionId ?? region.label ?? `region-${region.id}`
-    const key = `${sourceRegionId}|${chromaFamily}`
+    // A semantic material keeps one hue family across its light, base, and
+    // shadow roles. Splitting on local chroma turns one fur or skin region
+    // into unrelated color islands after quantization.
+    const key = `${sourceRegionId}|material`
     const current = grouped.get(key) ?? {
       cells: [],
       weightedImportance: 0,

@@ -164,6 +164,10 @@ export function searchFeaturePlacements(
           Math.hypot(shiftX, shiftY) / Math.max(1, input.budget.allowedShiftCells * Math.SQRT2),
         )
         const compactnessScore = template.cells.length / (template.width * template.height)
+        const expressiveEyeBonus = kind === 'eye'
+          && template.cells.some((cell) => cell.role === 'eye-highlight')
+          ? 0.08
+          : 0
         const placement: ResolvedFeaturePlacement = {
           featureId: input.landmark.id,
           kind,
@@ -173,7 +177,8 @@ export function searchFeaturePlacements(
           roles: roles.map((entry) => ({ cell: entry.cell, role: entry.role }))
             .sort((first, second) => first.cell - second.cell),
           shift: [shiftX, shiftY],
-          score: clamp(positionScore * 0.55 + budgetScore * 0.3 + compactnessScore * 0.15),
+          score: clamp(positionScore * 0.55 + budgetScore * 0.3
+            + compactnessScore * 0.15 + expressiveEyeBonus),
         }
         validateResolvedFeaturePlacement(placement, input.canvasPlan.size)
         placements.push(placement)
@@ -182,6 +187,8 @@ export function searchFeaturePlacements(
   }
   return [...placements].sort((first, second) =>
     second.score - first.score
+      || Number(second.roles.some((entry) => entry.role === 'eye-highlight'))
+        - Number(first.roles.some((entry) => entry.role === 'eye-highlight'))
       || first.templateId.localeCompare(second.templateId)
       || first.occupiedCells.join(',').localeCompare(second.occupiedCells.join(',')))
     .slice(0, maximumCandidates)

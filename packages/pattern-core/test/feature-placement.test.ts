@@ -38,7 +38,7 @@ const eyeBudget: FeatureBudget = {
   kind: 'eye',
   hard: true,
   minimumCells: 1,
-  preferredCells: 2,
+  preferredCells: 4,
   maximumCells: 4,
   allocatedCells: 4,
   feasible: true,
@@ -78,6 +78,17 @@ describe('feature placement search', () => {
     assert.ok(placements.length > 0)
     assert.deepEqual(placements[0]?.center, [24, 24])
     assert.doesNotThrow(() => validateResolvedFeaturePlacement(placements[0]!, canvasPlan().size))
+  })
+
+  it('prefers an expressive highlighted eye when four cells are available', () => {
+    const placements = searchFeaturePlacements({
+      canvasPlan: canvasPlan(),
+      budget: eyeBudget,
+      landmark: eye,
+    })
+
+    assert.equal(placements[0]?.templateId, 'eye-highlight')
+    assert.ok(placements[0]?.roles.some((entry) => entry.role === 'eye-highlight'))
   })
 
   it('uses carrier occupancy and blocked cells to choose a legal shifted placement', () => {

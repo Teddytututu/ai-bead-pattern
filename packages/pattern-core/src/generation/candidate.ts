@@ -25,6 +25,45 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
+function isSilhouetteBoundary(index: number, width: number, height: number, activeMask: Uint8Array): boolean {
+  if (activeMask[index] !== 1) return false
+  const x = index % width
+  const y = Math.floor(index / width)
+  return x === 0 || y === 0 || x === width - 1 || y === height - 1
+    || (x > 0 && activeMask[index - 1] === 0)
+    || (x + 1 < width && activeMask[index + 1] === 0)
+    || (y > 0 && activeMask[index - width] === 0)
+    || (y + 1 < height && activeMask[index + width] === 0)
+}
+
+/**
+ * Keep the outside contour readable as one ink family. Internal semantic
+ * boundaries retain their local outline roles, while silhouette cells share
+ * the darkest available physical bead color.
+ */
+export function unifySilhouetteOutlineColor(
+  colorIds: readonly string[],
+  palette: readonly PreparedColor[],
+  activeMask: Uint8Array,
+  width: number,
+  height: number,
+  outlineCells: ReadonlySet<number>,
+  protectedCells: ReadonlySet<number> = new Set(),
+): readonly string[] {
+  if (colorIds.length !== width * height || activeMask.length !== colorIds.length) {
+    throw new RangeError('Silhouette outline arrays must align with the grid')
+  }
+  const outlineColor = [...palette].sort((first, second) => first.lab[0] - second.lab[0]
+    || first.id.localeCompare(second.id))[0]?.id
+  if (outlineColor === undefined) return [...colorIds]
+  const output = [...colorIds]
+  for (const cell of outlineCells) {
+    if (protectedCells.has(cell) || isSilhouetteBoundary(cell, width, height, activeMask) === false) continue
+    output[cell] = outlineColor
+  }
+  return output
+}
+
 export interface CandidateContext {
   request: PatternGenerationRequest
   crop: CropRect
@@ -413,10 +452,19 @@ export function generateCandidate(
       distanceMethod,
     })
     : { colorIds: assigned.colorIds, edits: [] }
+  const unifiedOutlineColorIds = unifySilhouetteOutlineColor(
+    featureColors.colorIds,
+    selectedPalette,
+    activeMask,
+    size.width,
+    size.height,
+    new Set(plannedOutlineCells),
+    new Set([...landmarkProtected, ...featurePlacements.flatMap((placement) => placement.occupiedCells)]),
+  )
   const paletteOptimization = baseline === 'mvp'
     ? optimizePaletteAssignments({
       pixelLabs,
-      initialColorIds: featureColors.colorIds,
+      initialColorIds: unifiedOutlineColorIds,
       colors: selectedPalette,
       width: size.width,
       height: size.height,
@@ -432,7 +480,7 @@ export function generateCandidate(
     })
     : { colorIds: assigned.colorIds, changedCells: 0 }
   const paletteEdits = paletteOptimization.colorIds.flatMap((colorId, index) => {
-    const fromColorId = featureColors.colorIds[index]
+    const fromColorId = unifiedOutlineColorIds[index]
     if (activeMask[index] !== 1 || fromColorId === undefined || fromColorId === colorId) return []
     return [{
       x: index % size.width,

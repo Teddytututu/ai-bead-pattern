@@ -52,7 +52,7 @@ interface FeatureProfile {
 }
 
 const featureProfiles: Readonly<Record<LandmarkKind, FeatureProfile>> = {
-  eye: { minimum: 1, preferred: 2, maximum: 4, contrast: 18, shift: 1, scale: 32, weight: 1.5 },
+  eye: { minimum: 1, preferred: 4, maximum: 4, contrast: 18, shift: 1, scale: 32, weight: 1.5 },
   mouth: { minimum: 1, preferred: 3, maximum: 6, contrast: 14, shift: 1, scale: 28, weight: 1.25 },
   nose: { minimum: 1, preferred: 1, maximum: 3, contrast: 8, shift: 1, scale: 40, weight: 0.65 },
   ear: { minimum: 1, preferred: 3, maximum: 8, contrast: 10, shift: 1, scale: 26, weight: 0.9 },

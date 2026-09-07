@@ -207,6 +207,30 @@ describe('ValuePlan', () => {
     assert.ok(new Set(result.roleIdsByCell.filter((role) => role !== undefined)).size <= 3)
   })
 
+  it('keeps one semantic material hue family across local chroma changes', () => {
+    const structure = structurePlan()
+    structure.regionIds = new Int32Array([0, 0, 0, 0])
+    structure.regions = [{
+      ...structure.regions[0]!,
+      cellIndices: [0, 1, 2, 3],
+    }]
+
+    const result = buildValuePlan({
+      structurePlan: structure,
+      pixelLabs: [
+        [30, 64, -58],
+        [42, 58, -46],
+        [64, -52, 56],
+        [82, -44, 48],
+      ] as readonly Lab[],
+      activeMask: new Uint8Array([1, 1, 1, 1]),
+      levels: 3,
+    })
+
+    assert.equal(result.plan.roles.length, 3)
+    assert.equal(new Set(result.plannedLabs.map((lab) => `${lab[1].toFixed(3)}:${lab[2].toFixed(3)}`)).size, 1)
+  })
+
   it('keeps outline, deep shadow, shadow, base, and light in strict order at four levels', () => {
     const result = buildValuePlan({
       structurePlan: structurePlan(),
