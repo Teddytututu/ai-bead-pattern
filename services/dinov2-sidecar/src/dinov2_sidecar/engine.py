@@ -279,6 +279,59 @@ def _patch_salience(image: Image.Image) -> np.ndarray:
     return scores
 
 
+def _grid_shape(count: int) -> tuple[int, int] | None:
+    """Return the ViT patch grid when the token count forms a regular grid."""
+    side = int(round(float(np.sqrt(count))))
+    if side * side != count:
+        return None
+    return side, side
+
+
+def _spatially_constrained_best(
+    similarity: np.ndarray,
+    *,
+    reference_count: int,
+    candidate_count: int,
+) -> np.ndarray:
+    """Match patches within a one-cell neighbourhood before using global evidence.
+
+    A global maximum lets a candidate copy one salient patch into every location.
+    The neighbourhood constraint preserves coarse spatial correspondence while the
+    global fallback keeps support for rectangular/cropped views with unequal grids.
+    """
+    reference_grid = _grid_shape(reference_count)
+    candidate_grid = _grid_shape(candidate_count)
+    if reference_grid is None or candidate_grid is None:
+        return np.max(similarity, axis=1)
+    ref_h, ref_w = reference_grid
+    cand_h, cand_w = candidate_grid
+    best = np.empty(reference_count, dtype=np.float32)
+    for index in range(reference_count):
+        ref_y, ref_x = divmod(index, ref_w)
+        # Coordinates are compared in normalized image space so grids of different
+        # sizes retain correspondence after cropping and padding.
+        ref_y_norm = (ref_y + 0.5) / ref_h
+        ref_x_norm = (ref_x + 0.5) / ref_w
+        radius_y = 1.01 / ref_h
+        radius_x = 1.01 / ref_w
+        allowed: list[int] = []
+        for candidate_index in range(candidate_count):
+            cand_y, cand_x = divmod(candidate_index, cand_w)
+            cand_y_norm = (cand_y + 0.5) / cand_h
+            cand_x_norm = (cand_x + 0.5) / cand_w
+            normalized_distance = (
+                ((ref_y_norm - cand_y_norm) / radius_y) ** 2
+                + ((ref_x_norm - cand_x_norm) / radius_x) ** 2
+            ) ** 0.5
+            if normalized_distance <= 1.0:
+                allowed.append(candidate_index)
+        if allowed:
+            best[index] = float(np.max(similarity[index, allowed]))
+        else:
+            best[index] = float(np.max(similarity[index]))
+    return best
+
+
 def compare_feature_sets(
     reference: DinoEncodedView,
     candidate: DinoEncodedView,
@@ -296,10 +349,18 @@ def compare_feature_sets(
 
     identity = float(_unit_cosine(np.dot(reference_global, candidate_global)))
     similarity = _unit_cosine(reference_patches @ candidate_patches.T)
-    reference_best = np.max(similarity, axis=1)
-    candidate_best = np.max(similarity, axis=0)
     reference_weights = _salience_weights(reference.patch_salience, reference_patches.shape[0])
     candidate_weights = _salience_weights(candidate.patch_salience, candidate_patches.shape[0])
+    reference_best = _spatially_constrained_best(
+        similarity,
+        reference_count=reference_patches.shape[0],
+        candidate_count=candidate_patches.shape[0],
+    )
+    candidate_best = _spatially_constrained_best(
+        similarity.T,
+        reference_count=candidate_patches.shape[0],
+        candidate_count=reference_patches.shape[0],
+    )
     patch_correspondence = float(
         (
             np.dot(reference_best, reference_weights)
@@ -321,7 +382,16 @@ def compare_feature_sets(
     regional_coverage = float(np.dot(soft_coverage, reference_weights))
     detail_spread = float(np.clip(np.std(source_detail) * 4.0, 0.0, 1.0))
     patch_support = float(np.clip(reference_patches.shape[0] / 16.0, 0.0, 1.0))
-    confidence = float(np.clip(0.55 + 0.25 * patch_support + 0.20 * detail_spread, 0.0, 1.0))
+    # Confidence reflects observed agreement and usable local evidence. A fixed
+    # floor would make weak or collapsed candidates appear trustworthy.
+    confidence = float(np.clip(
+        0.45 * identity
+        + 0.30 * patch_correspondence
+        + 0.15 * regional_coverage
+        + 0.10 * (0.5 * patch_support + 0.5 * detail_spread),
+        0.0,
+        1.0,
+    ))
     return FeatureComparison(
         identity_similarity=identity,
         patch_correspondence=patch_correspondence,

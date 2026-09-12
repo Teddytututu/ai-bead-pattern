@@ -762,3 +762,37 @@ describe('source shape planning', () => {
     assert.ok(elapsedMs < 5_000, `Shape model took ${elapsedMs.toFixed(0)} ms`)
   })
 })
+
+describe('high resolution shape fidelity', () => {
+  it('keeps exact contour, hole, and distance semantics across the 512px boundary', () => {
+    const makeRing = (size: number) => {
+      const values = new Float32Array(size * size)
+      const c = (size - 1) / 2
+      const outer = size * 0.38
+      const inner = size * 0.16
+      for (let y = 0; y < size; y += 1) for (let x = 0; x < size; x += 1) {
+        const d = Math.hypot(x - c, y - c)
+        values[y * size + x] = Number(d <= outer && d >= inner)
+      }
+      return values
+    }
+    for (const size of [511, 513]) {
+      const model = buildSourceShapeModel(mask(size, size, makeRing(size)), 1)
+      assert.equal(model.holes, 1)
+      assert.ok(model.contours.length >= 2)
+      let maximumDistance = 0
+      for (const value of model.signedDistance) maximumDistance = Math.max(maximumDistance, value)
+      assert.ok(maximumDistance > 1)
+    }
+  })
+
+  it('preserves fractional coverage for a one pixel source line', () => {
+    const source = new Float32Array(1024 * 1024)
+    for (let x = 0; x < 1024; x += 1) source[512 * 1024 + x] = 1
+    const model = buildSourceShapeModel(mask(1024, 1024, source), 1)
+    const raster = rasterizeSourceShape(model, fullCrop(1024, 1024), fitCropToCanvas(fullCrop(1024, 1024), 32, 32), 32, 32, [], { preserveThinStructures: true })
+    const row = raster.coverage.slice(16 * 32, 17 * 32)
+    assert.ok(row.some((value) => value > 0 && value < 0.1))
+    assert.ok(raster.activeMask.slice(16 * 32, 17 * 32).some((value) => value === 1))
+  })
+})

@@ -63,6 +63,7 @@ export type {
   FeaturePairSearchInput,
   ResolvedFeaturePair,
 } from './planning/feature-pair-search.js'
+export { planFeaturePlacements } from './planning/feature-planner.js'
 export { resolveFeatureColors } from './planning/feature-color-resolver.js'
 export type {
   FeatureColorResolutionInput,
@@ -94,6 +95,24 @@ export type {
   PalettePlanningResult,
   PaletteSubstitutionDiagnostic,
 } from './planning/palette-planner.js'
+export { enforcePaletteInventory, quantizePalette } from './planning/palette-quantizer.js'
+export type {
+  PaletteInventoryRepairInput,
+  PaletteInventoryRepairResult,
+  PaletteQuantizationInput,
+  PaletteQuantizationResult,
+} from './planning/palette-quantizer.js'
+export {
+  hasConfidentSubjectMask,
+  resolveDistanceMethod,
+  resolveOccupancyModes,
+  resolveResizeMethod,
+  resolveSizes,
+  resolveStyles,
+  resolvedCrop,
+  styleColorLimit,
+  withoutSubjectMask,
+} from './planning/generation-policy.js'
 export { refineGridClusters } from './grid-refinement.js'
 export type {
   GridRefinementInput,

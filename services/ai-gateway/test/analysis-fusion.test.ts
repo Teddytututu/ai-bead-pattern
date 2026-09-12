@@ -163,6 +163,25 @@ describe('analysis fusion', () => {
     assert.equal(fused.landmarks?.[0]?.x, 5)
   })
 
+  it('discounts inferred and missing landmark states during evidence selection', () => {
+    const landmark = {
+      id: 'pet-01:tail-root',
+      kind: 'body' as const,
+      x: 3,
+      y: 4,
+      priority: 'hard' as const,
+      provenance: [{ origin: 'model' as const, provider: 'mmpose-animal-local' }],
+    }
+    const fused = fuseImageAnalyses([{
+      landmarks: [{ ...landmark, confidence: 0.9, observationState: 'inferred' as const }],
+    }, {
+      landmarks: [{ ...landmark, confidence: 0.7, observationState: 'missing' as const, x: 8 }],
+    }])
+
+    assert.equal(fused.landmarks?.[0]?.observationState, 'inferred')
+    assert.equal(fused.landmarks?.[0]?.x, 3)
+  })
+
   it('fuses complementary importance maps with confidence and origin calibration', () => {
     const first = {
       importanceMap: { width: 3, height: 1, weights: new Float32Array([1, 0.2, 0]) },

@@ -117,6 +117,23 @@ export const topologyAgreementSchema = Object.freeze({
 const minimumThinBranchAspectRatio = 1.6
 const maximumProjectedDiameterInCells = 1.25
 
+// Candidate variants share the same source model and crop. Keep one source
+// medial graph per model/crop pair; target masks remain candidate-specific.
+const sourceGraphCache = new WeakMap<SourceShapeModel, Map<string, MedialGraph>>()
+function sourceGraphFor(model: SourceShapeModel, crop: CropRect): MedialGraph {
+  const key = [crop.x, crop.y, crop.width, crop.height].join(':')
+  let byCrop = sourceGraphCache.get(model)
+  if (byCrop === undefined) {
+    byCrop = new Map<string, MedialGraph>()
+    sourceGraphCache.set(model, byCrop)
+  }
+  const cached = byCrop.get(key)
+  if (cached !== undefined) return cached
+  const graph = buildMedialGraph(model, { crop, minimumSpurGeodesicLength: 0 })
+  byCrop.set(key, graph)
+  return graph
+}
+
 interface PreparedTopology {
   binaryMask: Uint8Array
   graph: MedialGraph
@@ -493,10 +510,7 @@ export function projectTopologyReference(
   }
   const mask = Uint8Array.from(areaMask, (value) => Number(value >= 0.5))
   const reservedHoles = analyzeFourConnectedHoles(mask, width, height).enclosedMask
-  const graph = buildMedialGraph(model, {
-    crop,
-    minimumSpurGeodesicLength: 0,
-  })
+  const graph = sourceGraphFor(model, crop)
   const sourcePixelsPerCell = Math.max(crop.width / fit.width, crop.height / fit.height)
   const croppedSourceMask = sourceMaskWithinCrop(model, crop)
   const sourceLabels = labelEightConnectedComponents(croppedSourceMask, model.width, model.height)

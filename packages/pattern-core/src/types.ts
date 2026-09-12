@@ -297,7 +297,7 @@ export interface GridEditRecord {
   fromColorId: string
   toColorId: string
   reason: 'small-region' | 'isolated-cell' | 'stripe' | 'topology' | 'palette-coherence'
-    | 'feature-placement' | 'cluster-refinement' | 'symmetry' | 'tile-seam'
+    | 'feature-placement' | 'cluster-refinement' | 'symmetry' | 'tile-seam' | 'inventory'
 }
 
 export interface GenerationMetrics {

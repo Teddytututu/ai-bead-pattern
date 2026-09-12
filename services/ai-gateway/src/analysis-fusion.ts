@@ -123,8 +123,22 @@ function provenanceReliability(provenance: readonly EvidenceProvenance[] | undef
 function calibratedConfidence(
   confidence: number,
   provenance: readonly EvidenceProvenance[] | undefined,
+  observationState?: ImageLandmark['observationState'],
 ): number {
-  return confidence * provenanceReliability(provenance)
+  const stateReliability = observationState === 'missing'
+    ? 0.35
+    : observationState === 'inferred'
+      ? 0.75
+      : 1
+  return confidence * provenanceReliability(provenance) * stateReliability
+}
+
+function candidateObservationState(value: unknown): ImageLandmark['observationState'] | undefined {
+  if (value !== null && typeof value === 'object' && 'observationState' in value) {
+    const state = (value as { observationState?: unknown }).observationState
+    if (state === 'observed' || state === 'inferred' || state === 'missing') return state
+  }
+  return undefined
 }
 
 function mergeById<T extends {
@@ -141,10 +155,18 @@ function mergeById<T extends {
         ...(provenance.length === 0 ? {} : { provenance }),
       }
       const current = selected.get(candidate.id)
-      const candidateConfidence = calibratedConfidence(candidate.confidence, candidate.provenance)
+      const candidateConfidence = calibratedConfidence(
+        candidate.confidence,
+        candidate.provenance,
+        candidateObservationState(candidate),
+      )
       const currentConfidence = current === undefined
         ? Number.NEGATIVE_INFINITY
-        : calibratedConfidence(current.confidence, current.provenance)
+        : calibratedConfidence(
+          current.confidence,
+          current.provenance,
+          candidateObservationState(current),
+        )
       const preferred = current === undefined
         || candidateConfidence > currentConfidence
         || (candidateConfidence === currentConfidence

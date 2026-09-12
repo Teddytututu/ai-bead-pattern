@@ -669,6 +669,34 @@ class TransformersGroundingDinoBackend:
         self._load_lock = threading.Lock()
         self._inference_lock = threading.Lock()
 
+    def _weights_cached(self) -> bool:
+        """Check every pinned GroundingDINO asset before advertising degraded."""
+        try:
+            from huggingface_hub import try_to_load_from_cache
+            required = (
+                "config.json",
+                "model.safetensors",
+                "preprocessor_config.json",
+                "added_tokens.json",
+                "special_tokens_map.json",
+                "tokenizer.json",
+                "tokenizer_config.json",
+                "vocab.txt",
+            )
+            return all(
+                isinstance(
+                    try_to_load_from_cache(
+                        GROUNDING_DINO_MODEL_REPOSITORY,
+                        filename,
+                        revision=GROUNDING_DINO_MODEL_REVISION,
+                    ),
+                    str,
+                )
+                for filename in required
+            )
+        except Exception:
+            return False
+
     def _ensure_loaded(self) -> None:
         if self._model is not None:
             return
@@ -722,6 +750,11 @@ class TransformersGroundingDinoBackend:
         if transformers.__version__ != TRANSFORMERS_VERSION:
             return "unavailable", (
                 f"transformers {transformers.__version__} differs from {TRANSFORMERS_VERSION}"
+            )
+        if self._model is None and not self._weights_cached():
+            return "unavailable", (
+                "pinned GroundingDINO weights are absent from the local cache; "
+                "run the sidecar prefetch command"
             )
         if self._model is None:
             return "degraded", f"pinned GroundingDINO weights load on first request; device={device}"
@@ -816,6 +849,30 @@ class TransformersSam2Backend:
         self._load_lock = threading.Lock()
         self._inference_lock = threading.Lock()
 
+    def _weights_cached(self) -> bool:
+        """Check every pinned SAM2 asset before advertising degraded."""
+        try:
+            from huggingface_hub import try_to_load_from_cache
+            required = (
+                "config.json",
+                "model.safetensors",
+                "preprocessor_config.json",
+                "processor_config.json",
+            )
+            return all(
+                isinstance(
+                    try_to_load_from_cache(
+                        MODEL_REPOSITORY,
+                        filename,
+                        revision=MODEL_REVISION,
+                    ),
+                    str,
+                )
+                for filename in required
+            )
+        except Exception:
+            return False
+
     def _ensure_loaded(self) -> None:
         if self._model is not None:
             return
@@ -867,6 +924,11 @@ class TransformersSam2Backend:
         if transformers.__version__ != TRANSFORMERS_VERSION:
             return "unavailable", (
                 f"transformers {transformers.__version__} differs from {TRANSFORMERS_VERSION}"
+            )
+        if self._model is None and not self._weights_cached():
+            return "unavailable", (
+                "pinned SAM2 weights are absent from the local cache; "
+                "run the sidecar prefetch command"
             )
         if self._model is None:
             return "degraded", f"pinned SAM2 weights load on first request; device={device}"

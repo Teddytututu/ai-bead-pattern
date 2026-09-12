@@ -34,6 +34,7 @@ Demo 的主体流程以“沿主体外侧粗略圈一圈”为默认操作。页
 - [可采用方法与 GitHub 项目复核](docs/methods-and-github-review.md)
 - [拼豆生成算法实现规划](docs/algorithm-implementation-plan.md)
 - [V2 算法升级方案](docs/algorithm-upgrade-v2.md)
+- [算法重构边界](docs/algorithm-refactor.md)
 - [主体轮廓与目标格结构重构研究](docs/contour-reconstruction-research.md)
 - [系统架构](docs/architecture.md)
 - [产品路线](docs/roadmap.md)

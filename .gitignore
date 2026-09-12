@@ -42,3 +42,7 @@ work/mask-gate/
 
 # Local planning workspace
 .planning/
+
+# Downloaded real-image benchmark assets and generated reports
+work/real-pet-benchmark/
+examples/real-pet-benchmark/outputs/
