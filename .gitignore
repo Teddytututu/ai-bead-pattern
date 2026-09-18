@@ -42,3 +42,6 @@ work/mask-gate/
 
 # Local planning workspace
 .planning/
+
+# Local backups of discarded outer repositories and experiment files
+/.local-backup/
