@@ -51,6 +51,28 @@ function candidate(result: PatternGenerationResult): PatternCandidate {
 }
 
 describe('feature planning pipeline integration', () => {
+  it('keeps the subject carrier available underneath overlapping neural head and eye masks', async () => {
+    const image = portrait()
+    const full = { width: 16, height: 16, values: new Float32Array(256).fill(1) }
+    const eye = { ...full, values: Float32Array.from({ length: 256 }, (_, i) => Number(i % 16 >= 4 && i % 16 <= 7 && Math.floor(i / 16) >= 5 && Math.floor(i / 16) <= 8)) }
+    const result = await createPatternAlgorithm().generate({
+      image, palette,
+      analysis: {
+        subjectMask: full,
+        semanticRegions: [
+          { id: 'pet-01:subject', label: 'subject', mask: full, confidence: 0.8, importance: 0.5 },
+          { id: 'pet-01:head-01', label: 'head', mask: full, confidence: 0.9, importance: 0.9 },
+          { id: 'pet-01:eye-01', label: 'eye', mask: eye, confidence: 0.95, importance: 1 },
+        ],
+        landmarks: [{ id: 'pet-01:eye-01', kind: 'eye', x: 5, y: 6, confidence: 0.9, priority: 'hard',
+          carrierRegionId: 'pet-01:subject', featureRegionId: 'pet-01:eye-01', observationState: 'observed' }],
+      },
+      options: { canvas: { mode: 'fixed', size: { width: 16, height: 16 } }, structure: { occupancyMode: 'full-frame' },
+        maxColors: 3, maxCandidates: 1, styles: ['simple'] },
+    })
+    assert.ok(candidate(result).featurePlacements?.some(placement => placement.featureId === 'pet-01:eye-01'))
+  })
+
   it('resolves eyes and mouth before cleanup and protects every occupied feature cell', async () => {
     const source = portrait()
     const faceValues = new Float32Array(source.width * source.height).fill(1)
@@ -317,7 +339,7 @@ describe('feature planning pipeline integration', () => {
         },
         options: {
           canvas: { mode: 'fixed', size: { width: 16, height: 16 } },
-          structure: { occupancyMode: 'full-frame', valueLevels: 3 },
+          structure: { occupancyMode: 'full-frame', valueLevels: 3, valueMode: 'adaptive' },
           artDirection: { lightDirection },
           maxColors: 3,
           maxCandidates: 1,

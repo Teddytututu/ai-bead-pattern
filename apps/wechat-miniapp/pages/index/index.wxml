@@ -8,6 +8,12 @@
     <picker range="{{sizes}}" value="{{sizeIndex}}" bindchange="changeSize" disabled="{{busy}}"><view>画布：{{sizes[sizeIndex]}} × {{sizes[sizeIndex]}} ▾</view></picker>
     <view>本张最多使用 {{maxColors}} 色</view>
     <slider min="1" max="{{colorLimit}}" value="{{maxColors}}" bindchange="changeColors" disabled="{{busy}}" activeColor="#315b48" />
+    <picker range="{{valueModes}}" value="{{valueModeIndex}}" bindchange="changeValueMode" disabled="{{busy}}"><view>颜色策略：{{valueModes[valueModeIndex]}} ▾</view></picker>
+    <view>明暗强度：{{valueModeIndex === 1 ? 0 : valueStrength}}%</view>
+    <slider min="0" max="100" value="{{valueStrength}}" bindchange="changeValueStrength" disabled="{{busy || valueModeIndex === 1}}" activeColor="#315b48" />
+    <view>外轮廓 <switch checked="{{externalContour}}" bindchange="changeExternalContour" disabled="{{busy}}" /></view>
+    <view>内轮廓 <switch checked="{{internalContour}}" bindchange="changeInternalContour" disabled="{{busy}}" /></view>
+    <view class="note">保色或强度 0 保留原始明暗；色卡匹配仍会有色差。</view>
   </view>
   <button class="primary" bindtap="generate" disabled="{{!imagePath || busy}}">上传并生成图纸</button>
   <view class="status">{{status}}</view>
@@ -17,6 +23,7 @@
     <view class="candidates"><button wx:for="{{candidates}}" wx:key="id" data-index="{{index}}" bindtap="selectCandidate" class="{{selectedIndex === index ? 'selected' : ''}}">{{item.label}}</button></view>
     <canvas canvas-id="patternCanvas" class="pattern" />
     <view class="total">共 {{totalBeads}} 颗 · {{materials.length}} 色</view>
+    <view class="note">{{contourStatus}}</view>
     <view wx:for="{{materials}}" wx:key="code" class="material"><view class="swatch" style="background:{{item.hex}}" /><text>{{item.code}}</text><text>{{item.count}} 颗</text></view>
     <view class="downloads"><button data-format="png" bindtap="exportFile">保存图纸</button><button data-format="csv" bindtap="exportFile">材料 CSV</button><button data-format="json" bindtap="exportFile">图纸 JSON</button></view>
     <view class="note">屏幕色值仅供参考，制作时请按色号核对实物。</view>

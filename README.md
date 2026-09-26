@@ -4,7 +4,9 @@
 
 项目目标是把照片转换为兼顾主体特征、真实材料色卡和手工制作约束的网格图纸。底层围绕 `Material Palette + Grid Pattern` 设计，方便后续扩展到十字绣、钻石画、马赛克等网格手作。
 
-MARD 291 已接入生成、预览和 PNG/CSV/JSON 导出；完整色库参与匹配，单张图纸最多使用 48 色。产品 API、微信 TypeScript SDK 和原生小程序示例已落地，当前交付范围为本地运行与自动化验证。真实微信账号、HTTPS 部署和真机联调在后续接入。
+MARD 291 已接入生成、预览和 PNG/CSV/JSON 导出；支持完整材料色库，自动填色与描边遵守下方规则，单张图纸最多使用 48 色。产品 API、微信 TypeScript SDK 和原生小程序示例已落地，当前交付范围为本地运行与自动化验证。真实微信账号、HTTPS 部署和真机联调在后续接入。
+
+用户已于 2026-09-26 确认历史已实现部分全部验收通过。当前基线与归档见[项目总计划](docs/roadmap.md)；本期按[明暗、结构模板与纹理、编辑及 Perler 123 计划](docs/contours-features-editing-perler-123-plan.md)执行。首批明暗/保色修正已实装，见[实现与对照记录](docs/value-fidelity-2026-09-26.md)；其余阶段仍按计划推进。
 
 ## 本地使用
 
@@ -15,7 +17,15 @@ pnpm install
 pnpm demo
 ```
 
-浏览器打开终端打印的 `/apps/demo/` 地址，可直接使用默认 MARD 291 色卡。
+浏览器打开终端打印的 `/apps/demo/` 地址，可直接使用默认 MARD 291 色卡。Demo 默认使用 4173 端口；被占用时自动尝试 4174–4192，以终端打印的地址为准。也可在 PowerShell 中执行 `$env:PORT='4180'` 指定端口；显式指定的端口被占用时会提示退出，执行 `Remove-Item Env:PORT` 可恢复自动选择。
+
+自动识别主体、眼睛和其他部件蒙版：首次执行 `pnpm sam2:setup`，之后用 `pnpm demo:net` 同时启动现成 Grounded-SAM-2 模型和 Demo。眼睛蒙版可在“分析图层”查看，定位结果进入模板选择；缺失部件不再由几何规则补画。见[模型来源、运行说明与验证](docs/neural-masks-2026-09-27.md)。
+
+MARD 291 已更新为从 12 个深色高饱和色号中选一个统一描边色，自动填色排除 H7，并保护身体纹理与局部形状；24 色保持兼容。见[规则与修改前后对比](docs/mard-ink-fill-2026-09-27.md)。
+
+结构版新增“颜色策略”与“明暗强度”：还原风格默认保色，可显式选择保色、适度增强或风格化。强度 0 旁路明暗调整；描边另行开关，色卡量化仍会有色差。已有最新构建时可用 `pnpm demo:quick` 跳过构建并快速启动；首次运行或修改核心 TypeScript 代码后请用 `pnpm demo` 重新构建并启动。
+
+结构版默认开启外/内轮廓，可独立关闭；“五官定位与模板”支持原图点选、坐标修改、35 个部件模板、隐藏和锁定。两眼保留原图高差及大小关系，不强制等高或使用相同模板。详见[实现与演示说明](docs/contours-features-2026-09-27.md)；`node scripts/render-contours-features-demo.mjs` 可生成模板总览及姿态/轮廓合成对照。
 
 另一个终端启动供小程序调用的 API：
 
@@ -43,7 +53,7 @@ tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
 ```
 
-当前主线已到 `pattern-core v0.7.0`。生成顺序已经落成 CanvasPlan、FeaturePlacement、StructurePlan、ValuePlan、PalettePlan、Unified Grid Refinement 和 Preference Aggregation。人物五官先确定离散格位，语义区域再合并和重映射，区域明暗角色随后映射到真实材料色号，最后通过 Fast / Quality 两档统一能量整理孤立格、细条、棋盘锯齿与双眼对称。A/B/Tie 记录可以直接进入 Bradley–Terry 聚合，输出稳定的候选效用分数和排序。
+当前算法版本为 `0.9.0-contours-templates`。生成流程包含 CanvasPlan、FeaturePlacement、StructurePlan、ValuePlan、PalettePlan、蒙版轮廓、Unified Grid Refinement 和 Preference Aggregation。五官先确定离散格位，保留原图姿态；颜色按格匹配真实材料，轮廓与五官在后续精修中受保护。A/B/Tie 记录可进入 Bradley–Terry 聚合，输出候选效用分数和排序。
 
 v0.3.3.1 Evidence Performance Hardening 使用流式数值指纹处理大型 mask 和 importance map，并在 `pattern-core` 内规范化 landmark、semantic region 与 provenance 顺序，语义相同的分析输入会生成相同 identity。
 
@@ -55,7 +65,9 @@ Demo 的主体流程以“沿主体外侧粗略圈一圈”为默认操作。页
 
 ## 文档
 
-- [MARD 291 色实装与微信小程序接口实施计划](docs/mard-291-wechat-api-plan.md)
+- [项目总计划与验收状态](docs/roadmap.md)
+- [明暗与色差、结构模板与纹理、图纸编辑及 Perler 123 色实施计划](docs/contours-features-editing-perler-123-plan.md)
+- [MARD 291 与微信接口原计划（已实现范围验收通过）](docs/mard-291-wechat-api-plan.md)
 - [本地交付与验证记录](docs/local-delivery-2026-09-26.md)
 - [24/291 色性能对照](docs/palette-benchmark-2026-09-26.md)
 - [从绘画过程到拼豆图纸：生成方法论](docs/drawing-to-bead-method.md)
@@ -65,7 +77,6 @@ Demo 的主体流程以“沿主体外侧粗略圈一圈”为默认操作。页
 - [V2 算法升级方案](docs/algorithm-upgrade-v2.md)
 - [主体轮廓与目标格结构重构研究](docs/contour-reconstruction-research.md)
 - [系统架构](docs/architecture.md)
-- [产品路线](docs/roadmap.md)
 - [隐私设计](docs/privacy.md)
 
 ## 方向

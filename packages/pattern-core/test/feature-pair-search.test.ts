@@ -26,7 +26,7 @@ function placement(
 }
 
 describe('paired eye search', () => {
-  it('prefers aligned, non-overlapping, template-consistent eyes', () => {
+  it('prefers non-overlapping eyes at the source-relative positions', () => {
     const result = searchFeaturePairs({
       leftCandidates: [
         placement('left-eye', 'eye-e1', [16, 18], [18 * 48 + 16], 0.95),

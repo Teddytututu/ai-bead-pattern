@@ -208,6 +208,7 @@ describe('deterministic pattern algorithm', () => {
       ],
     }
     const analysis = {
+      subjectMask: { width: size, height: size, values: new Float32Array(size * size).fill(1) },
       semanticRegions: [{
         id: 'body',
         label: 'body',
@@ -1282,8 +1283,26 @@ describe('deterministic pattern algorithm', () => {
     const result = await algorithm.generate(request)
 
     assert.notEqual(success(result).metrics.sourceMeanColorDistance, success(result).metrics.planMeanColorDistance)
-    assert.equal(success(result).recommended.score.colorFidelity, success(result).recommended.score.planFidelity)
+    const score = success(result).recommended.score
+    assert.ok(Math.abs(score.colorFidelity - (score.sourceFidelity * 0.55 + score.planFidelity * 0.45)) < 1e-12)
     assert.notEqual(success(result).recommended.score.sourceFidelity, success(result).recommended.score.planFidelity)
+  })
+
+  it('bypasses tones for zero strength on both plain and semantic generation paths', async () => {
+    const source = image(3, 2, [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 0, 0], [0, 255, 0], [0, 0, 255]])
+    const algorithm = createPatternAlgorithm({ clock: () => 123 })
+    for (const semantic of [false, true]) {
+      const request = fixedRequest(source, { styles: ['high-contrast'], maxColors: 5, structure: { occupancyMode: 'full-frame', outlineMode: 'off' } })
+      if (semantic) request.analysis = { semanticRegions: [{ id: 'face-skin', label: 'face skin', confidence: 1, mask: { width: 3, height: 2, values: new Float32Array(6).fill(1) } }] }
+      const generate = (valueMode: 'preserve' | 'stylized') => algorithm.generate({ ...request, options: { ...request.options, structure: { ...request.options.structure, valueMode, valueStrength: 0 } } })
+      const preserve = candidate(await generate('preserve')), zero = candidate(await generate('stylized'))
+      assert.deepEqual(zero.pattern.cells, preserve.pattern.cells)
+      assert.equal(zero.pattern.metadata.valueStrength, 0)
+      assert.equal(zero.colorDiagnostics?.value.meanDeltaE, zero.colorDiagnostics?.structure.meanDeltaE)
+      assert.equal(zero.colorDiagnostics?.final.meanDeltaE, zero.metrics.sourceMeanColorDistance)
+      assert.ok(zero.colorDiagnostics!.selectedPaletteNearestMeanDeltaE <= zero.metrics.sourceMeanColorDistance + 1e-9)
+      if (semantic) assert.equal(zero.valueDiagnostics?.maximumNonOutlineDeltaE, 0)
+    }
   })
 
   it('keeps every public candidate score within zero and one', async () => {
@@ -1520,7 +1539,7 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(first.generationId, second.generationId)
   })
 
-  it('reduces a semantic gradient to a controlled three-level value design', async () => {
+  it('preserves source shades in faithful mode instead of forcing a three-color ladder', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const grayscalePalette: MaterialPalette = {
       id: 'gray',
@@ -1554,8 +1573,8 @@ describe('deterministic pattern algorithm', () => {
       },
     })
 
-    assert.ok(success(result).metrics.uniqueColors >= 2)
-    assert.ok(success(result).metrics.uniqueColors <= 3)
+    assert.ok(success(result).metrics.uniqueColors > 3)
+    assert.equal(success(result).recommended.valueDiagnostics?.maximumNonOutlineDeltaE, 0)
   })
 
   it('uses learned value-order strength to widen subject and background separation', async () => {
@@ -1593,7 +1612,7 @@ describe('deterministic pattern algorithm', () => {
         canvas: { mode: 'fixed', size: { width: 4, height: 1 } },
         maxColors: 8,
         styles: ['faithful'],
-        structure: { valueLevels: 3, valueOrderStrength },
+        structure: { valueLevels: 3, valueOrderStrength, valueMode: 'adaptive' },
         optimization: { minRegionSize: 1 },
       },
     })

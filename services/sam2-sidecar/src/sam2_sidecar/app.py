@@ -20,6 +20,7 @@ from .contracts import (
     SegmentationRequest,
 )
 from .engine import Sam2SegmentationEngine, SegmentationBatchResult, encode_uncompressed_rle
+from .parts import part_landmark
 
 MAXIMUM_IMAGE_BYTES = 32 * 1024 * 1024
 MAXIMUM_REQUEST_CHARACTERS = 64 * 1024
@@ -192,6 +193,17 @@ def create_app(engine: Engine | None = None) -> FastAPI:
                 "importance": 1.0,
                 "provenance": provenance,
             })
+        landmarks = []
+        for part in result.parts:
+            semantic_regions.append({
+                "id": part.instance_id, "label": part.label,
+                "mask": _mask_payload(part.mask), "confidence": part.confidence,
+                "importance": 1.0 if part.label in ("eye", "nose", "mouth") else 0.9,
+                "provenance": provenance,
+            })
+            landmark = part_landmark(part, provenance)
+            if landmark is not None:
+                landmarks.append(landmark)
         return {
             "schemaVersion": SCHEMA_VERSION,
             "providerId": provider_id,
@@ -199,6 +211,7 @@ def create_app(engine: Engine | None = None) -> FastAPI:
             "capabilities": list(segmentation_request.capabilities),
             "confidence": result.confidence,
             "inferenceMs": result.inference_ms,
+            "warnings": list(result.warnings),
             "analysis": {
                 "subjectMask": mask,
                 "subjectMaskEvidence": {
@@ -212,6 +225,7 @@ def create_app(engine: Engine | None = None) -> FastAPI:
                     "importanceMap": importance,
                 }),
                 "semanticRegions": semantic_regions,
+                "landmarks": landmarks,
                 "suggestedCrop": {
                     "x": x,
                     "y": y,
@@ -223,6 +237,9 @@ def create_app(engine: Engine | None = None) -> FastAPI:
                 "imageType": segmentation_request.image_type_hint or "general",
                 "confidence": result.confidence,
                 "modelVersions": {
+                    **({} if "semantic-parsing" not in segmentation_request.capabilities else {
+                        "neuralParts": "grounded-sam2-parts-v1",
+                    }),
                     "subject-segmentation": (
                         f"{model_identity['modelId']}@{model_identity['weightRevision']}"
                     ),

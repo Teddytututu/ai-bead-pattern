@@ -30,21 +30,25 @@ export function searchFeaturePairs(input: FeaturePairSearchInput): readonly Reso
   if (Number.isInteger(maximumPairs) === false || maximumPairs <= 0 || maximumPairs > 256) {
     throw new RangeError('Feature pair candidate limit must stay within 1..256')
   }
-  const expectedSpacing = Math.abs(input.expectedRightCenter[0] - input.expectedLeftCenter[0])
+  const expectedX = input.expectedRightCenter[0] - input.expectedLeftCenter[0]
+  const expectedY = input.expectedRightCenter[1] - input.expectedLeftCenter[1]
+  const expectedSpacing = Math.hypot(expectedX, expectedY)
   const pairs: ResolvedFeaturePair[] = []
   for (const left of input.leftCandidates) {
     for (const right of input.rightCandidates) {
       if (left.kind !== 'eye' || right.kind !== 'eye' || left.featureId === right.featureId) continue
-      if (left.center[0] >= right.center[0]) continue
+      const actualX = right.center[0] - left.center[0], actualY = right.center[1] - left.center[1]
+      if (actualX * expectedX + actualY * expectedY <= 0) continue
       const rightCells = new Set(right.occupiedCells)
       if (left.occupiedCells.some((cell) => rightCells.has(cell))) continue
-      const actualSpacing = Math.abs(right.center[0] - left.center[0])
+      const actualSpacing = Math.hypot(actualX, actualY)
       const spacingError = Math.abs(actualSpacing - expectedSpacing)
-      const heightError = Math.abs(right.center[1] - left.center[1])
+      const heightError = Math.abs(actualY - expectedY)
       const placementScore = (left.score + right.score) / 2
       const spacingScore = 1 / (1 + spacingError)
       const heightScore = 1 / (1 + heightError)
-      const templateScore = left.templateId === right.templateId ? 1 : 0.5
+      // Perspective can legitimately produce different eye sizes/templates.
+      const vectorScore = 1 / (1 + Math.hypot(actualX - expectedX, actualY - expectedY))
       pairs.push({
         left,
         right,
@@ -52,7 +56,7 @@ export function searchFeaturePairs(input: FeaturePairSearchInput): readonly Reso
         heightError,
         overlap: false,
         score: Math.min(1, Math.max(0,
-          placementScore * 0.5 + spacingScore * 0.2 + heightScore * 0.2 + templateScore * 0.1)),
+          placementScore * 0.5 + spacingScore * 0.2 + heightScore * 0.2 + vectorScore * 0.1)),
       })
     }
   }

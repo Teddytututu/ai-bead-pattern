@@ -7,7 +7,7 @@ import type {
   ImageType,
   PixelImage,
 } from '@ai-bead-pattern/pattern-core'
-import { inferPetInstances, numericArrayFingerprintSync } from '@ai-bead-pattern/pattern-core'
+import { numericArrayFingerprintSync } from '@ai-bead-pattern/pattern-core'
 
 export type SegmentationModel =
   | 'birefnet-general-lite'
@@ -290,14 +290,7 @@ function analysisFromMask(
   }
   const confidence = maskCertaintyHeuristic(cleanedMask.values)
   const componentCrop = subjectCrop(cleanedMask, cropThreshold, cropPaddingRatio)
-  const inferredPetGroup = imageTypeHint === 'portrait' || imageTypeHint === 'illustration' || imageTypeHint === 'landscape'
-    ? undefined
-    : inferPetInstances(image, subjectMask)
-  const petGroup = inferredPetGroup !== undefined
-    && (imageTypeHint === 'pet' || inferredPetGroup.confidence >= 0.62)
-    ? inferredPetGroup
-    : undefined
-  const crop = petGroup?.suggestedCrop ?? componentCrop
+  const crop = componentCrop
   const provenance = [{
     origin: 'model' as const,
     provider: 'rembg-http',
@@ -327,39 +320,17 @@ function analysisFromMask(
       importance: 0.8,
       mask: subjectMask,
       provenance,
-    }, ...(petGroup === undefined ? [] : petGroup.instances.flatMap((instance) => [{
-      id: `${instance.instanceId}:subject`,
-      label: 'pet instance',
-      confidence: instance.confidence,
-      importance: 0.95,
-      mask: instance.instanceMask,
-      provenance: [{ origin: 'heuristic' as const, provider: 'pet-components', version: 'significant-components-v1' }],
-    }, {
-      id: `${instance.instanceId}:pet-face`,
-      label: 'pet face',
-      confidence: instance.confidence,
-      importance: 1,
-      mask: instance.faceMask,
-      provenance: [{ origin: 'heuristic' as const, provider: 'pet-geometry', version: 'pet-face-v3' }],
-    }, ...instance.bodyRegions]))],
-    ...(petGroup === undefined ? {} : {
-      imageType: 'pet' as const,
-      landmarks: petGroup.instances.flatMap((instance) => instance.landmarks),
-    }),
+    }],
+    ...(imageTypeHint === undefined ? {} : { imageType: imageTypeHint }),
     modelVersions: {
       segmentation: `rembg/${model}`,
-      ...(petGroup === undefined ? {} : {
-        petAnalysis: 'pattern-core/pet-analysis-v3-ap10k',
-        petInstances: String(petGroup.instances.length),
-        petHeadPose: petGroup.instances.map((instance) => instance.headPose).join(','),
-      }),
     },
     provenance,
   }
   if (crop !== undefined) {
     analysis.suggestedCrop = crop
     analysis.suggestedCropSource = 'automatic'
-    analysis.suggestedCropConfidence = petGroup?.confidence ?? confidence
+    analysis.suggestedCropConfidence = confidence
   }
   return analysis
 }

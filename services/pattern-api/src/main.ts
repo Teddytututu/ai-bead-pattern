@@ -4,6 +4,7 @@ const api = await createPatternApi({
   ...(process.env.WECHAT_APP_ID ? { appId: process.env.WECHAT_APP_ID } : {}),
   ...(process.env.WECHAT_APP_SECRET ? { appSecret: process.env.WECHAT_APP_SECRET } : {}),
   ...(process.env.REMBG_ENDPOINT ? { rembgEndpoint: process.env.REMBG_ENDPOINT } : {}),
+  ...(process.env.SAM2_ENDPOINT ? { sam2Endpoint: process.env.SAM2_ENDPOINT } : {}),
   ...(process.env.REMOTE_ANALYSIS_LABEL ? { remoteAnalysisLabel: process.env.REMOTE_ANALYSIS_LABEL } : {}),
 })
 const port = Number(process.env.PORT ?? 7105), host = process.env.HOST ?? '127.0.0.1'

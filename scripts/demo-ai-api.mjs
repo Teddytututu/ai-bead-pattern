@@ -117,17 +117,14 @@ function routeStatus(route, providers) {
 
 function automaticPetProviderPlan(request, registry) {
   if (request.route !== 'neural-analysis'
-    || (request.imageTypeHint !== undefined && request.imageTypeHint !== 'pet')
     || request.providerIds !== undefined) return request
   const grounded = registry.get('grounded-sam2-local')
-  const pose = registry.get('mmpose-animal-local')
-  if (grounded === undefined || pose === undefined) return request
-  const providerIds = [grounded.manifest.providerId, pose.manifest.providerId]
-  const rembg = registry.get('rembg-birefnet-general-lite')
-  if (rembg !== undefined) providerIds.push(rembg.manifest.providerId)
+  if (grounded === undefined) return request
+  const providerIds = [grounded.manifest.providerId]
   return {
     ...request,
-    capabilities: [...new Set([...request.capabilities, 'keypoints'])],
+    capabilities: [...new Set([...request.capabilities, 'semantic-parsing', 'keypoints'])],
+    timeoutMs: 180_000,
     providerIds,
   }
 }
@@ -206,7 +203,10 @@ export function createDemoAiService(options = {}) {
   return {
     async health(signal) {
       const providers = await Promise.all(registry.list().map(async (provider) => {
-        const health = await provider.probe(signal)
+        const health = await provider.probe(signal).catch(error => ({
+          status: 'unavailable', latencyMs: 0, checkedAt: Date.now(),
+          message: error instanceof Error ? error.message : String(error),
+        }))
         return {
           providerId: provider.manifest.providerId,
           modelId: provider.manifest.modelId,

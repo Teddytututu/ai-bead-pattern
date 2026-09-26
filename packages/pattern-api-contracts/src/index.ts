@@ -1,4 +1,5 @@
-import type { PatternOptions, PatternStyle, PatternDocument, GenerationStatus } from '../../pattern-core/dist/index.js'
+import type { PatternOptions, PatternStyle, PatternDocument, GenerationStatus, StructureOptions, FeatureOverride, PatternCandidate } from '../../pattern-core/dist/index.js'
+import { validateFeatureOverrides } from '../../pattern-core/dist/index.js'
 export type Route = 'deterministic' | 'neural-analysis'
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 export interface CreateJobRequest {
@@ -17,7 +18,8 @@ export interface CreateJobInput {
     canvas?: { mode: 'auto' } | { mode: 'fixed'; size: { width: number; height: number } }
     maxColors?: number; maxCandidates?: number; styles?: PatternStyle[]
     imageType?: 'general' | 'portrait' | 'pet' | 'illustration' | 'landscape'
-    structure?: { occupancyMode: 'auto' | 'full-frame' | 'subject-shape' }
+    structure?: Pick<StructureOptions, 'occupancyMode' | 'valueMode' | 'valueStrength' | 'valueLevels' | 'outlineMode' | 'contours'>
+    featureOverrides?: readonly FeatureOverride[]
     optimization?: { refinementMode: 'fast' | 'quality' }
   }
 }
@@ -29,7 +31,7 @@ export interface JobView {
 }
 export interface ImageView { imageId: string; width: number; height: number; expiresAt: number }
 export interface SessionView { token: string; expiresAt: number }
-export interface CandidateView { id: string; style: string; valid: boolean; score: number; reasons: readonly string[]; pattern: PatternDocument }
+export interface CandidateView { id: string; style: string; valid: boolean; score: number; reasons: readonly string[]; pattern: PatternDocument; contourPlan?: PatternCandidate['contourPlan']; featurePlacements?: PatternCandidate['featurePlacements'] }
 export interface ResultView {
   generationId: string; generationStatus: GenerationStatus; actualRoute: Route
   recommendedId?: string; bestEffortId?: string; candidates: CandidateView[]; warnings: string[]
@@ -66,7 +68,15 @@ function choice<T extends string>(value: unknown, values: readonly T[], label: s
 export function parseCreateJob(input: unknown): CreateJobRequest {
   const value = record(input, ['imageId', 'paletteId', 'paletteVersion', 'route', 'failureMode', 'options', 'consentToRemoteAnalysis'])
   if (value.consentToRemoteAnalysis !== undefined && typeof value.consentToRemoteAnalysis !== 'boolean') throw new ContractError('Invalid remote analysis consent')
-  const raw = record(value.options ?? {}, ['canvas', 'maxColors', 'maxCandidates', 'styles', 'imageType', 'structure', 'optimization'])
+  const raw = record(value.options ?? {}, ['canvas', 'maxColors', 'maxCandidates', 'styles', 'imageType', 'structure', 'optimization', 'featureOverrides'])
+  if (raw.featureOverrides !== undefined) {
+    try { validateFeatureOverrides(raw.featureOverrides as readonly FeatureOverride[], apiLimits.normalizedSide, apiLimits.normalizedSide) }
+    catch (error) { throw new ContractError(error instanceof Error ? error.message : 'Invalid featureOverrides') }
+    for (const entry of raw.featureOverrides as readonly FeatureOverride[]) {
+      record(entry, ['id', 'kind', 'x', 'y', 'instanceId', 'featureGroupId', 'templateId', 'hidden', 'locked', 'shape'])
+      if (entry.shape !== undefined) record(entry.shape, ['widthPx', 'heightPx', 'angleDegrees', 'expression', 'anchors'])
+    }
+  }
   const canvas = record(raw.canvas ?? { mode: 'fixed', size: { width: 48, height: 48 } }, ['mode', 'size'])
   let chosenCanvas: PatternOptions['canvas']
   if (canvas.mode === 'auto') {
@@ -81,7 +91,13 @@ export function parseCreateJob(input: unknown): CreateJobRequest {
   }
   const styles = raw.styles ?? ['faithful', 'simple', 'high-contrast']
   if (!Array.isArray(styles) || styles.length < 1 || styles.length > 3 || new Set(styles).size !== styles.length) throw new ContractError('Choose one to three unique styles')
-  const structure = record(raw.structure ?? {}, ['occupancyMode'])
+  const structure = record(raw.structure ?? {}, ['occupancyMode', 'valueMode', 'valueStrength', 'valueLevels', 'outlineMode', 'contours'])
+  const contours = structure.contours === undefined ? undefined : record(structure.contours, ['external', 'internal', 'colorId'])
+  if (contours) {
+    for (const key of ['external', 'internal']) if (contours[key] !== undefined && typeof contours[key] !== 'boolean') throw new ContractError(`Invalid contours.${key}`)
+    if (contours.colorId !== undefined) nonempty(contours.colorId, 'contours.colorId')
+  }
+  if (structure.valueStrength !== undefined && (typeof structure.valueStrength !== 'number' || !Number.isFinite(structure.valueStrength) || structure.valueStrength < 0 || structure.valueStrength > 1)) throw new ContractError('Invalid valueStrength')
   const optimization = record(raw.optimization ?? {}, ['refinementMode'])
   return {
     imageId: nonempty(value.imageId, 'imageId'), paletteId: nonempty(value.paletteId ?? 'mard-291', 'paletteId'),
@@ -94,7 +110,15 @@ export function parseCreateJob(input: unknown): CreateJobRequest {
       maxCandidates: integer(raw.maxCandidates ?? 3, 1, apiLimits.maxCandidates, 'maxCandidates'),
       styles: styles.map(v => choice<PatternStyle>(v, ['faithful', 'simple', 'high-contrast', 'cute', 'soft'], 'style')),
       imageType: choice(raw.imageType ?? 'general', ['general', 'portrait', 'pet', 'illustration', 'landscape'], 'imageType'),
-      structure: { occupancyMode: choice(structure.occupancyMode ?? 'auto', ['auto', 'full-frame', 'subject-shape'], 'occupancyMode') },
+      ...(raw.featureOverrides === undefined ? {} : { featureOverrides: raw.featureOverrides as readonly FeatureOverride[] }),
+      structure: {
+        occupancyMode: choice(structure.occupancyMode ?? 'auto', ['auto', 'full-frame', 'subject-shape'], 'occupancyMode'),
+        ...(structure.valueMode === undefined ? {} : { valueMode: choice(structure.valueMode, ['preserve', 'adaptive', 'stylized'], 'valueMode') }),
+        ...(structure.valueStrength === undefined ? {} : { valueStrength: structure.valueStrength as number }),
+        ...(structure.valueLevels === undefined ? {} : { valueLevels: integer(structure.valueLevels, 2, 4, 'valueLevels') as 2 | 3 | 4 }),
+        ...(structure.outlineMode === undefined ? {} : { outlineMode: choice(structure.outlineMode, ['off', 'selective', 'full'], 'outlineMode') }),
+        ...(contours === undefined ? {} : { contours: contours as NonNullable<StructureOptions['contours']> }),
+      },
       optimization: { refinementMode: choice(optimization.refinementMode ?? 'fast', ['fast', 'quality'], 'refinementMode'), localSearchIterations: 1 },
     },
   }

@@ -179,10 +179,10 @@ describe('V2 planning contracts', () => {
     )
   })
 
-  it('exposes the preference-learning release identity on the baseline engine', () => {
+  it('exposes the color-fidelity release identity on the baseline engine', () => {
     const algorithm = createPatternAlgorithm()
     assert.equal(algorithm.engine, 'baseline')
-    assert.equal(algorithm.version, '0.7.0-preference-learning')
+    assert.equal(algorithm.version, '0.10.0-mard-ink-fill')
   })
 
   it('rejects inconsistent region graphs and feature constraints', () => {

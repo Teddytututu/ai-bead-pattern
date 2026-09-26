@@ -26,6 +26,9 @@ function capturePageErrors(page) {
 async function openGate(page, rater = 'e2e-rater') {
   await page.goto(`/apps/demo/?maskGateIndex=${encodeURIComponent(indexUrl)}&sample=wide-01&rater=${rater}`)
   await expect(page.locator('#maskGatePanel')).toBeVisible()
+  // The panel can now paint while the scheduler yields between candidates.
+  // Initial acceptance must refer to a completed pattern snapshot.
+  await expect(page.locator('#downloadButton')).toBeEnabled({ timeout: 30_000 })
   await expect(page.locator('#maskGateLockInitialButton')).toBeDisabled()
 }
 

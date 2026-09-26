@@ -2,6 +2,7 @@ import type {
   BinaryMask,
   EvidenceOrigin,
   EvidenceProvenance,
+  FeatureShape,
   ImageAnalysis,
   ImageLandmark,
   ImageType,
@@ -14,9 +15,9 @@ import type {
   SubjectMaskSource,
   StructuralRole,
 } from '@ai-bead-pattern/pattern-core'
+import { projectFeatureShape, validateFeatureShape } from '@ai-bead-pattern/pattern-core'
 
 import { fuseImageAnalyses } from './analysis-fusion.js'
-import { enrichPetGeometryAnalysis } from './pet-geometry-fusion.js'
 import {
   type AICapability,
   type ModelManifest,
@@ -201,6 +202,7 @@ export interface CompositeAnalysisResult {
   preferenceFeatures: readonly PreferenceFeatures[]
   contributions: readonly ProviderContribution[]
   uncoveredCapabilities: readonly AICapability[]
+  warnings?: readonly string[]
 }
 
 const imageTypes = new Set<ImageType>(['portrait', 'pet', 'illustration', 'landscape', 'general'])
@@ -712,6 +714,10 @@ function hydrateLandmarks(value: unknown): readonly ImageLandmark[] | undefined 
     const symmetryGroup = optionalString(input.symmetryGroup, `analysis.landmarks[${index}].symmetryGroup`)
     const featureRegionId = optionalString(input.featureRegionId, `analysis.landmarks[${index}].featureRegionId`)
     const carrierRegionId = optionalString(input.carrierRegionId, `analysis.landmarks[${index}].carrierRegionId`)
+    const instanceId = optionalString(input.instanceId, `analysis.landmarks[${index}].instanceId`)
+    const featureGroupId = optionalString(input.featureGroupId, `analysis.landmarks[${index}].featureGroupId`)
+    const featureShape = input.featureShape as FeatureShape | undefined
+    validateFeatureShape(featureShape)
     const observationState = input.observationState === undefined
       ? undefined
       : stringValue(input.observationState, `analysis.landmarks[${index}].observationState`) as LandmarkObservationState
@@ -739,6 +745,9 @@ function hydrateLandmarks(value: unknown): readonly ImageLandmark[] | undefined 
       ...(symmetryGroup === undefined ? {} : { symmetryGroup }),
       ...(featureRegionId === undefined ? {} : { featureRegionId }),
       ...(carrierRegionId === undefined ? {} : { carrierRegionId }),
+      ...(instanceId === undefined ? {} : { instanceId }),
+      ...(featureGroupId === undefined ? {} : { featureGroupId }),
+      ...(featureShape === undefined ? {} : { featureShape }),
       ...(observationState === undefined ? {} : { observationState }),
       ...(structuralRole === undefined ? {} : { structuralRole }),
       ...(input.affectsOccupancy === undefined ? {} : { affectsOccupancy: input.affectsOccupancy }),
@@ -1089,6 +1098,7 @@ export function validateImageAnalysis(
   }
   const landmarkIds = new Set<string>()
   for (const [index, landmark] of (analysis.landmarks ?? []).entries()) {
+    validateFeatureShape(landmark.featureShape)
     stringValue(landmark.id, `Image analysis landmark ${index} id`)
     if (landmarkIds.has(landmark.id)) throw new RangeError('Image analysis landmark ids must be unique')
     landmarkIds.add(landmark.id)
@@ -1239,6 +1249,7 @@ export function projectSourceAnalysisToProposal(
         ...landmark,
         x: frame.x + (landmark.x + 0.5) * scaleX - 0.5,
         y: frame.y + (landmark.y + 0.5) * scaleY - 0.5,
+        ...(landmark.featureShape === undefined ? {} : { featureShape: projectFeatureShape(landmark.featureShape, scaleX, scaleY, frame.x, frame.y) }),
         ...(landmark.sourceRadiusPx === undefined ? {} : {
           sourceRadiusPx: landmark.sourceRadiusPx * (scaleX + scaleY) / 2,
         }),
@@ -1533,6 +1544,7 @@ export class CompositeImageAnalyzer {
     const learnedProposals: LearnedProposal[] = []
     const preferenceFeatures: PreferenceFeatures[] = []
     const contributions: ProviderContribution[] = []
+    const warnings: string[] = []
     for (const provider of providers) {
       const baseRequest = providerRequestFor(request, provider)
       const derivedPrompts = provider.manifest.capabilities.includes('keypoints')
@@ -1546,6 +1558,7 @@ export class CompositeImageAnalyzer {
       const startedAt = performance.now()
       try {
         const result = await runProvider(provider, providerRequest)
+        warnings.push(...(result.warnings ?? []))
         if (result.analysis !== undefined) analyses.push(result.analysis)
         instanceProposals.push(...(result.instanceProposals ?? []))
         learnedProposals.push(...(result.learnedProposals ?? []))
@@ -1574,12 +1587,13 @@ export class CompositeImageAnalyzer {
     const fusedAnalysis = analyses.length === 0 ? {} : fuseImageAnalyses(analyses)
     return {
       route: request.route,
-      analysis: enrichPetGeometryAnalysis(request.image, fusedAnalysis, request.imageTypeHint),
+      analysis: fusedAnalysis,
       instanceProposals,
       learnedProposals,
       preferenceFeatures,
       contributions,
       uncoveredCapabilities,
+      ...(warnings.length === 0 ? {} : { warnings }),
     }
   }
 }

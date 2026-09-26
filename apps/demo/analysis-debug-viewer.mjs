@@ -3,6 +3,10 @@ export const analysisDebugLayers = Object.freeze([
   { id: 'ai-subject', label: 'AI 主体' },
   { id: 'corrected-subject', label: '修正主体' },
   { id: 'face', label: '脸部' },
+  { id: 'eye', label: '眼睛蒙版' },
+  { id: 'nose', label: '鼻子蒙版' },
+  { id: 'mouth', label: '嘴部蒙版' },
+  { id: 'body-parts', label: '身体部件' },
   { id: 'hair', label: '头发' },
   { id: 'skin', label: '皮肤' },
   { id: 'clothes', label: '衣服' },
@@ -17,6 +21,10 @@ const colors = Object.freeze({
   'ai-subject': [40, 125, 115],
   'corrected-subject': [36, 112, 185],
   face: [227, 184, 63],
+  eye: [65, 184, 211],
+  nose: [206, 96, 119],
+  mouth: [157, 77, 173],
+  'body-parts': [116, 169, 80],
   hair: [174, 71, 63],
   skin: [219, 126, 92],
   clothes: [83, 105, 151],
@@ -206,14 +214,23 @@ export function resolveAnalysisDebugLayer(id, {
   }
   if (id === 'face') {
     const petFace = combineSemanticRegions((analysis?.semanticRegions ?? []).filter((entry) =>
-      entry.id === 'pet-face' || entry.id.endsWith(':pet-face')))
+      entry.id === 'pet-face' || entry.id.endsWith(':pet-face') || entry.label === 'head'))
     return semanticLayer(
       id,
       region(analysis, 'face-skin') ?? petFace,
       petFace === undefined
         ? analysis?.modelVersions?.portraitSemantics
-        : analysis?.modelVersions?.petSemantics ?? analysis?.modelVersions?.petGeometry,
+        : analysis?.modelVersions?.neuralParts ?? analysis?.modelVersions?.petSemantics ?? analysis?.modelVersions?.petGeometry,
     )
+  }
+  if (['eye', 'nose', 'mouth', 'body-parts'].includes(id)) {
+    const labels = id === 'body-parts' ? ['torso', 'leg', 'tail', 'arm', 'hand', 'ear'] : [id]
+    return semanticLayer(id, combineSemanticRegions((analysis?.semanticRegions ?? []).filter(region =>
+      labels.includes(region.label))), analysis?.modelVersions?.neuralParts)
+  }
+  if (['hair', 'skin', 'clothes'].includes(id) && analysis?.modelVersions?.neuralParts) {
+    return semanticLayer(id, combineSemanticRegions((analysis.semanticRegions ?? []).filter(region =>
+      region.label === id)), analysis.modelVersions.neuralParts)
   }
   if (id === 'hair') {
     return semanticLayer(id, region(analysis, 'hair'), analysis?.modelVersions?.portraitSemantics)

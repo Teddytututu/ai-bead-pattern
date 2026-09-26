@@ -1,10 +1,10 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import sharp from 'sharp'
 import { createPatternAlgorithm, createPatternDocument, type ImageAnalysis } from '@ai-bead-pattern/pattern-core'
-import { AIProviderRegistry, CompositeImageAnalyzer, RembgVisionProvider, RembgHttpSegmentationProvider } from '@ai-bead-pattern/ai-gateway'
+import { AIProviderRegistry, CompositeImageAnalyzer, RembgVisionProvider, RembgHttpSegmentationProvider, HttpVisionProvider, modelManifest, type AICapability } from '@ai-bead-pattern/ai-gateway'
 import type { JobRecord, SavedResult } from './store.js'
 
-const { job, imagePath, rembgEndpoint } = workerData as { job: JobRecord; imagePath: string; rembgEndpoint?: string }
+const { job, imagePath, rembgEndpoint, sam2Endpoint } = workerData as { job: JobRecord; imagePath: string; rembgEndpoint?: string; sam2Endpoint?: string }
 const stage = (value: string) => parentPort!.postMessage({ type: 'stage', stage: value })
 try {
   stage('decoding')
@@ -21,10 +21,18 @@ try {
   if (job.request.route === 'neural-analysis') {
     stage('analyzing')
     try {
-      if (!rembgEndpoint) throw new Error('AI_NOT_CONFIGURED')
+      if (!rembgEndpoint && !sam2Endpoint) throw new Error('AI_NOT_CONFIGURED')
       const registry = new AIProviderRegistry()
-      registry.register(new RembgVisionProvider({ segmentation: new RembgHttpSegmentationProvider({ endpoint: rembgEndpoint, defaultModel: 'birefnet-general-lite', timeoutMs: 60_000 }) }))
-      const result = await new CompositeImageAnalyzer(registry).analyze({ image, route: 'neural-analysis', capabilities: ['subject-segmentation', 'edge-thin-structure'], failureMode: 'strict', timeoutMs: 60_000 })
+      const capabilities: AICapability[] = ['subject-segmentation', 'edge-thin-structure']
+      if (sam2Endpoint) {
+        registry.register(new HttpVisionProvider({ manifest: modelManifest('grounded-sam2-local'), endpoint: sam2Endpoint, healthPath: '/health/grounded', timeoutMs: 180_000 }))
+        capabilities.push('semantic-parsing', 'keypoints')
+      } else {
+        registry.register(new RembgVisionProvider({ segmentation: new RembgHttpSegmentationProvider({ endpoint: rembgEndpoint!, defaultModel: 'birefnet-general-lite', timeoutMs: 60_000 }) }))
+        warnings.push('当前仅配置主体分割模型，未启用部件蒙版识别。')
+      }
+      const result = await new CompositeImageAnalyzer(registry).analyze({ image, route: 'neural-analysis', capabilities, failureMode: 'strict', timeoutMs: 180_000 })
+      warnings.push(...(result.warnings ?? []))
       analysis = result.analysis; actualRoute = 'neural-analysis'
     } catch {
       if (job.request.failureMode === 'strict') throw new Error('AI_UNAVAILABLE')
@@ -40,7 +48,8 @@ try {
       generationId: result.generationId, generationStatus: result.status, actualRoute, warnings,
       ...(result.recommended ? { recommendedId: result.recommended.id } : {}),
       ...(result.bestEffort ? { bestEffortId: result.bestEffort.id } : {}),
-      candidates: candidates.map(c => ({ id: c.id, style: c.style, valid: c.valid, score: c.score.total, reasons: c.rejectionReasons, pattern: createPatternDocument(c.pattern) })),
+      candidates: candidates.map(c => ({ id: c.id, style: c.style, valid: c.valid, score: c.score.total, reasons: c.rejectionReasons, pattern: createPatternDocument(c.pattern),
+        contourPlan: c.contourPlan, featurePlacements: c.featurePlacements })),
     },
     patterns: Object.fromEntries(candidates.map(c => [c.id, c.pattern])),
   }

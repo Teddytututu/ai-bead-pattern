@@ -267,7 +267,7 @@ export const MODEL_CATALOG: readonly ModelManifest[] = [
     license: apache,
     weightLicense: apache,
     documentationUrl: 'https://github.com/IDEA-Research/Grounded-SAM-2/tree/dd4c5141b75e4838dd486c64f773c43b4db3a07b',
-    capabilities: ['subject-segmentation', 'edge-thin-structure'],
+    capabilities: ['subject-segmentation', 'edge-thin-structure', 'semantic-parsing', 'keypoints'],
     input: {
       minimumWidth: 32,
       minimumHeight: 32,
@@ -284,7 +284,7 @@ export const MODEL_CATALOG: readonly ModelManifest[] = [
       notes: 'GroundingDINO source 856dde20aee659246248e20734ef9ba5214f5e44 detects text-grounded boxes; one SAM 2.1 batch segments every retained box.',
     },
     privacy: localPrivacy,
-    failurePolicy: failure(60_000),
+    failurePolicy: failure(180_000),
   },
   {
     providerId: 'mediapipe-face-local',

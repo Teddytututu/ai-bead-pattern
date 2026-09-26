@@ -51,6 +51,20 @@ function valuePlan(): ValuePlan {
 }
 
 describe('PalettePlan', () => {
+  it('retains different colors within a single tonal role when assigning per cell', () => {
+    const colorsWithChroma = colors.map((color, index) => ({ ...color, lab: [50, index === 0 ? 50 : index === 1 ? -20 : 0, index === 0 ? 30 : index === 1 ? -30 : 0] as const }))
+    const result = buildPalettePlan({ preserveCellColors: true, valuePlan: valuePlan(), structurePlan: structurePlan(), roleIdsByCell: ['region-0:base', 'region-0:base', 'region-0:base'], plannedLabs: colorsWithChroma.map(color => color.lab), colors: colorsWithChroma, maximumColors: 3, distanceMethod: 'delta-e-2000', featurePlacements: [] })
+    assert.deepEqual(result.colorIds, colors.map(color => color.id))
+    assert.equal(result.plan.totalCost, 0)
+    assert.deepEqual(result.plan.cellColorIds, result.colorIds)
+    validatePalettePlan(result.plan)
+  })
+
+  it('splits per-cell stock demand without exceeding finite inventory', () => {
+    const result = buildPalettePlan({ preserveCellColors: true, valuePlan: valuePlan(), structurePlan: structurePlan(), roleIdsByCell: ['region-0:base', 'region-0:base', 'region-0:base'], plannedLabs: [[50, 0, 0], [50, 0, 0], [50, 0, 0]], colors, maximumColors: 3, distanceMethod: 'delta-e-2000', featurePlacements: [], inventory: { 'gray-20': 1, 'gray-50': 1, 'gray-80': 1 } })
+    assert.deepEqual(result.diagnostics.inventoryUse, { 'gray-50': 1, 'gray-80': 1, 'gray-20': 1 })
+    assert.equal(new Set(result.colorIds).size, 3)
+  })
   it('recomputes costs when color values or the distance method change between plans', () => {
     const input: Parameters<typeof buildPalettePlan>[0] = {
       valuePlan: valuePlan(), structurePlan: structurePlan(),

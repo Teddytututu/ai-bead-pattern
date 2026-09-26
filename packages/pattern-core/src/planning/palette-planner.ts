@@ -13,6 +13,8 @@ import type { ColorDistanceMethod, Lab, MaterialColor } from '../types.js'
 import type { ResolvedFeaturePlacement } from './feature-placement.js'
 
 export interface PalettePlanningInput {
+  /** Keep local color evidence instead of flattening every tonal role to one color. */
+  preserveCellColors?: boolean
   valuePlan: ValuePlan
   roleIdsByCell: readonly (string | undefined)[]
   plannedLabs: readonly Lab[]
@@ -22,6 +24,8 @@ export interface PalettePlanningInput {
   distanceMethod: ColorDistanceMethod
   featurePlacements: readonly ResolvedFeaturePlacement[]
   requiredColorIds?: readonly string[]
+  /** Automatic fill exclusions; stock still describes the complete catalog. */
+  excludedColorIds?: readonly string[]
   /** Missing entries represent unrestricted stock; supplied entries are bead counts. */
   inventory?: Readonly<Record<string, number>>
   /** Ordered physical substitutes for an unavailable or insufficient preferred color. */
@@ -105,10 +109,12 @@ function validateInput(input: PalettePlanningInput): void {
     }
   }
   const colorIds = new Set(input.colors.map((color) => color.id))
+  const excluded = new Set(input.excludedColorIds ?? [])
+  if ([...excluded].some(id => !colorIds.has(id)) || excluded.size === colorIds.size) throw new RangeError('Fill exclusions must leave at least one known material color')
   if ((input.requiredColorIds?.length ?? 0) > input.maximumColors
     || new Set(input.requiredColorIds ?? []).size !== (input.requiredColorIds?.length ?? 0)
     || (input.requiredColorIds ?? []).some((colorId) => colorIds.has(colorId) === false
-      || stock(input, colorId) <= 0)) {
+      || excluded.has(colorId) || stock(input, colorId) <= 0)) {
     throw new RangeError('Required palette colors must be unique, stocked, known, and within the color limit')
   }
   for (const [colorId, quantity] of Object.entries(input.inventory ?? {})) {
@@ -123,7 +129,7 @@ function validateInput(input: PalettePlanningInput): void {
     }
   }
   const required = input.roleIdsByCell.filter((roleId) => roleId !== undefined).length
-  const finiteCapacity = input.colors.reduce((sum, color) => sum + stock(input, color.id), 0)
+  const finiteCapacity = input.colors.filter(color => !excluded.has(color.id)).reduce((sum, color) => sum + stock(input, color.id), 0)
   if (Number.isFinite(finiteCapacity) && finiteCapacity < required) {
     throw new RangeError('Palette inventory cannot cover all planned cells')
   }
@@ -331,7 +337,8 @@ function assignRoles(
 
 export function buildPalettePlan(input: PalettePlanningInput): PalettePlanningResult {
   validateInput(input)
-  const colors = prepareColors(input.colors)
+  if (input.preserveCellColors) return buildCellPalettePlan(input)
+  const colors = prepareColors(input.colors).filter(color => !input.excludedColorIds?.includes(color.id))
   const roles = buildRoles(input, colors)
   const selectedColors = selectColors(input, colors, roles)
   const assignment = assignRoles(input, roles, selectedColors)
@@ -395,4 +402,135 @@ export function buildPalettePlan(input: PalettePlanningInput): PalettePlanningRe
       inventoryUse: assignment.inventoryUse,
     },
   }
+}
+
+/** Choose a bounded material subset from cell evidence, then allocate individual beads. */
+function buildCellPalettePlan(input: PalettePlanningInput): PalettePlanningResult {
+  const colors = prepareColors(input.colors).filter(color => !input.excludedColorIds?.includes(color.id))
+  const available = colors.filter(color => stock(input, color.id) > 0)
+  const active = input.roleIdsByCell.flatMap((roleId, cell) => roleId === undefined ? [] : [cell])
+  const roles = new Map(input.valuePlan.roles.map(role => [role.id, role]))
+  const distances = input.plannedLabs.map(lab => colors.map(color => colorDistance(lab, color.lab, input.distanceMethod)))
+  const indexById = new Map(colors.map((color, index) => [color.id, index]))
+  const weights = input.roleIdsByCell.map(id => Math.max(0.1, roles.get(id ?? '')?.importance ?? 0.1))
+  const selected = new Set(input.requiredColorIds ?? [])
+  const finiteStock = input.inventory !== undefined && Object.keys(input.inventory).length > 0
+  const featureRoles = new Set(input.featurePlacements.flatMap(placement => placement.roles.map(entry => entry.role)))
+  if (selected.size < input.maximumColors && [...featureRoles].some(role => role.endsWith('-dark'))) {
+    selected.add([...available].sort((a, b) => a.lab[0] - b.lab[0] || a.id.localeCompare(b.id))[0]!.id)
+  }
+  if (selected.size < input.maximumColors && featureRoles.has('eye-highlight')) {
+    selected.add([...available].sort((a, b) => b.lab[0] - a.lab[0] || a.id.localeCompare(b.id))[0]!.id)
+  }
+  // Aggregate subset-selection costs by nearest physical color. This bounds the
+  // greedy search to paletteSize buckets; final bead assignment still uses each cell's Lab.
+  const availableIndices = available.map(color => indexById.get(color.id)!)
+  const buckets = new Map<number, Float64Array>()
+  for (const cell of active) {
+    const row = distances[cell]!
+    const nearest = availableIndices.reduce((best, index) => row[index]! < row[best]! ? index : best)
+    const costs = buckets.get(nearest) ?? new Float64Array(colors.length)
+    for (let index = 0; index < colors.length; index++) costs[index] = costs[index]! + row[index]! * weights[cell]!
+    buckets.set(nearest, costs)
+  }
+  const demands = [...buckets.values()]
+  const best = new Float64Array(demands.length).fill(Number.POSITIVE_INFINITY)
+  const include = (id: string): void => {
+    selected.add(id)
+    const index = indexById.get(id)!
+    for (let bucket = 0; bucket < demands.length; bucket++) best[bucket] = Math.min(best[bucket]!, demands[bucket]![index]!)
+  }
+  for (const id of selected) include(id)
+  while (selected.size < Math.min(input.maximumColors, available.length)) {
+    let chosen: PreparedColor | undefined
+    let bestCost = Number.POSITIVE_INFINITY
+    const selectedCapacity = finiteStock ? [...selected].reduce((sum, id) => sum + stock(input, id), 0) : Number.POSITIVE_INFINITY
+    for (const color of available) {
+      if (selected.has(color.id)) continue
+      if (selectedCapacity < active.length) {
+        const remainingSlots = input.maximumColors - selected.size - 1
+        const capacity = selectedCapacity + stock(input, color.id) + available
+          .filter(other => other.id !== color.id && !selected.has(other.id))
+          .map(other => stock(input, other.id)).sort((a, b) => b - a)
+          .slice(0, remainingSlots).reduce((sum, value) => sum + value, 0)
+        if (capacity < active.length) continue
+      }
+      const index = indexById.get(color.id)!
+      let cost = 0
+      for (let bucket = 0; bucket < demands.length; bucket++) cost += Math.min(best[bucket]!, demands[bucket]![index]!)
+      if (cost < bestCost || (cost === bestCost && color.id.localeCompare(chosen?.id ?? '') < 0)) {
+        chosen = color
+        bestCost = cost
+      }
+    }
+    if (!chosen) break
+    include(chosen.id)
+  }
+  const selectedColors = colors.filter(color => selected.has(color.id))
+  const remaining = new Map(selectedColors.map(color => [color.id, stock(input, color.id)]))
+  if (!selectedColors.length || [...remaining.values()].reduce((sum, value) => sum + value, 0) < active.length) {
+    throw new RangeError('Palette inventory cannot cover all planned cells within the color limit')
+  }
+  const ranked = active.map(cell => {
+    const ordered = [...selectedColors].sort((a, b) => distances[cell]![indexById.get(a.id)!]! - distances[cell]![indexById.get(b.id)!]! || a.id.localeCompare(b.id))
+    const regret = ordered.length < 2 ? 0 : distances[cell]![indexById.get(ordered[1]!.id)!]! - distances[cell]![indexById.get(ordered[0]!.id)!]!
+    return { cell, ordered, regret }
+  }).sort((a, b) => b.regret - a.regret || a.cell - b.cell)
+  const colorIds = input.plannedLabs.map(() => selectedColors[0]!.id)
+  const inventoryUse: Record<string, number> = {}
+  const countsByRole = new Map<string, Map<string, number>>()
+  const substitutions = new Map<string, PaletteSubstitutionDiagnostic>()
+  let cost = 0
+  let totalWeight = 0
+  for (const { cell, ordered } of ranked) {
+    const preferred = input.substituteColorIds === undefined ? undefined : colors.reduce((best, color) => {
+      const difference = distances[cell]![indexById.get(color.id)!]! - distances[cell]![indexById.get(best.id)!]!
+      return difference < 0 || (difference === 0 && color.id.localeCompare(best.id) < 0) ? color : best
+    })
+    const substitute = (input.substituteColorIds?.[preferred?.id ?? ''] ?? []).find(id => (remaining.get(id) ?? 0) > 0)
+    const chosen = preferred !== undefined && (remaining.get(preferred.id) ?? 0) <= 0 && substitute !== undefined
+      ? selectedColors.find(color => color.id === substitute)!
+      : ordered.find(color => remaining.get(color.id)! > 0)!
+    colorIds[cell] = chosen.id
+    remaining.set(chosen.id, remaining.get(chosen.id)! - 1)
+    inventoryUse[chosen.id] = (inventoryUse[chosen.id] ?? 0) + 1
+    const roleId = input.roleIdsByCell[cell]!
+    if (preferred && input.substituteColorIds?.[preferred.id]?.includes(chosen.id)) substitutions.set(`${roleId}|${preferred.id}|${chosen.id}`, { roleId, preferredColorId: preferred.id, selectedColorId: chosen.id })
+    const counts = countsByRole.get(roleId) ?? new Map<string, number>()
+    counts.set(chosen.id, (counts.get(chosen.id) ?? 0) + 1)
+    countsByRole.set(roleId, counts)
+    cost += distances[cell]![indexById.get(chosen.id)!]! * weights[cell]!
+    totalWeight += weights[cell]!
+  }
+  const assignments: Record<string, string> = {}
+  const allowedColorIdsByRole: Record<string, string[]> = {}
+  for (const role of input.valuePlan.roles) {
+    const counts = countsByRole.get(role.id)
+    assignments[role.id] = counts ? [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]![0] : selectedColors[0]!.id
+    allowedColorIdsByRole[role.id] = counts ? [...counts.keys()].sort() : [selectedColors[0]!.id]
+  }
+  const plan: PalettePlan = { assignmentMode: 'per-cell', cellColorIds: colorIds, selectedColorIds: selectedColors.map(color => color.id), assignments, allowedColorIdsByRole, totalCost: cost / Math.max(1, totalWeight) }
+  validatePalettePlan(plan)
+  let pairs = 0, orderedPairs = 0
+  const relaxedRegionIds = new Set<string>()
+  const byRegion = new Map<string, ValueRole[]>()
+  for (const role of input.valuePlan.roles) {
+    if (!countsByRole.has(role.id)) continue
+    const group = byRegion.get(role.regionId) ?? []
+    group.push(role)
+    byRegion.set(role.regionId, group)
+  }
+  const meanLightness = (id: string): number => {
+    const counts = [...countsByRole.get(id)!]
+    return counts.reduce((sum, [colorId, count]) => sum + colors[indexById.get(colorId)!]!.lab[0] * count, 0) / counts.reduce((sum, [, count]) => sum + count, 0)
+  }
+  for (const [regionId, group] of byRegion) {
+    group.sort((a, b) => a.targetLightness - b.targetLightness || a.id.localeCompare(b.id))
+    for (let index = 1; index < group.length; index++) {
+      pairs++
+      if (meanLightness(group[index]!.id) - meanLightness(group[index - 1]!.id) + 1e-9 >= group[index]!.minimumSeparation) orderedPairs++
+      else relaxedRegionIds.add(regionId)
+    }
+  }
+  return { plan, colorRoles: [], colorIds, diagnostics: { roleOrderAccuracy: pairs === 0 ? 1 : orderedPairs / pairs, relaxedRegionIds: [...relaxedRegionIds].sort(), substitutions: [...substitutions.values()], inventoryUse } }
 }

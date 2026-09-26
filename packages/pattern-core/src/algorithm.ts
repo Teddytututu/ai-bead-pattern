@@ -17,6 +17,8 @@ export interface PatternAlgorithm {
 export interface PatternAlgorithmConfig {
   version?: string
   clock?: () => number
+  /** Optional UI scheduler; does not change generation identity or candidate ordering. */
+  yieldControl?: () => Promise<void>
 }
 
 export function createPatternAlgorithm(config: PatternAlgorithmConfig = {}): PatternAlgorithm {

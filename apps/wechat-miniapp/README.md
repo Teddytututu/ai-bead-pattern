@@ -2,7 +2,11 @@
 
 原生 TypeScript 单页提供选图、291/24 色卡、用色/尺寸设置、上传、异步生成、Canvas 候选预览、材料清单及 PNG/CSV/JSON 下载。退后台暂停轮询，回到前台使用保存的 jobId 恢复，任务继续在服务端执行。
 
+新增颜色策略与明暗强度：支持随风格、保色、适度增强、风格化；零强度保留原始明暗。字段经微信 SDK 的 `options.structure` 传递，语义与 [API](../../services/pattern-api/README.md) 一致。保色模式下滑块禁用，切换参数会清除待重试请求，避免复用旧参数。
+
 ## 使用
+
+外/内轮廓提供独立开关，默认开启；候选下方显示实际轮廓格数、对比不足和证据缺失提示。SDK 同时支持 `options.featureOverrides` 手动五官参数，点选编辑入口目前在浏览器 Demo，详见[轮廓与五官说明](../../docs/contours-features-2026-09-27.md)。
 
 1. 按 [Pattern API 说明](../../services/pattern-api/README.md)启动服务。
 2. `config.ts` 已使用本机调试配置 `apiBaseUrl: http://127.0.0.1:7105` 和 `devUserId: local-demo`；真实微信登录时清空 `devUserId` 并改为 HTTPS API 地址。

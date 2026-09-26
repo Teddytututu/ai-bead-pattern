@@ -33,8 +33,11 @@ async function uploadWideImage(page) {
 }
 
 test('switches analysis layers and exposes the confirmed subject state', async ({ page }) => {
+  // Initial auto search, then a fixed canvas for the mask confirmation.
+  test.setTimeout(60_000)
   await page.goto('/apps/demo/')
   await waitForGeneration(page)
+  await page.locator('[data-size="32"]').click()
   await page.getByRole('button', { name: '分析图层' }).click()
 
   const dialog = page.getByRole('dialog', { name: '图像理解' })
@@ -53,9 +56,12 @@ test('switches analysis layers and exposes the confirmed subject state', async (
 })
 
 test('keeps a wide source proportional in the mobile analysis viewer', async ({ page }) => {
+  // Initial automatic search, then another search after uploading the wide image.
+  test.setTimeout(60_000)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/apps/demo/')
   await waitForGeneration(page)
+  await page.locator('[data-size="32"]').click()
   await uploadWideImage(page)
   await page.getByRole('button', { name: '分析图层' }).click()
 
@@ -71,7 +77,7 @@ test('keeps a wide source proportional in the mobile analysis viewer', async ({ 
   await expect(page.getByRole('button', { name: '关闭图像理解' })).toBeInViewport()
 })
 
-test('shows resolved eye, nose, and mouth cells for the sample portrait', async ({ page }) => {
+test('shows resolved neural eye template cells for the sample image', async ({ page }) => {
   await page.goto('/apps/demo/')
   await waitForGeneration(page)
   await page.getByRole('button', { name: '分析图层' }).click()

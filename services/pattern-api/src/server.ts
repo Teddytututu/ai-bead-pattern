@@ -5,7 +5,7 @@ import { resolve, join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import sharp from 'sharp'
 import { getPalette, listPalettes } from '@ai-bead-pattern/material-palettes'
-import { createPatternAlgorithm, patternMaterialsCsv, patternSvg } from '@ai-bead-pattern/pattern-core'
+import { createPatternAlgorithm, patternMaterialsCsv, patternSvg, validateFeatureOverrides, isDeepSaturatedInk } from '@ai-bead-pattern/pattern-core'
 import { apiLimits, parseCreateJob, record, nonempty, ContractError, type JobView, type ApiErrorBody } from '@ai-bead-pattern/pattern-api-contracts'
 import { Store, type Stored, type ImageRecord, type JobRecord, type SavedResult } from './store.js'
 
@@ -17,6 +17,7 @@ class HttpError extends Error {
 }
 export interface ApiOptions {
   dataDir: string; production?: boolean; devAuth?: boolean; appId?: string; appSecret?: string; rembgEndpoint?: string
+  sam2Endpoint?: string
   remoteAnalysisLabel?: string
   concurrency?: number; maxQueue?: number; jobTimeoutMs?: number; queueTimeoutMs?: number; retentionMs?: number
   clock?: () => number
@@ -25,9 +26,9 @@ export interface ApiOptions {
 }
 
 export async function createPatternApi(options: ApiOptions) {
-  const endpoint = options.rembgEndpoint ? new URL(options.rembgEndpoint) : undefined
-  if (endpoint && (!['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password)) throw new Error('Invalid model endpoint')
-  const remoteAnalysis = endpoint !== undefined && !['localhost', '127.0.0.1', '[::1]'].includes(endpoint.hostname)
+  const endpoints = [options.rembgEndpoint, options.sam2Endpoint].filter((value): value is string => Boolean(value)).map(value => new URL(value))
+  if (endpoints.some(endpoint => !['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password)) throw new Error('Invalid model endpoint')
+  const remoteAnalysis = endpoints.some(endpoint => !['localhost', '127.0.0.1', '[::1]'].includes(endpoint.hostname))
   if (remoteAnalysis && !options.remoteAnalysisLabel?.trim()) throw new Error('Remote model endpoints require a processing location label')
   if (options.production && (options.devAuth || !options.appId || !options.appSecret || options.login || options.workerUrl)) {
     throw new Error('Production requires WeChat credentials and forbids development overrides')
@@ -92,7 +93,7 @@ export async function createPatternApi(options: ApiOptions) {
       let worker: Worker
       try {
         worker = new Worker(options.workerUrl ?? new URL('./worker.js', import.meta.url), {
-          workerData: { job, imagePath: imagePath(job.imageId), rembgEndpoint: options.rembgEndpoint },
+          workerData: { job, imagePath: imagePath(job.imageId), rembgEndpoint: options.rembgEndpoint, sam2Endpoint: options.sam2Endpoint },
           resourceLimits: { maxOldGenerationSizeMb: 512 },
         })
       } catch {
@@ -102,7 +103,7 @@ export async function createPatternApi(options: ApiOptions) {
       const timer = setTimeout(() => {
         terminal(job.id, 'failed', { code: 'JOB_TIMEOUT', message: '生成超时，请减少尺寸或候选数', retryable: true })
         void release(job.id)
-      }, options.jobTimeoutMs ?? (job.request.route === 'neural-analysis' ? 180_000 : 60_000))
+      }, options.jobTimeoutMs ?? (job.request.route === 'neural-analysis' ? (options.sam2Endpoint ? 300_000 : 180_000) : 60_000))
       running.set(job.id, { worker, timer })
       worker.on('message', (message: { type: string; stage?: string; error?: ApiErrorBody; result?: SavedResult }) => {
         if (closed) return
@@ -189,8 +190,9 @@ export async function createPatternApi(options: ApiOptions) {
       if (++bucket.count > 120) throw new HttpError(429, 'RATE_LIMITED', '请求过多，请稍后重试', true)
       const url = new URL(request.url ?? '/', 'http://localhost'), path = url.pathname, method = request.method
       if (path === '/healthz' && method === 'GET') return send({ status: 'ok' })
-      if (path === '/v1/capabilities' && method === 'GET') return send({ apiVersion: 'v1', defaultPaletteId: 'mard-291', routes: ['deterministic', ...(options.rembgEndpoint ? ['neural-analysis'] : [])], limits: apiLimits,
-        analysis: { configured: Boolean(endpoint), requiresConsent: remoteAnalysis, locationLabel: options.remoteAnalysisLabel ?? '自有本机服务' }, retentionMs: ttl })
+      if (path === '/v1/capabilities' && method === 'GET') return send({ apiVersion: 'v1', defaultPaletteId: 'mard-291', routes: ['deterministic', ...(options.rembgEndpoint || options.sam2Endpoint ? ['neural-analysis'] : [])], limits: apiLimits,
+        features: { independentContours: true, manualFeatureOverrides: true, featureCoordinateSpace: 'normalized-upload-pixels', templateVersion: 'feature-templates-v2' },
+        analysis: { configured: endpoints.length > 0, requiresConsent: remoteAnalysis, locationLabel: options.remoteAnalysisLabel ?? '自有本机服务' }, retentionMs: ttl })
       if ((path === '/v1/auth/wechat' || path === '/v1/auth/dev') && method === 'POST') {
         const input = record(await json(request), path.endsWith('/dev') ? ['userId'] : ['code'])
         let owner: string
@@ -267,6 +269,8 @@ export async function createPatternApi(options: ApiOptions) {
           return send(view(owned<JobRecord>('job', String(prior.jobId), owner)), 202)
         }
         const image = owned<ImageRecord>('image', input.imageId, owner)
+        try { validateFeatureOverrides(input.options.featureOverrides, image.width, image.height) }
+        catch { throw new HttpError(422, 'INVALID_FEATURE', '五官坐标或模板无效，请使用上传接口返回的图片尺寸') }
         let palette
         try { palette = await getPalette(input.paletteId, input.paletteVersion) }
         catch { throw new HttpError(404, 'PALETTE_NOT_FOUND', '色卡或版本不存在') }
@@ -277,8 +281,11 @@ export async function createPatternApi(options: ApiOptions) {
           return send(view(owned<JobRecord>('job', String(raced.jobId), owner)), 202)
         }
         if (input.options.maxColors > palette.colorCount) throw new HttpError(422, 'COLOR_LIMIT', '用色数量超过当前色卡')
+        if (input.options.structure?.contours?.colorId !== undefined && !palette.colors.some(color => color.id === input.options.structure!.contours!.colorId)) throw new HttpError(422, 'INVALID_CONTOUR_COLOR', '轮廓色必须属于当前色卡')
+        if (palette.id === 'mard-291' && input.options.structure?.contours?.colorId !== undefined
+          && !isDeepSaturatedInk(palette.colors.find(color => color.id === input.options.structure!.contours!.colorId)!)) throw new HttpError(422, 'INVALID_CONTOUR_COLOR', `MARD 291 描边必须选用深色高饱和子集：${palette.colors.filter(isDeepSaturatedInk).map(color => color.id).join('、')}`)
         if (input.route === 'neural-analysis' && remoteAnalysis && input.consentToRemoteAnalysis !== true) throw new HttpError(422, 'REMOTE_CONSENT_REQUIRED', '使用此分析服务前需要单独同意图片传输')
-        if (input.route === 'neural-analysis' && !options.rembgEndpoint && input.failureMode === 'strict') throw new HttpError(503, 'AI_UNAVAILABLE', 'AI 分析尚未配置', true)
+        if (input.route === 'neural-analysis' && !options.rembgEndpoint && !options.sam2Endpoint && input.failureMode === 'strict') throw new HttpError(503, 'AI_UNAVAILABLE', 'AI 分析尚未配置', true)
         const allJobs = store.list<JobRecord>('job'), mine = allJobs.filter(j => j.owner === owner && j.expiresAt > now)
         if (allJobs.filter(j => j.state === 'queued').length >= maxQueue || mine.filter(active).length >= 3 || mine.length >= 100) throw new HttpError(429, 'QUEUE_FULL', '任务数量已达上限，请稍后重试', true)
         const id = `job_${randomUUID()}`

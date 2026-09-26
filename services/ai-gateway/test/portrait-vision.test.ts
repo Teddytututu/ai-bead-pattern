@@ -45,6 +45,24 @@ function face({
 }
 
 describe('Portrait Vision face landmarks', () => {
+  it('retains a rolled face, individual eye shape and visibility, and one anchored mouth', () => {
+    const base = face()
+    const points = base.landmarks.map(p => ({ ...p }))
+    points[362] = { x: 0.57, y: 0.4, z: 0 }; points[263] = { x: 0.7, y: 0.4, z: 0 }
+    points[386] = { x: 0.64, y: 0.38, z: 0 }; points[374] = { x: 0.64, y: 0.43, z: 0 }
+    points[33] = { x: 0.32, y: 0.38, z: 0 }; points[133] = { x: 0.37, y: 0.38, z: 0 }
+    points[159] = { x: 0.345, y: 0.37, z: 0 }; points[145] = { x: 0.345, y: 0.39, z: 0 }
+    const rolled = { ...base, landmarks: points.map((p, index) => ({ ...p, x: 1 - p.y, y: p.x, ...(index === 468 ? { visibility: 0.1 } : {}) })) }
+    assert.equal(selectPrimaryFace([rolled]).status, 'primary')
+    const mapped = mapMediaPipeFaceLandmarks(rolled, { width: 100, height: 100, modelVersion: 'test' })
+    const left = mapped.find(p => p.id === 'left-eye-center')!, right = mapped.find(p => p.id === 'right-eye-center')!
+    assert.ok(left.y !== right.y)
+    assert.equal(left.featureShape?.angleDegrees, 90)
+    assert.ok(left.featureShape!.widthPx > right.featureShape!.widthPx)
+    assert.equal(right.observationState, 'missing')
+    assert.equal(mapped.filter(p => p.kind === 'mouth').length, 1)
+    assert.equal(mapped.find(p => p.kind === 'mouth')?.featureShape?.anchors?.length, 4)
+  })
   it('selects a clearly dominant primary face and flags close multi-face cases', () => {
     assert.deepEqual(selectPrimaryFace([face(), face({ left: 0.05, top: 0.05, right: 0.2, bottom: 0.2 })]), {
       status: 'primary',
@@ -79,8 +97,6 @@ describe('Portrait Vision face landmarks', () => {
       'face-right',
       'left-eye-center',
       'mouth-center',
-      'mouth-left',
-      'mouth-right',
       'nose-tip',
       'right-eye-center',
     ])
@@ -107,7 +123,7 @@ describe('Portrait Vision face landmarks', () => {
       signal: controller.signal,
     })
     assert.equal(result.status, 'primary')
-    assert.equal(result.analysis.landmarks?.length, 9)
+    assert.equal(result.analysis.landmarks?.length, 7)
     assert.equal(result.analysis.modelVersions?.faceLandmarks, 'mediapipe/face-v1')
   })
 })
@@ -215,7 +231,7 @@ describe('Portrait Vision semantic regions', () => {
     })
     assert.equal(primary.status, 'primary')
     assert.equal(primary.analysis.imageType, 'portrait')
-    assert.equal(primary.analysis.landmarks?.length, 9)
+    assert.equal(primary.analysis.landmarks?.length, 7)
     assert.equal(primary.analysis.subjectMaskEvidence?.revision, 'manual:test')
     assert.equal(primary.analysis.modelVersions?.faceLandmarks, 'mediapipe/face-v1')
 

@@ -57,6 +57,13 @@ export type BaselineMode = 'a0' | 'a1' | 'mvp'
 export type AlgorithmEngine = 'baseline'
 export type GridRefinementMode = 'fast' | 'quality'
 export type OutlineMode = 'off' | 'selective' | 'full'
+export type ValueMode = 'preserve' | 'adaptive' | 'stylized'
+export interface ContourOptions {
+  external?: boolean
+  internal?: boolean
+  /** Physical palette id, not a displayed code or arbitrary RGB. */
+  colorId?: string
+}
 
 export interface GridSize {
   width: number
@@ -84,8 +91,14 @@ export interface StructureOptions {
   /** Multiplier for semantic eye/skin, face/hair, and subject/background lightness gaps. */
   valueOrderStrength?: number
   valueLevels?: 2 | 3 | 4
+  /** Faithful defaults to preserve; other styles use bounded Lab lightness changes. */
+  valueMode?: ValueMode
+  /** 0 bypasses tonal adjustments; outlines remain an independent option. */
+  valueStrength?: number
   /** Contrast-aware bead-grid outline applied before physical palette assignment. */
   outlineMode?: OutlineMode
+  /** Independent one-bead contours; both default on in the structure engine. */
+  contours?: ContourOptions
   occupancyMode?: 'auto' | 'full-frame' | 'subject-shape'
   shapeRefinementIterations?: number
 }
@@ -122,6 +135,8 @@ export interface PatternOptions {
   artDirection?: ArtDirectionOptions
   optimization?: OptimizationOptions
   beadDiameterMm?: number
+  /** Manual components in normalized upload image pixel coordinates; no CSS coordinates. */
+  featureOverrides?: readonly FeatureOverride[]
 }
 
 export interface ImportanceMap {
@@ -207,6 +222,25 @@ export type StructuralRole =
 export type LandmarkPriority = 'hard' | 'soft'
 
 export type LandmarkObservationState = 'observed' | 'inferred' | 'missing'
+export interface FeatureShape {
+  widthPx: number
+  heightPx: number
+  angleDegrees?: number
+  expression?: 'neutral' | 'open' | 'closed' | 'smile'
+  anchors?: readonly { x: number; y: number }[]
+}
+export interface FeatureOverride {
+  id: string
+  kind: 'eye' | 'nose' | 'mouth'
+  x: number
+  y: number
+  instanceId?: string
+  featureGroupId?: string
+  templateId?: string
+  hidden?: boolean
+  locked?: boolean
+  shape?: FeatureShape
+}
 
 export interface ImageLandmark {
   id: string
@@ -233,6 +267,11 @@ export interface ImageLandmark {
   /** Evidence state controls whether a landmark may edit occupancy or only guide planning. */
   observationState?: LandmarkObservationState
   provenance?: readonly EvidenceProvenance[]
+  instanceId?: string
+  featureGroupId?: string
+  featureShape?: FeatureShape
+  templateId?: string
+  placementLocked?: boolean
 }
 
 export interface ImageAnalysis {
@@ -281,7 +320,10 @@ export interface PatternMetadata {
   baseline: BaselineMode
   outlineMode?: OutlineMode
   engine?: AlgorithmEngine
+  valueMode?: ValueMode
+  valueStrength?: number
   aiProvider?: string
+  contours?: import('./planning/contour-planner.js').ResolvedContourOptions
   aiModel?: string
   beadDiameterMm?: number
 }
@@ -306,7 +348,7 @@ export interface GridEditRecord {
   fromColorId: string
   toColorId: string
   reason: 'small-region' | 'isolated-cell' | 'stripe' | 'topology' | 'palette-coherence'
-    | 'feature-placement' | 'cluster-refinement' | 'symmetry' | 'tile-seam'
+    | 'feature-placement' | 'cluster-refinement' | 'symmetry' | 'tile-seam' | 'contour' | 'fill-fidelity'
 }
 
 export interface GenerationMetrics {
@@ -359,6 +401,8 @@ export interface GenerationMetrics {
   paletteRoleConsistency: number
   paletteOptimizationChanges: number
   gridRefinementChanges: number
+  /** Source-supported body cells restored after cleanup, excluding features and contours. */
+  fillFidelityRestoredCells?: number
   symmetryQuality: number
   topologyEdits: number
   shapeApplied: boolean
@@ -484,6 +528,9 @@ export interface PatternCandidate {
   structurePlan?: StructurePlan
   /** @experimental Region-level light, base, shadow, and outline roles. */
   valuePlan?: ValuePlan
+  valueDiagnostics?: import('./planning/value-planner.js').ValuePlanningDiagnostics
+  colorDiagnostics?: import('./planning/color-diagnostics.js').ColorFidelityDiagnostics
+  contourPlan?: import('./planning/contour-planner.js').ContourPlan
   /** @experimental Global material-color subset and role assignments. */
   palettePlan?: PalettePlan
   /** @experimental Unified cluster cleanup diagnostics. */

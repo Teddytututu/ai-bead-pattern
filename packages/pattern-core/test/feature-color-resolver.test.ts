@@ -80,7 +80,7 @@ describe('feature role color resolution', () => {
     assert.ok(rgbToLab(highlight.rgb)[0] > rgbToLab(eyeDark.rgb)[0])
   })
 
-  it('uses one role color across a paired set of eyes', () => {
+  it('resolves each eye against its own colors instead of pooling the pair', () => {
     const initialColorIds = new Array(18).fill('skin')
     initialColorIds[10] = 'rose'
     initialColorIds[11] = 'rose'
@@ -96,10 +96,11 @@ describe('feature role color resolution', () => {
     })
 
     assert.equal(result.colorIds[4], result.colorIds[10])
-    assert.equal(result.colorIds[8], result.colorIds[14])
+    assert.equal(result.colorIds[8], 'skin')
+    assert.equal(result.colorIds[14], 'rose')
   })
 
-  it('combines paired source colors into dark pupils and one shared chromatic iris', () => {
+  it('keeps distinct source preferences for the two eyes', () => {
     const initialColorIds = new Array(18).fill('white')
 
     const result = resolveFeatureColors({
@@ -120,7 +121,8 @@ describe('feature role color resolution', () => {
     })
 
     assert.equal(result.roleColorIds['eye-dark'], 'black')
-    assert.equal(result.roleColorIds['eye-highlight'], 'olive')
+    assert.equal(result.featureRoleColorIds?.['left-eye-center']?.['eye-highlight'], 'olive')
+    assert.equal(result.featureRoleColorIds?.['right-eye-center']?.['eye-highlight'], 'white')
   })
 
   it('uses the source-derived material color for a nose when it meets the contrast budget', () => {

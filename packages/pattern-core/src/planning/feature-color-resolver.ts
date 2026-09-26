@@ -26,11 +26,14 @@ export interface FeatureColorResolutionInput {
 export interface FeatureColorResolutionResult {
   colorIds: readonly string[]
   roleColorIds: Readonly<Partial<Record<FeatureCellRole, string>>>
+  featureRoleColorIds?: Readonly<Record<string, Readonly<Partial<Record<FeatureCellRole, string>>>>>
   edits: readonly GridEditRecord[]
 }
 
 const roleOrder: readonly FeatureCellRole[] = [
   'eye-dark',
+  'eye-iris',
+  'eye-white',
   'eye-highlight',
   'mouth-dark',
   'mouth-inner',
@@ -137,7 +140,7 @@ function sourcePreferredFeatureColor(
   method: ColorDistanceMethod,
 ): PreparedColor | undefined {
   if (preferredColorIdsByFeature === undefined
-    || (role !== 'eye-highlight' && role !== 'nose-base')) return undefined
+    || (role !== 'eye-highlight' && role !== 'eye-iris' && role !== 'nose-base')) return undefined
   const counts = new Map<string, number>()
   for (const entry of entries) {
     const colorId = preferredColorIdsByFeature.get(entry.featureId)
@@ -271,6 +274,27 @@ function selectNose(
 export function resolveFeatureColors(
   input: FeatureColorResolutionInput,
 ): FeatureColorResolutionResult {
+  validateInput(input, prepareColors(input.colors))
+  const colorIds = [...input.initialColorIds]
+  const featureCells = new Set(input.placements.flatMap(placement => placement.occupiedCells))
+  const edits: GridEditRecord[] = []
+  const featureRoleColorIds: Record<string, Partial<Record<FeatureCellRole, string>>> = {}
+  for (const placement of input.placements) {
+    const preferred = input.preferredColorIdsByFeature?.get(placement.featureId)
+    const result = resolveOneFeatureColors({ ...input, placements: [placement],
+      preferredColorIdsByFeature: preferred === undefined ? new Map() : new Map([[placement.featureId, preferred]]),
+    }, featureCells)
+    for (const cell of placement.occupiedCells) colorIds[cell] = result.colorIds[cell]!
+    edits.push(...result.edits)
+    featureRoleColorIds[placement.featureId] = result.roleColorIds
+  }
+  return { colorIds, edits, featureRoleColorIds, roleColorIds: Object.assign({}, ...Object.values(featureRoleColorIds)) }
+}
+
+function resolveOneFeatureColors(
+  input: FeatureColorResolutionInput,
+  featureCells: ReadonlySet<number>,
+): FeatureColorResolutionResult {
   const colors = prepareColors(input.colors)
   validateInput(input, colors)
   if (input.placements.length === 0) {
@@ -278,7 +302,6 @@ export function resolveFeatureColors(
   }
   const colorsById = new Map(colors.map((color) => [color.id, color]))
   const entriesByRole = new Map<FeatureCellRole, { cell: number; featureId: string }[]>()
-  const featureCells = new Set(input.placements.flatMap((placement) => placement.occupiedCells))
   for (const placement of input.placements) {
     for (const entry of placement.roles) {
       if ((input.activeMask?.[entry.cell] ?? 1) !== 1) continue
@@ -337,7 +360,9 @@ export function resolveFeatureColors(
     const preferred = preferredByRole.get(role)
     const color = role === 'eye-dark'
       ? selectEyeDark(colors, carrier, minimumContrast, input.distanceMethod)
-      : role === 'eye-highlight'
+      : role === 'eye-iris'
+      ? preferred ?? selectHighlight(colors, selected.get('eye-dark') ?? colors[0]!, input.distanceMethod)
+      : role === 'eye-highlight' || role === 'eye-white'
       ? selectHighlight(colors, selected.get('eye-dark') ?? selectDark(
         colors,
         carrier,

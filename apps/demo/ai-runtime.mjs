@@ -1,3 +1,4 @@
+import { projectFeatureShape } from '../../packages/pattern-core/dist/index.js'
 const routeCapabilities = Object.freeze({
   deterministic: Object.freeze([]),
   'neural-analysis': Object.freeze(['subject-segmentation', 'edge-thin-structure']),
@@ -227,6 +228,7 @@ export function projectSourceAnalysisToProposal(sourceAnalysis = {}, proposal) {
         ...landmark,
         x: frame.x + (landmark.x + 0.5) * scaleX - 0.5,
         y: frame.y + (landmark.y + 0.5) * scaleY - 0.5,
+        ...(landmark.featureShape === undefined ? {} : { featureShape: projectFeatureShape(landmark.featureShape, scaleX, scaleY, frame.x, frame.y) }),
         ...(landmark.sourceRadiusPx === undefined ? {} : {
           sourceRadiusPx: landmark.sourceRadiusPx * (scaleX + scaleY) / 2,
         }),

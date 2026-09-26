@@ -130,6 +130,52 @@ function splitOutlineStructurePlan(sharedSourceRegion: boolean): StructurePlan {
 }
 
 describe('ValuePlan', () => {
+  it('retains distinct local chroma and exactly bypasses all tones in preserve or zero strength', () => {
+    const labs: Lab[] = [[50, 50, 30], [50, -20, -30], [5, 0, 0], [95, 0, 0]]
+    for (const policy of [{ mode: 'preserve' as const }, { mode: 'stylized' as const, strength: 0 }]) {
+      const result = buildValuePlan({ structurePlan: structurePlan(), pixelLabs: labs,
+        activeMask: new Uint8Array(4).fill(1), levels: 3, outlineMode: 'off',
+        lighting: { direction: [1, 0], intensity: 1, ambientLight: 1 }, materialByRegionId: { 'face-skin': 'metal' }, ...policy })
+      assert.deepEqual(result.plannedLabs, labs)
+      assert.equal(result.diagnostics.maximumNonOutlineDeltaE, 0)
+    }
+  })
+
+  it('never averages opposing hues even when bounded enhancement is enabled', () => {
+    const labs: Lab[] = [[50, 50, 30], [50, -20, -30], [50, 50, 30], [50, -20, -30]]
+    const result = buildValuePlan({ structurePlan: structurePlan(), pixelLabs: labs, activeMask: new Uint8Array(4).fill(1), levels: 3 })
+    assert.deepEqual(result.plannedLabs, labs)
+  })
+
+  it('does not brighten any interior cell when adding a full outline', () => {
+    const input = { structurePlan: outlinedSquareStructurePlan(), pixelLabs: Array.from({ length: 25 }, () => [50, 0, 0] as Lab), activeMask: new Uint8Array(25).fill(1), levels: 3 as const }
+    for (const mode of ['preserve', 'adaptive', 'stylized'] as const) {
+      const off = buildValuePlan({ ...input, mode, outlineMode: 'off' })
+      const full = buildValuePlan({ ...input, mode, outlineMode: 'full' })
+      for (const cell of [6, 7, 8, 11, 12, 13, 16, 17, 18]) assert.deepEqual(full.plannedLabs[cell], off.plannedLabs[cell])
+      assert.ok(full.plannedLabs[0]![0] < off.plannedLabs[0]![0])
+    }
+  })
+
+  it('bounds a light eye on dark skin and ignores non-adjacent semantic regions', () => {
+    const structure = semanticStructurePlan()
+    const labs: Lab[] = [[35, 15, 10], [45, 0, 0], [70, 0, 0], [50, 0, 0], [50, 0, 0]]
+    const input = { structurePlan: structure, pixelLabs: labs, activeMask: new Uint8Array(5).fill(1), levels: 3 as const }
+    const adaptive = buildValuePlan(input)
+    assert.ok(adaptive.plannedLabs[2]![0] >= 64)
+    assert.ok(adaptive.diagnostics.maximumNonOutlineDeltaE <= 6)
+    assert.deepEqual(buildValuePlan({ ...input, mode: 'preserve' }).plannedLabs, labs)
+    for (const region of structure.regions) region.adjacentRegionIds = []
+    assert.equal(buildValuePlan(input).diagnostics.semanticGaps.length, 0)
+  })
+
+  it('rejects invalid tonal controls and leaves inactive cells untouched', () => {
+    const input = { structurePlan: structurePlan(), pixelLabs: Array.from({ length: 4 }, () => [50, 20, 10] as Lab), activeMask: new Uint8Array([1, 0, 1, 0]), levels: 3 as const }
+    for (const strength of [-1, 1.01, NaN, Infinity]) assert.throws(() => buildValuePlan({ ...input, strength }), RangeError)
+    const result = buildValuePlan({ ...input, mode: 'stylized', outlineMode: 'full' })
+    assert.deepEqual(result.plannedLabs[1], input.pixelLabs[1])
+    assert.deepEqual(result.plannedLabs[3], input.pixelLabs[3])
+  })
   it('turns a region lightness range into ordered shadow, base, and light roles', () => {
     const result = buildValuePlan({
       structurePlan: structurePlan(),
@@ -328,7 +374,7 @@ describe('ValuePlan', () => {
     assert.equal(result.diagnostics.outline.selectedOutlineCells, 0)
   })
 
-  it('enforces semantic lightness gaps for eyes, hair, skin, subject, and background', () => {
+  it('relaxes impossible semantic gaps instead of exceeding the source lightness budget', () => {
     const result = buildValuePlan({
       structurePlan: semanticStructurePlan(),
       pixelLabs: Array.from({ length: 5 }, () => [52, 0, 0] as Lab),
@@ -345,10 +391,10 @@ describe('ValuePlan', () => {
       result.plan.roles.find((role) => role.regionId === group.groupId && role.kind === 'base')!.targetLightness,
     ]))
 
-    assert.ok(baseBySource.get('face-skin')! - baseBySource.get('eye')! >= 18)
-    assert.ok(Math.abs(baseBySource.get('face-skin')! - baseBySource.get('hair')!) >= 12)
-    assert.ok(Math.abs(baseBySource.get('subject-body')! - baseBySource.get('background')!) >= 14)
-    assert.equal(result.diagnostics.semanticGapAccuracy, 1)
+    for (const lightness of baseBySource.values()) assert.ok(Math.abs(lightness - 52) <= 6)
+    assert.ok(result.diagnostics.semanticGapAccuracy < 1)
+    assert.ok(result.diagnostics.maximumNonOutlineLightnessShift <= 6)
+    assert.ok(result.diagnostics.maximumNonOutlineDeltaE <= 6)
   })
 
   it('applies bounded light direction, ambient light, and material reflection adjustments', () => {

@@ -488,7 +488,7 @@
     .canvas-shell {
       min-height: 0;
       display: grid;
-      place-items: center;
+      place-items: start center;
       padding: 22px;
       overflow: auto;
     }
@@ -668,6 +668,12 @@
       .sidebar .section:nth-child(3) .check-item { justify-content: flex-start; flex-direction: row-reverse; }
       .sidebar .section:nth-child(4) .check-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
     }
+    #featureEditor label { display: block; margin: 8px 0; font-size: 12px; }
+    #featureEditor select, #featureEditor input:not([type="checkbox"]) { width: 100%; padding: 5px; }
+    #featureEditor .feature-coordinates { display: flex; gap: 8px; }
+    #featureEditor .feature-coordinates label { min-width: 0; flex: 1; }
+    #featureEditor p { font-size: 12px; color: var(--muted); line-height: 1.6; }
+    #featureStatus { overflow-wrap: anywhere; margin: 0; }
   </style>
 </head>
 <body>
@@ -718,6 +724,8 @@
         </div>
       </section>
 
+      <section class="section" id="featureEditor"></section>
+      <p class="section analysis-source" id="featureStatus" aria-live="polite"></p>
       <section class="section mask-gate-panel" id="maskGatePanel" hidden>
         <h2 class="section-title">Mask Gate</h2>
         <p class="mask-gate-sample" id="maskGateSample">等待 sidecar</p>
@@ -798,7 +806,17 @@
           </div>
         </div>
         <div class="control-group">
-          <div class="control-label"><span>明暗</span><span class="control-value" id="valueLevelsValue">3 档</span></div>
+          <div class="control-label"><label for="valueModeControl">颜色策略</label></div>
+          <select id="valueModeControl" aria-label="颜色策略">
+            <option value="auto">随风格（还原默认保色）</option>
+            <option value="preserve">保色</option>
+            <option value="adaptive">适度增强</option>
+            <option value="stylized">风格化</option>
+          </select>
+          <div class="control-label"><label for="valueStrengthControl">明暗强度</label><span class="control-value" id="valueStrengthValue">100%</span></div>
+          <input id="valueStrengthControl" type="range" min="0" max="100" value="100" aria-label="明暗强度">
+          <p class="hint">保色或强度 0 保留原始明暗；描边独立控制，实物色卡仍会带来量化色差。</p>
+          <div class="control-label"><span>明暗层级</span><span class="control-value" id="valueLevelsValue">3 档</span></div>
           <div class="segmented three" id="valueLevelsControl" aria-label="明暗层级">
             <button type="button" data-levels="2" aria-pressed="false">2</button>
             <button type="button" data-levels="3" aria-pressed="true">3</button>
@@ -806,13 +824,18 @@
           </div>
         </div>
         <div class="control-group">
-          <div class="control-label"><span>描边</span><span class="control-value" id="outlineModeValue">选择性</span></div>
+          <div class="control-label"><span>描边</span><span class="control-value" id="outlineModeValue">完整</span></div>
           <div class="segmented three" id="outlineModeControl" aria-label="图纸描边模式">
             <button type="button" data-outline-mode="off" aria-pressed="false">关闭</button>
-            <button type="button" data-outline-mode="selective" aria-pressed="true">选择性</button>
-            <button type="button" data-outline-mode="full" aria-pressed="false">完整</button>
+            <button type="button" data-outline-mode="selective" aria-pressed="false">选择性</button>
+            <button type="button" data-outline-mode="full" aria-pressed="true">完整</button>
           </div>
         </div>
+        <div class="check-list">
+          <label class="check-item">外轮廓（1 格）<input id="externalContour" type="checkbox" checked></label>
+          <label class="check-item">内轮廓（1 格）<input id="internalContour" type="checkbox" checked></label>
+        </div>
+        <p id="contourStatus" class="analysis-source" aria-live="polite"></p>
       </section>
 
       <section class="section">
@@ -902,7 +925,7 @@
           <div class="summary-item"><span class="summary-value" id="paletteChanges">0</span><span class="summary-label">配色调整</span></div>
           <div class="summary-item"><span class="summary-value" id="gridEdits">0</span><span class="summary-label">网格整理</span></div>
           <div class="summary-item"><span class="summary-value" id="gridRefinementChanges">--</span><span class="summary-label">精修改动</span></div>
-          <div class="summary-item"><span class="summary-value" id="symmetryQuality">--</span><span class="summary-label">对称质量</span></div>
+          <div class="summary-item"><span class="summary-value" id="symmetryQuality">--</span><span class="summary-label">姿态保持</span></div>
           <div class="summary-item"><span class="summary-value" id="valueOrderAccuracy">--</span><span class="summary-label">明暗顺序</span></div>
           <div class="summary-item"><span class="summary-value" id="shapeScore">--</span><span class="summary-label">轮廓吻合</span></div>
           <div class="summary-item"><span class="summary-value" id="shapeCoverage">--</span><span class="summary-label">覆盖吻合</span></div>
@@ -1094,6 +1117,10 @@
             <button class="analysis-debug-layer" type="button" data-analysis-layer="edges" aria-pressed="false">边缘</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="depth" aria-pressed="false">深度</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="embedding" aria-pressed="false">嵌入</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="eye" aria-pressed="false">眼睛蒙版</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="nose" aria-pressed="false">鼻子蒙版</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="mouth" aria-pressed="false">嘴部蒙版</button>
+            <button class="analysis-debug-layer" type="button" data-analysis-layer="body-parts" aria-pressed="false">身体部件</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="landmarks" aria-pressed="false">关键点</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="features" aria-pressed="false">五官落格</button>
           </div>
@@ -1137,7 +1164,6 @@
       derivePreferenceGenerationParameters,
       fitBradleyTerry,
       fitPreferenceModelV2,
-      inferPetAnalysis,
       preferenceRecordFromWorkbenchSession,
       rankPreferenceCandidates,
       redoMaskEdit,
@@ -1162,6 +1188,8 @@
       loadMaskGateSample,
     } from './mask-gate.mjs'
     import { inferSubjectAnalysis } from './subject-mask.mjs'
+    import { createFeatureEditor } from './feature-editor.mjs'
+    import { featureTemplateLibrary, prepareFeatureEvidence, validateFeatureOverrides } from '/packages/pattern-core/dist/index.js'
     import {
       createBlindCandidatePair,
       loadPreferenceRecords,
@@ -1181,7 +1209,7 @@
     import { getPalette } from '../../packages/material-palettes/dist/index.js'
     import { downloadPatternFile } from './pattern-download.mjs'
     let palette = await getPalette('mard-291')
-    const algorithm = createPatternAlgorithm()
+    const algorithm = createPatternAlgorithm({ yieldControl: () => new Promise(resolve => setTimeout(resolve, 0)) })
     const preferenceRuntime = createPreferenceRuntime({
       core: {
         comparePreferenceModels,
@@ -1215,9 +1243,15 @@
       occupancyControl: document.querySelector('#occupancyControl'),
       occupancyValue: document.querySelector('#occupancyValue'),
       valueLevelsControl: document.querySelector('#valueLevelsControl'),
+      valueModeControl: document.querySelector('#valueModeControl'),
+      valueStrengthControl: document.querySelector('#valueStrengthControl'),
+      valueStrengthValue: document.querySelector('#valueStrengthValue'),
       valueLevelsValue: document.querySelector('#valueLevelsValue'),
       outlineModeControl: document.querySelector('#outlineModeControl'),
       outlineModeValue: document.querySelector('#outlineModeValue'),
+      externalContour: document.querySelector('#externalContour'),
+      internalContour: document.querySelector('#internalContour'),
+      contourStatus: document.querySelector('#contourStatus'),
       styleControl: document.querySelector('#styleControl'),
       cleanGrid: document.querySelector('#cleanGrid'),
       refinementModeControl: document.querySelector('#refinementModeControl'),
@@ -1355,8 +1389,11 @@
     let selectedBaseline = 'mvp'
     let selectedOccupancy = 'auto'
     let selectedValueLevels = 3
-    let selectedOutlineMode = 'selective'
+    let selectedOutlineMode = 'full'
     let selectedRefinementMode = 'quality'
+    const featureEditor = createFeatureEditor({ container: document.querySelector('#featureEditor'), canvas: elements.sourcePreview,
+      templates: featureTemplateLibrary, getImage: () => sourceImage, getAnalysis: () => sourceAnalysis,
+      onChange: () => renderSourcePreview(), validate: validateFeatureOverrides })
     let showGrid = true
     let currentGenerationId
     let activePreferencePair
@@ -1504,7 +1541,8 @@
         return { evidence, source: 'sam2' }
       },
       onSelectError: (error) => {
-        console.warn('SAM 2 subject selection used the local structure fallback', error)
+        console.warn('SAM 2 subject selection failed; current mask retained', error)
+        setStatus('神经圈选未成功，已保留当前蒙版；可补画或擦除', 'error')
       },
       onClose: ({ session, outcome }) => {
         if (maskGateContext === undefined || maskGateRun === undefined || outcome !== 'cancelled') return
@@ -1549,7 +1587,11 @@
         ? '透明通道'
         : segmentationVersion?.startsWith('rembg/')
           ? 'AI 分割'
-          : '本地粗分割'
+          : sourceAnalysis.modelVersions?.neuralParts
+            ? '神经网络 · 主体与部件'
+            : sourceAnalysis.subjectMaskEvidence?.source === 'ai'
+              ? '预计算 AI 主体'
+              : '未检测到蒙版 · 可查看完整原图'
     }
 
     function refreshAnalysisDebugViewer() {
@@ -1615,7 +1657,7 @@
         option.disabled = availability.available === false
         const label = {
           deterministic: '确定性基线',
-          'neural-analysis': 'BiRefNet 神经分析',
+          'neural-analysis': '神经网络自动分割',
           'learned-pixelization': '学习像素化',
           'generative-proposal': '生成式提案',
         }[option.value]
@@ -1624,6 +1666,10 @@
           : label
       }
       elements.modelRouteSelect.querySelector('option[value="deterministic"]').disabled = false
+      if (routeAvailability(aiHealth, 'neural-analysis').available && maskGateContext === undefined) {
+        selectedModelRoute = 'neural-analysis'
+        elements.modelRouteSelect.value = selectedModelRoute
+      }
       renderModelRouteStatus()
     }
 
@@ -1666,6 +1712,13 @@
       aiResultByRoute.set(selectedModelRoute, result)
       renderAnalysisSource()
       renderModelRouteStatus()
+      if (selectedModelRoute === 'neural-analysis') {
+        const eyes = (sourceAnalysis.semanticRegions ?? []).filter(region => region.label === 'eye').length
+        elements.modelRouteStatus.textContent = eyes > 0
+          ? `自动分割完成 · ${eyes} 个眼睛区域`
+          : '主体分析完成 · 未检测到眼睛蒙版'
+        elements.modelRouteStatus.title = (result.warnings ?? []).join('\n')
+      }
       refreshAnalysisDebugViewer()
     }
 
@@ -1918,64 +1971,13 @@
     }
 
     function createSampleAnalysis(image, bundledMask) {
-      const local = inferSubjectAnalysis(image)
-      const provenance = [{
-        origin: bundledMask === undefined ? 'heuristic' : 'model',
-        provider: bundledMask === undefined ? 'demo-sample' : 'bundled-birefnet',
-        model: 'bundled-cc0-cat',
-        version: '2026-09-01',
-      }]
-      const subjectMask = bundledMask ?? local.subjectMaskEvidence.mask
-      const pet = inferPetAnalysis(image, subjectMask)
-      const faceMask = pet?.faceMask ?? {
-        width: image.width,
-        height: image.height,
-        values: new Float32Array(image.width * image.height),
-      }
-      const base = {
-        ...local,
-        subjectMask,
-        subjectMaskEvidence: {
-          mask: subjectMask,
-          confidence: bundledMask === undefined ? local.confidence : 0.96,
-          source: bundledMask === undefined ? local.subjectMaskEvidence.source : 'ai',
-          revision: bundledMask === undefined ? local.subjectMaskEvidence.revision : 'demo:bundled-birefnet:cat-v1',
-          provenance,
-        },
-      }
+      if (bundledMask === undefined) return inferSubjectAnalysis(image)
+      const provenance = [{ origin: 'model', provider: 'bundled-birefnet', model: 'bundled-cc0-cat', version: '2026-09-01' }]
       return {
-        ...base,
-        imageType: 'pet',
-        ...(pet === undefined ? {} : {
-          landmarks: pet.landmarks,
-          suggestedCrop: pet.suggestedCrop,
-          suggestedCropSource: 'automatic',
-          suggestedCropConfidence: pet.suggestedCropConfidence,
-          confidence: pet.confidence,
-        }),
-        semanticRegions: [
-          {
-            id: 'subject',
-            label: 'subject',
-            mask: base.subjectMaskEvidence.mask,
-            confidence: base.subjectMaskEvidence.confidence,
-            importance: 0.9,
-            provenance,
-          },
-          {
-            id: 'pet-face',
-            label: 'pet face',
-            mask: faceMask,
-            confidence: 1,
-            importance: 1,
-            provenance,
-          },
-        ],
-        modelVersions: {
-          ...base.modelVersions,
-          petLandmarks: 'pet-geometry/pet-face-v2',
-          petSemantics: 'pet-geometry/pet-face-v2',
-        },
+        imageType: 'pet', confidence: 0.96, subjectMask: bundledMask,
+        subjectMaskEvidence: { mask: bundledMask, confidence: 0.96, source: 'ai', revision: 'demo:bundled-birefnet:cat-v1', provenance },
+        semanticRegions: [{ id: 'subject', label: 'subject', mask: bundledMask, confidence: 0.96, importance: 0.9, provenance }],
+        modelVersions: { segmentation: 'bundled-birefnet' }, provenance,
       }
     }
 
@@ -2040,6 +2042,7 @@
       const width = buffer.width * scale
       const height = buffer.height * scale
       context.drawImage(buffer, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
+      featureEditor.draw()
     }
 
     function selectedStyles() {
@@ -2070,12 +2073,16 @@
         styles: selectedStyles(),
         baseline: selectedBaseline,
         aiEnhancement: selectedModelRoute !== 'deterministic',
+        featureOverrides: featureEditor.overrides(),
         backgroundRgb: [245, 245, 242],
         structure: {
           importanceStrength: 3.5,
           edgeStrength: 1.1,
           valueLevels: selectedValueLevels,
+          ...(elements.valueModeControl.value === 'auto' ? {} : { valueMode: elements.valueModeControl.value }),
+          valueStrength: Number(elements.valueStrengthControl.value) / 100,
           outlineMode: selectedOutlineMode,
+          contours: { external: selectedOutlineMode !== 'off' && elements.externalContour.checked, internal: selectedOutlineMode !== 'off' && elements.internalContour.checked },
           occupancyMode: selectedOccupancy,
           shapeRefinementIterations: 2,
         },
@@ -2177,14 +2184,17 @@
         )
         const proposalGrid = learnedProposal?.targetGrid
         const options = generationOptions()
+        const correctedAnalysis = prepareFeatureEvidence({ image: sourceImage, palette, analysis: sourceAnalysis, options }).analysis ?? sourceAnalysis
+        // Corrections have been merged in source coordinates; project them together with the evidence.
+        delete options.featureOverrides
         const inferredProposalAnalysis = learnedProposal === undefined
           ? undefined
           : inferSubjectAnalysis(learnedProposal.image)
         const projectedSourceAnalysis = learnedProposal === undefined
           ? undefined
-          : projectSourceAnalysisToProposal(sourceAnalysis, learnedProposal)
+          : projectSourceAnalysisToProposal(correctedAnalysis, learnedProposal)
         const proposalAnalysis = learnedProposal === undefined
-          ? sourceAnalysis
+          ? correctedAnalysis
           : {
             ...inferredProposalAnalysis,
             ...projectedSourceAnalysis,
@@ -2290,6 +2300,9 @@
     }
 
     function renderPattern(candidate) {
+      document.querySelector('#featureStatus').textContent = (candidate.featurePlacements ?? []).map(p => `${p.featureId}：${p.templateId}，位置 ${p.center.join(', ')}${p.rotationDegrees ? `，${p.rotationDegrees}°` : ''}`).join('；') || '未生成五官模板；可在原图中手动校正。'
+      const contour = candidate.contourPlan
+      elements.contourStatus.textContent = contour ? `轮廓 ${contour.diagnostics.retainedCells}/${contour.diagnostics.selectedCells} 格${contour.colorPolicy === 'single-deep-saturated' ? `；单色深描边 ${contour.options.colorId}` : ''}；对比不足 ${contour.diagnostics.unresolvedContrastCells} 格${contour.diagnostics.externalSource === 'unavailable' && contour.options.external ? '；缺少主体蒙版，外轮廓未生成' : ''}${contour.diagnostics.internalSource === 'unavailable' && contour.options.internal ? '；缺少区域证据，内轮廓未生成' : ''}` : ''
       drawPattern(elements.patternCanvas, candidate.pattern, { grid: showGrid, beads: true })
       const outlineName = { off: '无描边', selective: '选择性描边', full: '完整描边' }[
         candidate.pattern.metadata.outlineMode ?? 'off'
@@ -2624,6 +2637,10 @@
       for (const item of elements.valueLevelsControl.querySelectorAll('button')) {
         item.disabled = selectedBaseline !== 'mvp'
       }
+      elements.valueModeControl.disabled = selectedBaseline !== 'mvp'
+      elements.externalContour.disabled = selectedBaseline !== 'mvp'
+      elements.internalContour.disabled = selectedBaseline !== 'mvp'
+      elements.valueStrengthControl.disabled = selectedBaseline !== 'mvp' || elements.valueModeControl.value === 'preserve'
       for (const item of elements.outlineModeControl.querySelectorAll('button')) {
         item.disabled = selectedBaseline !== 'mvp'
       }
@@ -2646,6 +2663,13 @@
       for (const item of elements.occupancyControl.querySelectorAll('button')) {
         item.setAttribute('aria-pressed', String(item === button))
       }
+    })
+    elements.valueModeControl.addEventListener('change', () => {
+      elements.valueStrengthControl.disabled = elements.valueModeControl.value === 'preserve' || selectedBaseline !== 'mvp'
+      elements.valueStrengthValue.textContent = elements.valueModeControl.value === 'preserve' ? '0%（保色）' : `${elements.valueStrengthControl.value}%`
+    })
+    elements.valueStrengthControl.addEventListener('input', () => {
+      elements.valueStrengthValue.textContent = `${elements.valueStrengthControl.value}%`
     })
     elements.valueLevelsControl.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-levels]')
@@ -2764,6 +2788,7 @@
       } finally {
         elements.openMaskEditorButton.disabled = false
       }
+      if (evidence === undefined) throw new Error('模型未返回主体蒙版，请启动神经分割服务后重试')
       if (savedMaskEditSession?.baseRevision !== evidence.revision) savedMaskEditSession = undefined
       maskEditor.open({
         image: sourceImage,

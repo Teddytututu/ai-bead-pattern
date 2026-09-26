@@ -143,6 +143,9 @@ export interface ColorRole {
 }
 
 export interface PalettePlan {
+  /** Per-cell plans retain representative role assignments for diagnostics. */
+  assignmentMode?: 'role' | 'per-cell'
+  cellColorIds?: readonly string[]
   selectedColorIds: readonly string[]
   assignments: Readonly<Record<string, string>>
   allowedColorIdsByRole: Readonly<Record<string, readonly string[]>>
@@ -473,6 +476,10 @@ export function validateValuePlan(plan: ValuePlan): void {
 export function validatePalettePlan(plan: PalettePlan): void {
   assertUniqueStrings(plan.selectedColorIds, 'Palette selected color ids')
   const selected = new Set(plan.selectedColorIds)
+  if (plan.assignmentMode !== undefined && !['role', 'per-cell'].includes(plan.assignmentMode)) {
+    throw new RangeError('Invalid palette assignment mode')
+  }
+  if (plan.cellColorIds?.some(id => !selected.has(id))) throw new RangeError('Palette cells must use selected colors')
   assertFinite(plan.totalCost, 'Palette total cost')
   if (plan.totalCost < 0) throw new RangeError('Palette total cost must be non-negative')
   for (const [roleId, allowedIds] of Object.entries(plan.allowedColorIdsByRole)) {

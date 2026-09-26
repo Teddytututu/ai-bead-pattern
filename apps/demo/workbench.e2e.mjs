@@ -16,7 +16,7 @@ test('generates a refined pattern with planning diagnostics', async ({ page }) =
   await expect(page.locator('#valueRoleCount')).not.toHaveText('--')
   await expect(page.locator('#paletteRoleCount')).not.toHaveText('--')
   await expect(page.locator('#gridRefinementEnergy')).toContainText('→')
-  await expect(page.locator('#outlineModeValue')).toHaveText('选择性')
+  await expect(page.locator('#outlineModeValue')).toHaveText('完整')
   await page.locator('[data-outline-mode="full"]').click()
   await expect(page.locator('#outlineModeValue')).toHaveText('完整')
   await expect(page.locator('[data-outline-mode="full"]')).toHaveAttribute('aria-pressed', 'true')

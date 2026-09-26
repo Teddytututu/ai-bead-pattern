@@ -69,7 +69,7 @@ describe('workbench product controls', () => {
     const html = await readFile(new URL('./index.html', import.meta.url), 'utf8')
 
     assert.match(html, /projectSourceAnalysisToProposal/)
-    assert.match(html, /projectSourceAnalysisToProposal\(\s*sourceAnalysis,\s*learnedProposal\s*\)/)
+    assert.match(html, /projectSourceAnalysisToProposal\(\s*correctedAnalysis,\s*learnedProposal\s*\)/)
     assert.match(html, /analysis:\s*proposalAnalysis/)
   })
 

@@ -6,6 +6,8 @@ export type FeatureTemplateKind = Extract<LandmarkKind,
 export type FeatureCellRole =
   | 'eye-dark'
   | 'eye-highlight'
+  | 'eye-iris'
+  | 'eye-white'
   | 'mouth-dark'
   | 'mouth-inner'
   | 'nose-base'
@@ -26,12 +28,17 @@ export interface FeatureTemplate {
   height: number
   anchor: readonly [number, number]
   cells: readonly FeatureTemplateCell[]
+  version?: string
+  expression?: 'neutral' | 'open' | 'closed' | 'smile'
+  source?: { kind: 'original'; description: string }
 }
 
 const kinds = new Set<FeatureTemplateKind>(['eye', 'mouth', 'nose', 'ear', 'identity-mark', 'custom'])
 const roles = new Set<FeatureCellRole>([
   'eye-dark',
   'eye-highlight',
+  'eye-iris',
+  'eye-white',
   'mouth-dark',
   'mouth-inner',
   'nose-base',
@@ -40,7 +47,7 @@ const roles = new Set<FeatureCellRole>([
   'endpoint-dark',
 ])
 const rolesByKind: Readonly<Record<FeatureTemplateKind, ReadonlySet<FeatureCellRole>>> = {
-  eye: new Set(['eye-dark', 'eye-highlight']),
+  eye: new Set(['eye-dark', 'eye-highlight', 'eye-iris', 'eye-white']),
   mouth: new Set(['mouth-dark', 'mouth-inner']),
   nose: new Set(['nose-base']),
   ear: new Set(['ear-tip']),

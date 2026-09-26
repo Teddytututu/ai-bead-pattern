@@ -3,6 +3,15 @@ import { test } from 'node:test'
 import { createRequire } from 'node:module'
 import { WechatPatternClient, ApiError } from '../dist/index.js'
 function transport(request) { return { request, login: opts => opts.success({ code: 'code' }), uploadFile: () => {}, downloadFile: () => {} } }
+test('passes tone and outline controls through without replacing zero strength', async () => {
+  const structure = { valueMode: 'adaptive', valueStrength: 0, valueLevels: 3, outlineMode: 'full' }
+  const client = new WechatPatternClient({ baseUrl: 'https://example.test', token: 'token', wx: transport(options => {
+    assert.deepEqual(options.data.options.structure, structure)
+    options.success({ statusCode: 202, data: { data: { jobId: 'job_1' }, requestId: 'r' } })
+    return { abort() {} }
+  }) })
+  assert.equal((await client.createPatternJob({ imageId: 'img_1', options: { structure } }, 'tone-zero')).jobId, 'job_1')
+})
 test('retries creation with the same idempotency key and parses upload JSON strings', async () => {
   const calls = []
   const wx = transport(options => { calls.push(options); if (calls.length === 1) options.fail({ errMsg: 'offline' }); else options.success({ statusCode: 202, data: { data: { jobId: 'job_1' }, requestId: 'r' } }); return { abort() {} } })

@@ -1,5 +1,6 @@
 import type {
   EvidenceProvenance,
+  FeatureShape,
   ImageAnalysis,
   ImageLandmark,
   PixelImage,
@@ -75,6 +76,9 @@ function validateCandidate(candidate: MediaPipeFaceCandidate): void {
     if (Number.isFinite(landmark.x) === false || Number.isFinite(landmark.y) === false) {
       throw new RangeError('MediaPipe face landmarks must contain finite coordinates')
     }
+    for (const probability of [landmark.visibility, landmark.presence]) {
+      if (probability !== undefined && (!Number.isFinite(probability) || probability < 0 || probability > 1)) throw new RangeError('Face point confidence must stay within 0..1')
+    }
   }
 }
 
@@ -83,7 +87,7 @@ function faceArea(candidate: MediaPipeFaceCandidate): number {
   const right = candidate.landmarks[454]!
   const top = candidate.landmarks[10]!
   const bottom = candidate.landmarks[152]!
-  return Math.abs(right.x - left.x) * Math.abs(bottom.y - top.y)
+  return Math.abs((right.x - left.x) * (bottom.y - top.y) - (right.y - left.y) * (bottom.x - top.x))
 }
 
 export function selectPrimaryFace(
@@ -120,7 +124,8 @@ function average(
 ): NormalizedFaceLandmark {
   const first = point(candidate, firstIndex)
   const second = point(candidate, secondIndex)
-  return { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 }
+  return { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2,
+    visibility: Math.min(first.visibility ?? 1, second.visibility ?? 1), presence: Math.min(first.presence ?? 1, second.presence ?? 1) }
 }
 
 export function mapMediaPipeFaceLandmarks(
@@ -141,7 +146,24 @@ export function mapMediaPipeFaceLandmarks(
     model: 'face-landmarker',
     version: options.modelVersion.trim(),
   }]
-  const faceWidth = Math.abs(point(candidate, 454).x - point(candidate, 234).x) * options.width
+  const faceWidth = Math.hypot((point(candidate, 454).x - point(candidate, 234).x) * options.width,
+    (point(candidate, 454).y - point(candidate, 234).y) * options.height)
+  // Component axes follow their own source anchors, never a horizontal-eye prior.
+  const shape = (left: number, right: number, top: number, bottom: number, kind: 'eye' | 'mouth'): FeatureShape | undefined => {
+    const anchors = [left, right, top, bottom].map(index => ({ x: point(candidate, index).x * options.width, y: point(candidate, index).y * options.height }))
+    const dx = anchors[1]!.x - anchors[0]!.x, dy = anchors[1]!.y - anchors[0]!.y
+    const widthPx = Math.hypot(dx, dy)
+    if (widthPx < 1) return undefined
+    const heightPx = Math.abs((anchors[3]!.x - anchors[2]!.x) * -dy + (anchors[3]!.y - anchors[2]!.y) * dx) / widthPx
+    return { widthPx: Math.min(2048, widthPx), heightPx: Math.max(1, Math.min(2048, heightPx)),
+      angleDegrees: Math.atan2(dy, dx) * 180 / Math.PI, anchors,
+      expression: heightPx / widthPx < (kind === 'eye' ? 0.12 : 0.08) ? 'closed' : 'open' }
+  }
+  const shapes = new Map<string, FeatureShape | undefined>([
+    ['left-eye-center', shape(362, 263, 386, 374, 'eye')],
+    ['right-eye-center', shape(33, 133, 159, 145, 'eye')],
+    ['mouth-center', shape(61, 291, 13, 14, 'mouth')],
+  ])
   const irisAvailable = candidate.landmarks.length >= 478
   const definitions = [
     { id: 'chin', kind: 'face-contour' as const, point: point(candidate, 152), priority: 'soft' as const, radius: 0.025 },
@@ -149,8 +171,6 @@ export function mapMediaPipeFaceLandmarks(
     { id: 'face-right', kind: 'face-contour' as const, point: point(candidate, 234), priority: 'soft' as const, radius: 0.025, symmetryGroup: 'face-sides' },
     { id: 'left-eye-center', kind: 'eye' as const, point: irisAvailable ? point(candidate, 473) : average(candidate, 362, 263), priority: 'hard' as const, radius: 0.04, symmetryGroup: 'eyes' },
     { id: 'mouth-center', kind: 'mouth' as const, point: average(candidate, 13, 14), priority: 'hard' as const, radius: 0.035 },
-    { id: 'mouth-left', kind: 'mouth' as const, point: point(candidate, 291), priority: 'hard' as const, radius: 0.025, symmetryGroup: 'mouth-corners' },
-    { id: 'mouth-right', kind: 'mouth' as const, point: point(candidate, 61), priority: 'hard' as const, radius: 0.025, symmetryGroup: 'mouth-corners' },
     { id: 'nose-tip', kind: 'nose' as const, point: point(candidate, 1), priority: 'soft' as const, radius: 0.025 },
     { id: 'right-eye-center', kind: 'eye' as const, point: irisAvailable ? point(candidate, 468) : average(candidate, 33, 133), priority: 'hard' as const, radius: 0.04, symmetryGroup: 'eyes' },
   ]
@@ -159,7 +179,11 @@ export function mapMediaPipeFaceLandmarks(
     kind: definition.kind,
     x: clamp(definition.point.x, 0, 1) * options.width,
     y: clamp(definition.point.y, 0, 1) * options.height,
-    confidence: candidate.confidence,
+    confidence: Math.min(candidate.confidence, definition.point.visibility ?? 1, definition.point.presence ?? 1),
+    observationState: Math.min(definition.point.visibility ?? 1, definition.point.presence ?? 1) < 0.2 ? 'missing' : 'observed',
+    instanceId: 'primary-face',
+    featureGroupId: 'face',
+    ...(shapes.get(definition.id) === undefined ? {} : { featureShape: shapes.get(definition.id)! }),
     priority: definition.priority,
     sourceRadiusPx: Math.max(1, faceWidth * definition.radius),
     gridRadiusCells: definition.kind === 'eye' ? 1 : 0,

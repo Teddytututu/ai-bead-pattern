@@ -7,6 +7,7 @@ os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 from huggingface_hub import snapshot_download
 
 from .contracts import (
+    checkpoint_directory,
     GROUNDING_DINO_MODEL_REPOSITORY,
     GROUNDING_DINO_MODEL_REVISION,
     MODEL_REPOSITORY,
@@ -34,15 +35,18 @@ GROUNDING_DINO_REQUIRED_FILES = (
 
 def main() -> None:
     os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+    # Official local_dir downloads use ordinary files, avoiding Windows symlinks.
     sam_path = snapshot_download(
         repo_id=MODEL_REPOSITORY,
         revision=MODEL_REVISION,
         allow_patterns=list(SAM2_REQUIRED_FILES),
+        local_dir=checkpoint_directory(MODEL_REPOSITORY, MODEL_REVISION),
     )
     grounding_path = snapshot_download(
         repo_id=GROUNDING_DINO_MODEL_REPOSITORY,
         revision=GROUNDING_DINO_MODEL_REVISION,
         allow_patterns=list(GROUNDING_DINO_REQUIRED_FILES),
+        local_dir=checkpoint_directory(GROUNDING_DINO_MODEL_REPOSITORY, GROUNDING_DINO_MODEL_REVISION),
     )
     print(f"SAM2 checkpoint ready: {sam_path}")
     print(f"GroundingDINO checkpoint ready: {grounding_path}")

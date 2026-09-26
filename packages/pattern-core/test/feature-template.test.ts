@@ -9,7 +9,7 @@ import {
 
 describe('feature template library', () => {
   it('provides facial, ear-tip, identity-mark, and endpoint templates with semantic roles', () => {
-    assert.deepEqual(featureTemplateLibrary.map((template) => template.id), [
+    assert.deepEqual(featureTemplateLibrary.slice(0, 19).map((template) => template.id), [
       'eye-e1',
       'eye-e2-h',
       'eye-e2-v',
@@ -33,7 +33,9 @@ describe('feature template library', () => {
     for (const template of featureTemplateLibrary) {
       assert.doesNotThrow(() => validateFeatureTemplate(template))
       assert.ok(template.cells.every((cell) => cell.role.includes('-')))
+      assert.equal(template.version, 'feature-templates-v2')
     }
+    for (const size of ['2x3', '3x3', '4x4', '5x5']) assert.ok(featureTemplateLibrary.some(template => template.id === `eye-open-${size}`))
   })
 
   it('selects templates by feature kind and allocated cell budget', () => {
@@ -51,7 +53,7 @@ describe('feature template library', () => {
 
   it('uses a dark pupil and a lighter iris role for every two-cell eye template', () => {
     const twoCellEyes = featureTemplateLibrary.filter((template) =>
-      template.kind === 'eye' && template.cells.length === 2)
+      template.kind === 'eye' && template.cells.length === 2 && template.expression !== 'closed')
 
     assert.ok(twoCellEyes.length > 0)
     for (const template of twoCellEyes) {

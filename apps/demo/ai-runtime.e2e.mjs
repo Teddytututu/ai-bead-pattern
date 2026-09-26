@@ -20,15 +20,15 @@ test('runs neural analysis and exposes model contributions', async ({ page }) =>
   await expect(page.locator('#modelRouteSelect option[value="learned-pixelization"]')).toBeDisabled()
   await expect(page.locator('#modelRouteSelect option[value="generative-proposal"]')).toBeDisabled()
 
-  await page.locator('#modelRouteSelect').selectOption('neural-analysis')
-  await expect(page.locator('#analysisSource')).toContainText('BiRefNet', { timeout: 45_000 })
+  await expect(page.locator('#modelRouteSelect')).toHaveValue('neural-analysis')
+  await expect(page.locator('#analysisSource')).toContainText('神经网络', { timeout: 45_000 })
   await expect(page.locator('#statusText')).not.toHaveText('生成中', { timeout: 45_000 })
 
   await page.getByRole('button', { name: '分析图层' }).click()
   const dialog = page.getByRole('dialog', { name: '图像理解' })
   await expect(dialog.getByRole('button', { name: 'AI 主体', exact: true })).toBeEnabled()
   await expect(dialog.getByRole('button', { name: '边缘', exact: true })).toBeEnabled()
-  await expect(dialog.locator('#analysisDebugProvider')).toContainText('rembg-birefnet-general-lite')
+  await expect(dialog.locator('#analysisDebugProvider')).toContainText('grounded-sam2-local')
   await expect(dialog.locator('#analysisDebugContributions')).toContainText('subject-segmentation')
 })
 
@@ -37,7 +37,7 @@ test('keeps route controls and unavailable state readable on mobile', async ({ p
   await page.goto('/apps/demo/')
 
   await expect(page.locator('#modelRouteSelect')).toBeInViewport()
-  await expect(page.locator('#modelRouteStatus')).toContainText(/已连接|检查中|不可用/)
+  await expect(page.locator('#modelRouteStatus')).toContainText(/已连接|检查中|不可用|分析中|分析完成|自动分割完成/)
   const layout = await page.evaluate(() => ({
     viewportWidth: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth,
@@ -51,17 +51,18 @@ test('discovers pet landmarks after uploading a cat without type metadata', asyn
   test.setTimeout(60_000)
   await page.goto('/apps/demo/')
   await waitForGeneration(page)
+  await page.locator('[data-size="32"]').click()
   await expect(page.locator('#modelRouteSelect option[value="neural-analysis"]'))
     .toBeEnabled({ timeout: 20_000 })
 
   await page.locator('#fileInput').setInputFiles('apps/demo/assets/sample-cat.png')
   await waitForGeneration(page)
-  await page.locator('#modelRouteSelect').selectOption('neural-analysis')
-  await waitForGeneration(page)
+  await expect(page.locator('#modelRouteSelect')).toHaveValue('neural-analysis')
 
   await page.getByRole('button', { name: '分析图层' }).click()
   const dialog = page.getByRole('dialog', { name: '图像理解' })
   await expect(dialog.getByRole('button', { name: '关键点', exact: true })).toBeEnabled()
   await expect(dialog.locator('#analysisDebugContributions')).toContainText('grounded-sam2-local')
-  await expect(dialog.locator('#analysisDebugContributions')).toContainText('mmpose-animal-local')
+  await expect(dialog.locator('#analysisDebugContributions')).toContainText('semantic-parsing')
+  await expect(dialog.getByRole('button', { name: '眼睛蒙版', exact: true })).toBeEnabled()
 })

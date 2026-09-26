@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
+from pathlib import Path
 from typing import Any, Mapping
 
 SCHEMA_VERSION = "ai-gateway-provider-v1"
@@ -15,8 +17,19 @@ UPSTREAM_GROUNDING_DINO_SOURCE_REVISION = "856dde20aee659246248e20734ef9ba5214f5
 UPSTREAM_GROUNDED_SAM2_SOURCE_REVISION = "dd4c5141b75e4838dd486c64f773c43b4db3a07b"
 TRANSFORMERS_VERSION = "5.16.1"
 TRANSFORMERS_SOURCE_REVISION = "93c8b7b485963a10800c91f55304db6be211c2bd"
-DEFAULT_DETECTION_LABELS = ("a cat", "a dog", "a rabbit", "a pet")
-DEFAULT_DETECTION_TEXT = "a cat. a dog. a rabbit. a pet."
+DEFAULT_DETECTION_LABELS = ("a cat", "a dog", "a rabbit", "a pet", "a person", "a bird")
+DEFAULT_DETECTION_TEXT = "a cat. a dog. a rabbit. a pet. a person. a bird."
+
+
+def checkpoint_directory(repository: str, revision: str) -> Path:
+    home = Path(os.environ.get("HF_HOME", str(Path.home() / ".cache/huggingface")))
+    return home / "pinned" / repository.replace("/", "--") / revision
+
+
+def checkpoint_source(repository: str, revision: str) -> str:
+    directory = checkpoint_directory(repository, revision)
+    return str(directory) if (directory / "model.safetensors").is_file() else repository
+
 MODEL_IDENTITY = {
     "modelId": MODEL_REPOSITORY,
     "modelVersion": f"transformers-{TRANSFORMERS_VERSION}+sam2.1",
@@ -258,13 +271,14 @@ class SegmentationRequest:
         else:
             raise ValueError("model identity differs from the pinned manifest")
         capabilities_value = body.get("capabilities")
+        supported = (*SUPPORTED_CAPABILITIES, "semantic-parsing", "keypoints") if automatic_detection else SUPPORTED_CAPABILITIES
         if (
             not isinstance(capabilities_value, list)
             or len(capabilities_value) == 0
-            or len(capabilities_value) > len(SUPPORTED_CAPABILITIES)
+            or len(capabilities_value) > len(supported)
             or any(not isinstance(capability, str) for capability in capabilities_value)
             or len(set(capabilities_value)) != len(capabilities_value)
-            or any(capability not in SUPPORTED_CAPABILITIES for capability in capabilities_value)
+            or any(capability not in supported for capability in capabilities_value)
         ):
             raise ValueError("request capabilities must select supported segmentation features")
         image_type_hint = body.get("imageTypeHint")

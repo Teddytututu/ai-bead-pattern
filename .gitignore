@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+.tools/
 services/pixel-proposal-sidecar/.venv/
 services/openclip-sidecar/.venv/
 services/sam2-sidecar/.venv/

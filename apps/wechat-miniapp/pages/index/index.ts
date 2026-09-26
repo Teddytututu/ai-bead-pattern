@@ -11,6 +11,8 @@ let visible = true
 Page({
   data: { imagePath: '', paletteId: 'mard-291', paletteNames: ['MARD 291', '通用 24 色'], paletteIndex: 0,
     sizes: [32, 48, 64, 96], sizeIndex: 1, maxColors: 20, colorLimit: 48, busy: false,
+    valueModes: ['随风格（还原默认保色）', '保色', '适度增强', '风格化'], valueModeIndex: 0, valueStrength: 100,
+    externalContour: true, internalContour: true, contourStatus: '',
     status: '选择图片，生成你的拼豆图纸', error: '', jobId: '', candidates: [] as { id: string; label: string }[],
     selectedIndex: 0, materials: [] as { code: string; hex: string; count: number }[], totalBeads: 0, quality: '', hasResult: false,
   },
@@ -34,6 +36,10 @@ Page({
   },
   changeSize(event: { detail: { value: string } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ sizeIndex: Number(event.detail.value) }) },
   changeColors(event: { detail: { value: number } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ maxColors: event.detail.value }) },
+  changeValueMode(event: { detail: { value: string } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ valueModeIndex: Number(event.detail.value) }) },
+  changeValueStrength(event: { detail: { value: number } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ valueStrength: event.detail.value }) },
+  changeExternalContour(event: { detail: { value: boolean } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ externalContour: event.detail.value }) },
+  changeInternalContour(event: { detail: { value: boolean } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ internalContour: event.detail.value }) },
   async generate() {
     if (!this.data.imagePath || this.data.busy) return
     waiter?.stop(); result = undefined; wx.removeStorageSync('activePatternJob')
@@ -47,7 +53,9 @@ Page({
         const image = await client.uploadImage(this.data.imagePath, percent => this.setData({ status: `上传 ${percent}%` }))
         const palette = await client.getPalette(this.data.paletteId), side = this.data.sizes[this.data.sizeIndex]
         pending = { key: `mini-${Date.now()}-${Math.random().toString(36).slice(2)}`, input: { imageId: image.imageId, paletteId: palette.id, paletteVersion: palette.version,
-          options: { canvas: { mode: 'fixed', size: { width: side, height: side } }, maxColors: this.data.maxColors, maxCandidates: 3 } } }
+          options: { canvas: { mode: 'fixed', size: { width: side, height: side } }, maxColors: this.data.maxColors, maxCandidates: 3,
+            structure: { ...(this.data.valueModeIndex === 0 ? {} : { valueMode: (['preserve', 'adaptive', 'stylized'] as const)[this.data.valueModeIndex - 1] }), valueStrength: this.data.valueStrength / 100,
+              contours: { external: this.data.externalContour, internal: this.data.internalContour } } } } }
         wx.setStorageSync('pendingPatternRequest', pending)
       }
       const job = await client.createPatternJob(pending.input, pending.key)
@@ -84,7 +92,9 @@ Page({
     const candidate = result?.candidates[index]
     if (!candidate) return
     const pattern = candidate.pattern
-    this.setData({ selectedIndex: index, materials: pattern.materials, totalBeads: pattern.totalBeads })
+    const contour = candidate.contourPlan
+    this.setData({ selectedIndex: index, materials: pattern.materials, totalBeads: pattern.totalBeads,
+      contourStatus: contour ? `轮廓 ${contour.diagnostics.retainedCells}/${contour.diagnostics.selectedCells} 格，对比不足 ${contour.diagnostics.unresolvedContrastCells} 格${contour.diagnostics.externalSource === 'unavailable' && contour.options.external ? '；缺少主体蒙版' : ''}${contour.diagnostics.internalSource === 'unavailable' && contour.options.internal ? '；缺少内部区域证据' : ''}` : '' })
     const context = wx.createCanvasContext('patternCanvas', this), cell = 300 / pattern.width
     context.clearRect(0, 0, 300, 300)
     pattern.grid.forEach((colorIndex, i) => {

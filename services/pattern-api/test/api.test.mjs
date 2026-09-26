@@ -34,7 +34,7 @@ test('real multipart -> persistent async MARD 291 -> exact grid, CSV and PNG', a
   const upload = await h.upload(token); assert.equal(upload.status, 201)
   const imageId = upload.json.data.imageId
   assert.equal((await h.upload(token)).json.data.imageId, imageId)
-  const data = { imageId, options: { canvas: { mode: 'fixed', size: { width: 32, height: 32 } }, maxCandidates: 1, styles: ['faithful'] } }
+  const data = { imageId, options: { canvas: { mode: 'fixed', size: { width: 32, height: 32 } }, maxCandidates: 1, styles: ['faithful'], structure: { valueMode: 'stylized', valueStrength: 0, outlineMode: 'off' } } }
   const [first, duplicate] = await Promise.all([1, 2].map(() => h.call('/v1/pattern-jobs', { token, method: 'POST', key: 'same', data })))
   assert.equal(first.status, 202); assert.equal(first.json.data.jobId, duplicate.json.data.jobId)
   const jobId = first.json.data.jobId
@@ -45,6 +45,8 @@ test('real multipart -> persistent async MARD 291 -> exact grid, CSV and PNG', a
   const result = (await h.call(`/v1/pattern-jobs/${jobId}/result`, { token })).json.data
   assert.equal(result.generationStatus, 'success'); assert.equal(result.actualRoute, 'deterministic')
   const c = result.candidates[0], doc = c.pattern
+  assert.equal(doc.metadata.valueMode, 'stylized'); assert.equal(doc.metadata.valueStrength, 0)
+  assert.equal(doc.metadata.outlineMode, 'off')
   assert.equal(doc.paletteId, 'mard-291'); assert.match(doc.paletteVersion, /^sha256:/)
   assert.equal(doc.materials.reduce((n, m) => n + m.count, 0), doc.grid.filter(v => v >= 0).length)
   assert.ok(doc.grid.includes(-1)); assert.ok(doc.materials.every(m => /^[A-Z]+\d+$/.test(m.code)))
@@ -54,6 +56,32 @@ test('real multipart -> persistent async MARD 291 -> exact grid, CSV and PNG', a
   assert.equal((await h.call(`/v1/pattern-jobs/${jobId}/exports/${c.id}?format=json`, { token: other })).status, 404)
   await h.restart()
   assert.equal((await h.call(`/v1/pattern-jobs/${jobId}/result`, { token })).json.data.generationId, result.generationId)
+})
+
+test('manual feature coordinates and contour switches reach the worker and final result', async t => {
+  const h = await harness(t), token = await h.auth(), uploaded = (await h.upload(token)).json.data
+  const base = { imageId: uploaded.imageId, options: { canvas: { mode: 'fixed', size: { width: 32, height: 32 } }, styles: ['faithful'], maxCandidates: 1,
+    structure: { contours: { external: false, internal: true } }, featureOverrides: [
+      { id: 'near', kind: 'eye', x: 6, y: 3, templateId: 'eye-open-3x3' },
+      { id: 'far', kind: 'eye', x: 14, y: 6, templateId: 'eye-e1' },
+    ] } }
+  const bad = await h.call('/v1/pattern-jobs', { token, method: 'POST', key: 'bad-face', data: { ...base, options: { ...base.options, featureOverrides: [{ ...base.options.featureOverrides[0], x: uploaded.width }] } } })
+  assert.equal(bad.status, 422)
+  const badInk = await h.call('/v1/pattern-jobs', { token, method: 'POST', key: 'bad-ink', data: { ...base,
+    options: { ...base.options, structure: { contours: { external: true, colorId: 'H7' } } } } })
+  assert.equal(badInk.status, 422); assert.equal(badInk.json.error.code, 'INVALID_CONTOUR_COLOR')
+  const submitted = await h.call('/v1/pattern-jobs', { token, method: 'POST', key: 'manual-face', data: base })
+  assert.equal(submitted.status, 202)
+  const jobId = submitted.json.data.jobId
+  assert.equal((await h.done(jobId, token)).state, 'succeeded')
+  const c = (await h.call(`/v1/pattern-jobs/${jobId}/result`, { token })).json.data.candidates[0]
+  assert.equal(c.contourPlan.options.external, false); assert.equal(c.contourPlan.options.internal, true)
+  assert.equal(c.pattern.metadata.contours.external, false); assert.equal(c.pattern.metadata.contours.internal, true)
+  assert.ok(c.contourPlan.diagnostics.warnings.includes('contour-internal-evidence-unavailable'))
+  assert.equal(c.featurePlacements.length, 2)
+  const near = c.featurePlacements.find(p => p.featureId === 'near'), far = c.featurePlacements.find(p => p.featureId === 'far')
+  assert.ok(near.center[1] < far.center[1]); assert.equal(near.occupiedCells.length, 5); assert.equal(far.occupiedCells.length, 1)
+  assert.ok(c.pattern.materials.length > 1)
 })
 test('rejects unauthenticated, oversized, invalid and unsupported requests', async t => {
   const h = await harness(t), token = await h.auth()

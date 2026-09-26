@@ -57,7 +57,7 @@ class SegmentationRequestTests(unittest.TestCase):
         )
         self.assertEqual(
             DEFAULT_DETECTION_LABELS,
-            ("a cat", "a dog", "a rabbit", "a pet"),
+            ("a cat", "a dog", "a rabbit", "a pet", "a person", "a bird"),
         )
 
     def test_grounded_identity_accepts_labels_only_and_uses_default_labels(self) -> None:

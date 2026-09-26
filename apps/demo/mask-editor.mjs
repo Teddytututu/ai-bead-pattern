@@ -332,6 +332,7 @@ export function createMaskEditorController({
   let snapSummary
   let selectionPending = false
   let selectionSource
+  let selectionError
   const sourceBuffer = document.createElement('canvas')
   const overlayBuffer = document.createElement('canvas')
   const livePreview = createLiveStrokePreview(elements.canvas)
@@ -381,16 +382,18 @@ export function createMaskEditorController({
       : mode === 'select'
         ? selectionSource === 'sam2'
           ? ' · SAM 2 已贴合主体'
-          : ' · 本地结构已贴合主体'
+          : ''
         : elements.snapToggle?.checked === true
           ? ` · 自动贴边 ${snapSummary.snappedCount} 点`
           : ''
     elements.detail.textContent = selectionPending
       ? 'SAM 2 正在贴合主体'
+      : selectionError
+      ? selectionError
       : session === undefined
       ? '沿主体外侧圈一圈'
       : session.strokes.length === 0
-        ? '沿主体外侧圈一圈，松手后自动识别'
+        ? selectionSource === 'sam2' ? '神经蒙版已载入 · 待确认 · SAM 2 已贴合主体' : '沿主体外侧圈一圈，松手后自动识别'
         : `${session.cursor} / ${session.strokes.length} 次调整 · ${dirty ? '待确认，取消将放弃' : '已确认'}${snapText}`
     elements.detail.dataset.dirty = String(dirty)
     elements.dialog.dataset.maskMode = mode
@@ -480,30 +483,17 @@ export function createMaskEditorController({
         pointerPoints = []
         return
       }
-      const inputPoints = prepared?.points ?? pointerPoints
-      snapSummary = resolveStrokePoints(
-        inputPoints,
-        sourceImage,
-        mode === 'select' || elements.snapToggle?.checked === true,
-        {
-          maxDistanceNormalized: mode === 'select' ? 0.08 : 0.045,
-          endpointLock: mode === 'select' ? 0 : 0.02,
-          referenceMask: draft?.mask ?? baseEvidence.mask,
-        },
-      )
-      const snappedLasso = mode === 'select' ? prepareSubjectLasso(snapSummary.points) : undefined
-      const resolvedPoints = mode === 'select'
-        ? snappedLasso.valid ? snappedLasso.points : prepared.points
-        : snapSummary.points
-      if (mode === 'select' && onSelectSubject !== undefined) {
+      if (mode === 'select') {
+        snapSummary = undefined
         selectionPending = true
         selectionSource = undefined
+        selectionError = undefined
         syncControls()
         try {
-          const selection = await onSelectSubject({
+          const selection = await onSelectSubject?.({
             image: sourceImage,
             evidence: baseEvidence,
-            instancePrompt: createInstancePromptFromLasso(resolvedPoints),
+            instancePrompt: createInstancePromptFromLasso(prepared.points),
           })
           if (selection?.evidence !== undefined) {
             const evidence = selection.evidence
@@ -517,21 +507,30 @@ export function createMaskEditorController({
             session = confirmedSession
             selectionSource = selection.source ?? 'sam2'
           } else {
-            selectionSource = 'local'
+            throw new Error('神经分割服务不可用，保留当前蒙版；可使用补画或擦除手动校正')
           }
         } catch (error) {
-          selectionSource = 'local'
+          selectionSource = undefined
           onSelectError?.(error)
+          selectionError = error.message
         } finally {
           selectionPending = false
+          pointerId = undefined
+          pointerPoints = []
         }
-      } else if (mode === 'select') {
-        selectionSource = 'local'
+        // Keep the network mask intact; the lasso is a prompt, not a new mask.
+        rebuildDraft()
+        return
       }
+      snapSummary = resolveStrokePoints(pointerPoints, sourceImage, elements.snapToggle?.checked === true, {
+        maxDistanceNormalized: 0.045,
+        endpointLock: 0.02,
+        referenceMask: draft?.mask ?? baseEvidence.mask,
+      })
       session = core.appendMaskEditStroke(session, {
         ...currentPointerStroke(),
         id: uniqueStrokeId(),
-        points: resolvedPoints,
+        points: snapSummary.points,
       })
       rebuildDraft()
     } else {
@@ -643,6 +642,7 @@ export function createMaskEditorController({
       snapSummary = undefined
       selectionPending = false
       selectionSource = undefined
+      selectionError = undefined
       mode = 'select'
       if (elements.snapToggle !== undefined) elements.snapToggle.checked = true
       strokeSequence = session.strokes.length + 1

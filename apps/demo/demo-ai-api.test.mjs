@@ -405,7 +405,7 @@ describe('demo AI JSON API', () => {
     assert.equal(result.instanceProposals[0].detectionScore, 0.9)
   })
 
-  it('discovers an untyped pet upload before one batched RTMPose request', async () => {
+  it('requests neural part masks and keypoints for untyped uploads without geometry completion', async () => {
     const groundedModel = modelManifest('grounded-sam2-local')
     const poseModel = modelManifest('mmpose-animal-local')
     const requests = []
@@ -437,9 +437,17 @@ describe('demo AI JSON API', () => {
           sourceRevision: groundedModel.sourceRevision,
           weightRevision: groundedModel.weightRevision,
         },
-        capabilities: ['subject-segmentation', 'edge-thin-structure'],
+        capabilities: requests.at(-1).request.capabilities,
         confidence: 0.92,
         inferenceMs: 8,
+        analysis: {
+          imageType: 'pet',
+          landmarks: [8, 24].map((x, index) => ({
+            id: `pet-0${index + 1}:eye-01`, kind: 'eye', x, y: 10 + index * 6,
+            confidence: 0.9, priority: 'hard', observationState: 'observed',
+          })),
+        },
+        warnings: ['pet-01: neural masks unavailable for mouth'],
         instanceProposals: [
           {
             id: 'pet-01:cat', instanceId: 'pet-01', label: 'cat',
@@ -523,16 +531,16 @@ describe('demo AI JSON API', () => {
     assert.equal(response.status, 200)
     assert.deepEqual(result.contributions.map((entry) => entry.providerId).slice(0, 2), [
       'grounded-sam2-local',
-      'mmpose-animal-local',
     ])
-    assert.deepEqual(requests[1].request.instancePrompts.map((prompt) => prompt.selectedInstanceId), [
-      'pet-01',
-      'pet-02',
-    ])
+    assert.equal(requests.length, 1)
+    assert.ok(requests[0].request.capabilities.includes('semantic-parsing'))
+    assert.ok(requests[0].request.capabilities.includes('keypoints'))
     assert.deepEqual(result.analysis.landmarks.map((landmark) => landmark.id), [
-      'pet-01:nose-tip',
-      'pet-02:nose-tip',
+      'pet-01:eye-01',
+      'pet-02:eye-01',
     ])
+    assert.deepEqual(result.analysis.landmarks.map(point => point.y), [10, 16])
+    assert.deepEqual(result.warnings, ['pet-01: neural masks unavailable for mouth'])
     assert.equal(result.analysis.imageType, 'pet')
   })
 

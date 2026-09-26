@@ -14,6 +14,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageOps, UnidentifiedImageError
 
 from .contracts import (
+    checkpoint_source,
     GROUNDING_DINO_MODEL_REPOSITORY,
     GROUNDING_DINO_MODEL_REVISION,
     MODEL_REPOSITORY,
@@ -118,6 +119,8 @@ class SegmentationBatchResult:
     device: str
     detector_inference_ms: float = 0.0
     segmentation_inference_ms: float = 0.0
+    parts: tuple[SegmentationResult, ...] = ()
+    warnings: tuple[str, ...] = ()
 
     @classmethod
     def from_instances(
@@ -692,7 +695,7 @@ class TransformersGroundingDinoBackend:
                 dtype = torch.bfloat16 if device.type == "cuda" else torch.float32
                 local_files_only = os.environ.get("SAM2_ALLOW_RUNTIME_DOWNLOAD", "0") != "1"
                 model = GroundingDinoForObjectDetection.from_pretrained(
-                    GROUNDING_DINO_MODEL_REPOSITORY,
+                    checkpoint_source(GROUNDING_DINO_MODEL_REPOSITORY, GROUNDING_DINO_MODEL_REVISION),
                     revision=GROUNDING_DINO_MODEL_REVISION,
                     dtype=dtype,
                     low_cpu_mem_usage=True,
@@ -700,7 +703,7 @@ class TransformersGroundingDinoBackend:
                 ).to(device)
                 model.eval()
                 processor = GroundingDinoProcessor.from_pretrained(
-                    GROUNDING_DINO_MODEL_REPOSITORY,
+                    checkpoint_source(GROUNDING_DINO_MODEL_REPOSITORY, GROUNDING_DINO_MODEL_REVISION),
                     revision=GROUNDING_DINO_MODEL_REVISION,
                     local_files_only=local_files_only,
                 )
@@ -796,12 +799,17 @@ class TransformersGroundingDinoBackend:
                 score=float(np.clip(score_value, 0.0, 1.0)),
                 label=label_value,
             ))
+        from torchvision.ops import batched_nms
+
+        labels_by_id = {label: index for index, label in enumerate(sorted({item.label for item in detections}))}
+        kept = batched_nms(
+            torch.tensor([item.box for item in detections], dtype=torch.float32).reshape(-1, 4),
+            torch.tensor([item.score for item in detections], dtype=torch.float32),
+            torch.tensor([labels_by_id[item.label] for item in detections], dtype=torch.int64),
+            self._nms_iou_threshold,
+        ).tolist()[:self._maximum_instances]
         return GroundingPrediction(
-            detections=stable_detection_nms(
-                tuple(detections),
-                iou_threshold=self._nms_iou_threshold,
-                maximum=self._maximum_instances,
-            ),
+            detections=tuple(detections[index] for index in kept),
             inference_ms=max(0.0, elapsed_ms),
             device=str(self._device),
         )
@@ -837,7 +845,7 @@ class TransformersSam2Backend:
                 dtype = torch.bfloat16 if device.type == "cuda" else torch.float32
                 local_files_only = os.environ.get("SAM2_ALLOW_RUNTIME_DOWNLOAD", "0") != "1"
                 model = Sam2Model.from_pretrained(
-                    MODEL_REPOSITORY,
+                    checkpoint_source(MODEL_REPOSITORY, MODEL_REVISION),
                     revision=MODEL_REVISION,
                     dtype=dtype,
                     low_cpu_mem_usage=True,
@@ -845,7 +853,7 @@ class TransformersSam2Backend:
                 ).to(device)
                 model.eval()
                 processor = Sam2Processor.from_pretrained(
-                    MODEL_REPOSITORY,
+                    checkpoint_source(MODEL_REPOSITORY, MODEL_REVISION),
                     revision=MODEL_REVISION,
                     local_files_only=local_files_only,
                 )
@@ -990,7 +998,11 @@ class Sam2SegmentationEngine:
         request: SegmentationRequest,
     ) -> SegmentationBatchResult:
         if request.automatic_detection:
-            return self._segment_detected(source, request)
+            result = self._segment_detected(source, request)
+            if "semantic-parsing" in request.capabilities or "keypoints" in request.capabilities:
+                from .parts import segment_parts
+                result = segment_parts(prepare_image(source), result, self._detector, self._backend)
+            return result
         result = self.segment(source, request)
         return SegmentationBatchResult.from_instances(
             (result,),
@@ -1005,7 +1017,7 @@ class Sam2SegmentationEngine:
         image = prepare_image(source)
         grounding = self._detector.detect(image, request.prompt.labels)
         if not grounding.detections:
-            raise RuntimeError("GroundingDINO found no matching pet instances")
+            raise RuntimeError("GroundingDINO found no matching subject instances")
         boxes = tuple(detection.box for detection in grounding.detections)
         prediction = self._backend.segment_boxes(image, boxes)
         masks = np.asarray(prediction.masks, dtype=np.float32)

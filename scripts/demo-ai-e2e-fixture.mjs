@@ -61,12 +61,36 @@ export function createDemoAiE2EService() {
     },
     async analyze(request) {
       const length = request.image.width * request.image.height
+      // Test double only: explicit model outputs replace the retired geometry fallback.
+      const mask = { width: request.image.width, height: request.image.height, values: new Float32Array(length).fill(1) }
+      const provenance = [{ origin: 'model', provider: groundedManifest.providerId, model: 'e2e-neural-parts-fixture', version: 'fixture-v1' }]
       return {
         providerId: groundedManifest.providerId,
         model: groundedManifest,
         capabilities: request.capabilities,
         confidence: 0.93,
         elapsedMs: 2,
+        analysis: {
+          imageType: 'pet', subjectMask: mask,
+          importanceMap: { width: mask.width, height: mask.height, weights: Float32Array.from(mask.values, value => value * 0.8) },
+          subjectMaskEvidence: { mask, confidence: 0.93, source: 'ai', revision: 'e2e:neural-parts:v1', provenance },
+          semanticRegions: [
+            { id: 'pet-01:subject', label: 'subject', mask, confidence: 0.93, provenance },
+            { id: 'pet-01:head-01', label: 'head', mask, confidence: 0.9, provenance },
+            ...[[0.4, 0.35], [0.6, 0.4]].map(([x, y], index) => ({
+              id: `pet-01:eye-0${index + 1}`, label: 'eye', confidence: 0.9, provenance,
+              mask: { width: mask.width, height: mask.height, values: Float32Array.from({ length }, (_, i) =>
+                Number(Math.abs(i % mask.width - x * mask.width) < mask.width * 0.025 && Math.abs(Math.floor(i / mask.width) - y * mask.height) < mask.height * 0.025)) },
+            })),
+          ],
+          landmarks: [[0.4, 0.35], [0.6, 0.4]].map(([x, y], index) => ({
+            id: `pet-01:eye-0${index + 1}`, kind: 'eye', x: request.image.width * x, y: request.image.height * y,
+            confidence: 0.9, priority: 'hard', observationState: 'observed', carrierRegionId: 'pet-01:subject',
+            featureShape: { widthPx: request.image.width * 0.05, heightPx: request.image.height * 0.05, angleDegrees: 0 },
+            provenance,
+          })),
+          modelVersions: { segmentation: groundedManifest.modelId, neuralParts: 'e2e-neural-parts-fixture' },
+        },
         instanceProposals: [{
           id: 'pet-01:cat',
           instanceId: 'pet-01',

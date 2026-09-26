@@ -34,8 +34,11 @@ async function uploadWideImage(page) {
 }
 
 test('roughly circles a subject, confirms once, and restores the solid selection', async ({ page }) => {
+  // Keep this interaction test focused on one canvas after the initial auto search.
+  test.setTimeout(60_000)
   await page.goto('/apps/demo/')
   await waitForGeneration(page)
+  await page.locator('[data-size="32"]').click()
   await page.getByRole('button', { name: '圈选主体' }).click()
 
   const canvas = page.getByLabel('主体圈选画布')
@@ -51,6 +54,9 @@ test('roughly circles a subject, confirms once, and restores the solid selection
   await expect(page.locator('#maskEditorDetail')).toContainText('待确认')
   await expect(page.locator('#maskEditorDetail')).toContainText('SAM 2 已贴合主体')
 
+  // Neural selection is the base mask. Undo/redo applies to manual corrections.
+  await page.getByRole('button', { name: '补充' }).click()
+  await page.mouse.click(bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5)
   await page.getByRole('button', { name: '撤销' }).click()
   await expect(page.getByRole('button', { name: '重做' })).toBeEnabled()
   await page.getByRole('button', { name: '重做' }).click()
@@ -92,12 +98,31 @@ test('roughly circles a subject, confirms once, and restores the solid selection
   await page.getByRole('button', { name: '取消并关闭主体编辑器' }).click()
   await page.getByRole('button', { name: '圈选主体' }).click()
   await expect(page.locator('#maskEditorDetail')).toContainText('1 / 1 次调整 · 已确认')
+
+  // A failed network selection must preserve every pixel, with no lasso fallback.
+  await page.getByRole('button', { name: '圈选', exact: true }).click()
+  const beforeFailure = await canvas.evaluate(element => element.toDataURL())
+  await page.route('**/api/ai/analyze', route => route.fulfill({
+    status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'model offline' }),
+  }))
+  await page.mouse.move(reopenedBounds.x + reopenedBounds.width * 0.2, reopenedBounds.y + reopenedBounds.height * 0.2)
+  await page.mouse.down()
+  for (const [x, y] of [[0.7, 0.2], [0.7, 0.7], [0.2, 0.7], [0.2, 0.2]]) {
+    await page.mouse.move(reopenedBounds.x + reopenedBounds.width * x, reopenedBounds.y + reopenedBounds.height * y, { steps: 4 })
+  }
+  await page.mouse.up()
+  await expect(page.locator('#statusText')).toContainText('已保留当前蒙版')
+  await expect(page.getByRole('button', { name: '确认主体并重新生成' })).toBeEnabled()
+  expect(await canvas.evaluate(element => element.toDataURL())).toBe(beforeFailure)
 })
 
 test('keeps a wide source proportional in the mobile editor', async ({ page }) => {
+  // Initial automatic search plus the upload-triggered generation.
+  test.setTimeout(60_000)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/apps/demo/')
   await waitForGeneration(page)
+  await page.locator('[data-size="32"]').click()
   await uploadWideImage(page)
   await page.getByRole('button', { name: '圈选主体' }).click()
 

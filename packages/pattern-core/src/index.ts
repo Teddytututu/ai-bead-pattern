@@ -1,5 +1,9 @@
 export { patternLimits } from './limits.js'
+export { planContours, resolveContourOptions } from './planning/contour-planner.js'
+export type { ContourPlan, ContourPlanningInput, ResolvedContourOptions } from './planning/contour-planner.js'
+export type { ColorFidelityDiagnostics, ColorStageError } from './planning/color-diagnostics.js'
 export { createPaletteVersion } from './palette.js'
+export { mardFillPolicyVersion, isDeepSaturatedInk } from './planning/mard-fill-policy.js'
 export { createPatternDocument, patternMaterialsCsv, patternSvg, type PatternDocument } from './export.js'
 export {
   createPatternAlgorithm,
@@ -225,6 +229,8 @@ export type {
   GridSize,
   ImageAnalysis,
   ImageLandmark,
+  FeatureShape,
+  FeatureOverride,
   ImageType,
   ImportanceMap,
   Lab,
@@ -238,6 +244,8 @@ export type {
   MaterialSubstitutionMap,
   OptimizationOptions,
   OutlineMode,
+  ContourOptions,
+  ValueMode,
   StructureOptions,
   StructuralRole,
   PatternCandidate,
@@ -274,3 +282,5 @@ export type {
   PalettePlanningDiagnostics,
   PaletteSubstitutionDiagnostic,
 } from './planning/palette-planner.js'
+export { prepareFeatureEvidence, projectFeatureShape, validateFeatureShape, validateFeatureOverrides } from './planning/feature-evidence.js'
+export { featureTemplateLibrary } from './planning/feature-template-library.js'
