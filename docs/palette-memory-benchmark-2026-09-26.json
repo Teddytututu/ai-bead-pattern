@@ -1,0 +1,105 @@
+{
+  "date": "2026-09-26T04:27:35.415Z",
+  "node": "v25.5.0",
+  "cpu": "Intel(R) Core(TM) Ultra 9 185H",
+  "platform": "win32",
+  "memoryMetric": "Fresh process for each case; process.resourceUsage().maxRSS in KiB / 1024. Includes imports, image preparation, one warmup and three measured runs.",
+  "rows": [
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        1364,
+        1091,
+        1080
+      ],
+      "maxRssGrowthMiB": 91,
+      "status": "success",
+      "colors": 7,
+      "processPeakRssMiB": 273
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        4734,
+        4677,
+        4615
+      ],
+      "maxRssGrowthMiB": 149,
+      "status": "success",
+      "colors": 3,
+      "processPeakRssMiB": 250
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        3354,
+        2852,
+        2979
+      ],
+      "maxRssGrowthMiB": 137,
+      "status": "success",
+      "colors": 9,
+      "processPeakRssMiB": 230
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        3084,
+        2759,
+        2762
+      ],
+      "maxRssGrowthMiB": 78,
+      "status": "success",
+      "colors": 11,
+      "processPeakRssMiB": 271
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        7178,
+        6920,
+        6339
+      ],
+      "maxRssGrowthMiB": 155,
+      "status": "success",
+      "colors": 11,
+      "processPeakRssMiB": 256
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        5358,
+        4871,
+        4626
+      ],
+      "maxRssGrowthMiB": 151,
+      "status": "success",
+      "colors": 11,
+      "processPeakRssMiB": 273
+    }
+  ]
+}

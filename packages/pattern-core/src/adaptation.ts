@@ -1,4 +1,5 @@
 import { colorDistance, prepareColors } from './color.js'
+import { patternLimits } from './limits.js'
 import type {
   MaterialDelta,
   PatternAdaptationChange,
@@ -21,6 +22,9 @@ function countMaterials(cells: readonly PatternCell[]): Map<string, number> {
 
 function validateRequest(request: PatternAdaptationRequest): void {
   const { pattern } = request
+  if (request.palette.colors.length < 1 || request.palette.colors.length > patternLimits.maxPaletteColors) {
+    throw new RangeError('Palette exceeds the adaptation processing limit')
+  }
   if (pattern.width <= 0 || pattern.height <= 0) throw new RangeError('Pattern dimensions must be positive')
   if (request.editableMask !== undefined
     && (request.editableMask.width !== pattern.width
@@ -139,13 +143,17 @@ export function adaptPattern(
       delta: (afterCounts.get(color.id) ?? 0) - (beforeCounts.get(color.id) ?? 0),
     }))
     .filter((entry) => entry.delta !== 0)
+  const { paletteVersion: _previousVersion, paletteBrand: _previousBrand, ...previousMetadata } = request.pattern.metadata
   return {
     pattern: {
       ...request.pattern,
       palette: request.palette.colors.filter((color) => usedIds.has(color.id)),
       cells,
       metadata: {
-        ...request.pattern.metadata,
+        ...previousMetadata,
+        paletteId: request.palette.id,
+        ...(request.palette.version === undefined ? {} : { paletteVersion: request.palette.version }),
+        ...(request.palette.brand === undefined ? {} : { paletteBrand: request.palette.brand }),
         generatedAt,
         algorithmVersion,
       },

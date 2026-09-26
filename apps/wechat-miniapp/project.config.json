@@ -1,0 +1,5 @@
+{
+  "description": "MARD 291 拼豆图纸联调示例", "projectname": "ai-bead-pattern", "appid": "touristappid",
+  "miniprogramRoot": "./", "compileType": "miniprogram",
+  "setting": { "es6": true, "minified": true, "urlCheck": true }
+}

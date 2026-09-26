@@ -4,11 +4,37 @@
 
 项目目标是把照片转换为兼顾主体特征、真实材料色卡和手工制作约束的网格图纸。底层围绕 `Material Palette + Grid Pattern` 设计，方便后续扩展到十字绣、钻石画、马赛克等网格手作。
 
+MARD 291 已接入生成、预览和 PNG/CSV/JSON 导出；完整色库参与匹配，单张图纸最多使用 48 色。产品 API、微信 TypeScript SDK 和原生小程序示例已落地，当前交付范围为本地运行与自动化验证。真实微信账号、HTTPS 部署和真机联调在后续接入。
+
+## 本地使用
+
+要求 Node 24.13+、pnpm 11.19。在仓库根目录执行：
+
+```powershell
+pnpm install
+pnpm demo
+```
+
+浏览器打开终端打印的 `/apps/demo/` 地址，可直接使用默认 MARD 291 色卡。
+
+另一个终端启动供小程序调用的 API：
+
+```powershell
+Copy-Item services/pattern-api/.env.example services/pattern-api/.env
+pnpm api:dev
+```
+
+已有 `.env` 时保留自己的配置。服务默认监听 `http://127.0.0.1:7105`，使用显式启用的本地模拟身份。运行 `pnpm wechat:build` 后，将 `apps/wechat-miniapp` 导入微信开发者工具；本地示例已配置 `local-demo` 身份。详见 [API 说明](services/pattern-api/README.md)、[OpenAPI](services/pattern-api/openapi.json)和[小程序说明](apps/wechat-miniapp/README.md)。
+
 ## 仓库结构
 
 ```text
 apps/wechat-miniapp/   微信小程序客户端
 packages/pattern-core/ 平台无关的图像与图纸核心
+packages/material-palettes/ 291/24 色卡注册表与校验
+packages/pattern-api-contracts/ HTTP 请求校验与共享类型
+packages/wechat-client/ 微信 API 调用 SDK
+services/pattern-api/  产品 HTTP API、任务 Worker、SQLite 持久化
 services/ai-gateway/   AI 能力接入层
 services/pixel-proposal-sidecar/ 本地 Pixel Art + LCM 提案服务
 services/sam2-sidecar/ 本地 SAM 2.1 粗圈提示分割服务
@@ -29,6 +55,9 @@ Demo 的主体流程以“沿主体外侧粗略圈一圈”为默认操作。页
 
 ## 文档
 
+- [MARD 291 色实装与微信小程序接口实施计划](docs/mard-291-wechat-api-plan.md)
+- [本地交付与验证记录](docs/local-delivery-2026-09-26.md)
+- [24/291 色性能对照](docs/palette-benchmark-2026-09-26.md)
 - [从绘画过程到拼豆图纸：生成方法论](docs/drawing-to-bead-method.md)
 - [拼豆生成算法完整调研](docs/algorithm-research.md)
 - [可采用方法与 GitHub 项目复核](docs/methods-and-github-review.md)

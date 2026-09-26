@@ -1,0 +1,4 @@
+{
+  "compilerOptions": { "target": "ES2019", "module": "CommonJS", "moduleResolution": "Node", "strict": true, "skipLibCheck": true, "types": [], "lib": ["ES2022"], "noEmitOnError": true },
+  "include": ["app.ts", "config.ts", "pages/**/*.ts", "wx.d.ts"]
+}

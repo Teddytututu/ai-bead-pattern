@@ -18,4 +18,4 @@
 
 ## Phase 4: Product Validation
 
-完善编辑、导出、历史记录与真实用户评估。
+MARD 291、带色号 PNG/CSV/JSON 导出、产品 HTTP API、微信 SDK 和原生最小页面已完成本地实现。用户选择先交付本地版本，HTTPS 环境、正式微信登录与 Android/iOS 真机验收后续接入。验收状态见[本地交付记录](local-delivery-2026-09-26.md)。完整编辑、历史作品中心与真实用户评估继续列入后续工作。

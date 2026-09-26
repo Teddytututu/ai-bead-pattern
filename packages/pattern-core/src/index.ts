@@ -1,3 +1,6 @@
+export { patternLimits } from './limits.js'
+export { createPaletteVersion } from './palette.js'
+export { createPatternDocument, patternMaterialsCsv, patternSvg, type PatternDocument } from './export.js'
 export {
   createPatternAlgorithm,
   type PatternAlgorithm,

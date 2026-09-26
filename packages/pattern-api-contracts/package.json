@@ -1,0 +1,6 @@
+{
+  "name": "@ai-bead-pattern/pattern-api-contracts", "version": "1.0.0", "private": true, "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "test": "node --test test/*.test.mjs" },
+  "dependencies": { "@ai-bead-pattern/pattern-core": "workspace:*" }
+}

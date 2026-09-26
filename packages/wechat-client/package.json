@@ -1,0 +1,6 @@
+{
+  "name": "@ai-bead-pattern/wechat-client", "version": "0.1.0", "private": true, "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist-cjs/index.js" } },
+  "scripts": { "build": "tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node build.mjs", "typecheck": "tsc -p tsconfig.json --noEmit", "test": "node --test test/*.test.mjs" },
+  "dependencies": { "@ai-bead-pattern/pattern-api-contracts": "workspace:*" }
+}

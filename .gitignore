@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 services/pixel-proposal-sidecar/.venv/
 services/openclip-sidecar/.venv/
 services/sam2-sidecar/.venv/
@@ -10,6 +11,7 @@ services/dinov2-sidecar/.venv/
 
 # Build output
 dist/
+dist-cjs/
 .test-dist/
 miniprogram_npm/
 
@@ -45,3 +47,6 @@ work/mask-gate/
 
 # Local backups of discarded outer repositories and experiment files
 /.local-backup/
+/services/pattern-api/data/
+/apps/wechat-miniapp/vendor/
+/apps/wechat-miniapp/**/*.js

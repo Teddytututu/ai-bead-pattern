@@ -1,0 +1,13 @@
+{
+  "name": "@ai-bead-pattern/material-palettes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "scripts": {
+    "build": "node build.mjs && tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": { "@ai-bead-pattern/pattern-core": "workspace:*" }
+}

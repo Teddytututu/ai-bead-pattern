@@ -301,7 +301,7 @@
     .stage-title { margin: 0; font-size: 15px; }
     .stage-detail { color: var(--muted); font-size: 12px; white-space: nowrap; }
 
-    .toolbar-actions { display: flex; align-items: center; gap: 8px; }
+    .toolbar-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
     .icon-button {
       width: 34px;
@@ -774,8 +774,12 @@
           </div>
         </div>
         <div class="control-group">
-          <label class="control-label" for="maxColors"><span>颜色</span><span class="control-value" id="colorValue">20 色</span></label>
-          <input id="maxColors" type="range" min="6" max="24" step="1" value="20">
+          <label class="control-label" for="paletteSelect"><span>材料色卡</span><span class="control-value" id="paletteCount">291 色</span></label>
+          <select id="paletteSelect" aria-label="材料色卡"><option value="mard-291">MARD 291</option><option value="generic-24">通用 24 色</option></select>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="maxColors"><span>本张最多用色</span><span class="control-value" id="colorValue">20 色</span></label>
+          <input id="maxColors" type="range" min="1" max="48" step="1" value="20">
         </div>
         <div class="control-group">
           <div class="control-label"><span>算法</span><span class="control-value" id="baselineValue">结构版</span></div>
@@ -853,6 +857,7 @@
         <div class="toolbar-actions">
           <button class="text-button" id="openAnalysisDebugButton" type="button">分析图层</button>
           <button class="icon-button" id="toggleGridButton" type="button" title="切换网格" aria-label="切换网格" aria-pressed="true">#</button>
+          <select id="exportFormat" aria-label="导出格式"><option value="png">PNG 图纸</option><option value="csv">材料 CSV</option><option value="json">图纸 JSON</option></select>
           <button class="icon-button" id="downloadButton" type="button" title="下载 PNG" aria-label="下载 PNG" disabled>↓</button>
         </div>
       </div>
@@ -922,6 +927,8 @@
 
       <section class="section">
         <h2 class="section-title">材料</h2>
+        <label for="materialSort">排序</label>
+        <select id="materialSort"><option value="count">按用量</option><option value="code">按色号</option></select>
         <div class="material-list" id="materialList">
           <div class="empty">等待生成</div>
         </div>
@@ -1171,11 +1178,9 @@
     } from './ai-runtime.mjs'
     import { createPreferenceRuntime } from './preference-runtime.mjs'
 
-    const palette = await fetch('/assets/palettes/generic-24.json').then((response) => {
-      if (response.ok === false) throw new Error('色板读取失败')
-      return response.json()
-    })
-    const colorsById = new Map(palette.colors.map((color) => [color.id, color]))
+    import { getPalette } from '../../packages/material-palettes/dist/index.js'
+    import { downloadPatternFile } from './pattern-download.mjs'
+    let palette = await getPalette('mard-291')
     const algorithm = createPatternAlgorithm()
     const preferenceRuntime = createPreferenceRuntime({
       core: {
@@ -1523,6 +1528,8 @@
     }
 
     function setBusy(busy) {
+      document.querySelector('#paletteSelect').disabled = busy
+      if (busy) elements.downloadButton.disabled = true
       elements.generateButton.disabled = busy
       elements.modelRouteSelect.disabled = busy
       elements.preferenceStartButton.disabled = busy || candidates.length < 2
@@ -2343,6 +2350,7 @@
       canvas.width = pattern.width * cellSize
       canvas.height = pattern.height * cellSize
       const context = canvas.getContext('2d')
+      const colorsById = new Map(pattern.palette.map(color => [color.id, color]))
       context.clearRect(0, 0, canvas.width, canvas.height)
       for (const cell of pattern.cells) {
         const color = colorsById.get(cell.colorId)
@@ -2503,8 +2511,11 @@
     }
 
     function renderMaterials(candidate) {
+      const colorsById = new Map(candidate.pattern.palette.map(color => [color.id, color]))
       elements.materialList.replaceChildren()
-      const rows = [...candidate.materialCounts].sort((first, second) => second.count - first.count)
+      const rows = [...candidate.materialCounts].sort((first, second) => document.querySelector('#materialSort').value === 'code'
+        ? first.colorId.localeCompare(second.colorId, 'en', { numeric: true })
+        : second.count - first.count)
       for (const entry of rows) {
         const color = colorsById.get(entry.colorId)
         const row = document.createElement('div')
@@ -2514,7 +2525,7 @@
         swatch.style.backgroundColor = color?.hex ?? '#fff'
         const name = document.createElement('span')
         name.className = 'material-name'
-        name.textContent = color?.name ?? entry.colorId
+        name.textContent = color?.code ?? color?.name ?? entry.colorId
         const count = document.createElement('span')
         count.className = 'material-count'
         count.textContent = entry.count.toLocaleString('zh-CN')
@@ -2556,15 +2567,25 @@
       await generate()
     }
 
-    function downloadPattern() {
-      if (selectedCandidate === null) return
-      const canvas = document.createElement('canvas')
-      drawPattern(canvas, selectedCandidate.pattern, { grid: true, beads: true, maximum: 1600 })
-      const link = document.createElement('a')
-      link.download = `bead-pattern-${selectedCandidate.pattern.width}x${selectedCandidate.pattern.height}-${selectedCandidate.style}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
+    async function downloadPattern() {
+      if (selectedCandidate === null || elements.downloadButton.disabled) return
+      try { await downloadPatternFile(selectedCandidate.pattern, document.querySelector('#exportFormat').value) }
+      catch (error) { setStatus(error.message, 'error') }
     }
+
+    document.querySelector('#materialSort').addEventListener('change', () => {
+      if (selectedCandidate) renderMaterials(selectedCandidate)
+    })
+    document.querySelector('#paletteSelect').addEventListener('change', async (event) => {
+      try {
+        palette = await getPalette(event.target.value)
+        document.querySelector('#paletteCount').textContent = `${palette.colorCount} 色`
+        elements.maxColors.max = String(Math.min(48, palette.colorCount))
+        elements.maxColors.value = String(Math.min(Number(elements.maxColors.value), Number(elements.maxColors.max)))
+        elements.colorValue.textContent = `${elements.maxColors.value} 色`
+        await generate()
+      } catch (error) { setStatus(error.message, 'error') }
+    })
 
     elements.sizeControl.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-size]')

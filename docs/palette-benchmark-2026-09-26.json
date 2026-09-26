@@ -1,0 +1,1451 @@
+{
+  "date": "2026-09-26T03:12:57.556Z",
+  "node": "v25.5.0",
+  "cpu": "Intel(R) Core(TM) Ultra 9 185H",
+  "platform": "win32",
+  "full": true,
+  "repeats": 3,
+  "memoryMetric": "RSS growth after each run; not sampled peak",
+  "rows": [
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        84,
+        50,
+        44
+      ],
+      "maxRssGrowthMiB": 4,
+      "status": "success",
+      "colors": 12
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        111,
+        113,
+        101
+      ],
+      "maxRssGrowthMiB": 22,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        83,
+        71,
+        46
+      ],
+      "maxRssGrowthMiB": 25,
+      "status": "success",
+      "colors": 12
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        155,
+        146,
+        130
+      ],
+      "maxRssGrowthMiB": 3,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        90,
+        81,
+        64
+      ],
+      "maxRssGrowthMiB": 3,
+      "status": "success",
+      "colors": 14
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        169,
+        154,
+        174
+      ],
+      "maxRssGrowthMiB": 71,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        103,
+        95,
+        91
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 12
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        243,
+        249,
+        308
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        90,
+        109,
+        103
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 15
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        261,
+        261,
+        273
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        182,
+        157,
+        187
+      ],
+      "maxRssGrowthMiB": 10,
+      "status": "success",
+      "colors": 14
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        390,
+        390,
+        387
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        208,
+        197,
+        208
+      ],
+      "maxRssGrowthMiB": 7,
+      "status": "success",
+      "colors": 15
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        543,
+        513,
+        524
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        368,
+        362,
+        385
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 15
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "gradient",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        1006,
+        1105,
+        1008
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        160,
+        129,
+        134
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 6
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        361,
+        377,
+        357
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 3
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        219,
+        188,
+        190
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 6
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        511,
+        541,
+        497
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 3
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        281,
+        291,
+        272
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 5
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        823,
+        879,
+        885
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 3
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        506,
+        449,
+        460
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 5
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        1440,
+        1261,
+        1290
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 3
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        522,
+        475,
+        491
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 5
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        1465,
+        1482,
+        1427
+      ],
+      "maxRssGrowthMiB": 3,
+      "status": "success",
+      "colors": 3
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        793,
+        801,
+        823
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 5
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        2236,
+        2114,
+        2119
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 3
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        1003,
+        996,
+        1068
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 6
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        2767,
+        2803,
+        2915
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 3
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        1348,
+        1345,
+        1388
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 6
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        4214,
+        4249,
+        4354
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 3
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        71,
+        63,
+        54
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 9
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        165,
+        171,
+        175
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 9
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        76,
+        81,
+        84
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 8
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        271,
+        245,
+        233
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 8
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        162,
+        167,
+        176
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        452,
+        509,
+        472
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        245,
+        275,
+        261
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        775,
+        761,
+        745
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        211,
+        223,
+        211
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        629,
+        638,
+        623
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        448,
+        444,
+        439
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        1259,
+        1312,
+        1264
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        573,
+        539,
+        566
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        1645,
+        1598,
+        1554
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        1067,
+        1087,
+        1086
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 9
+    },
+    {
+      "paletteId": "generic-24",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        2883,
+        2971,
+        3272
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 9
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        110,
+        111,
+        105
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 17
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        284,
+        331,
+        320
+      ],
+      "maxRssGrowthMiB": 3,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        151,
+        115,
+        133
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 17
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        369,
+        379,
+        361
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 17
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        176,
+        212,
+        193
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 18
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        555,
+        585,
+        553
+      ],
+      "maxRssGrowthMiB": 8,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        285,
+        263,
+        254
+      ],
+      "maxRssGrowthMiB": 3,
+      "status": "success",
+      "colors": 18
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        744,
+        799,
+        794
+      ],
+      "maxRssGrowthMiB": 8,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        385,
+        369,
+        382
+      ],
+      "maxRssGrowthMiB": 5,
+      "status": "success",
+      "colors": 18
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        1064,
+        1081,
+        1079
+      ],
+      "maxRssGrowthMiB": 14,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        562,
+        540,
+        540
+      ],
+      "maxRssGrowthMiB": 5,
+      "status": "success",
+      "colors": 18
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        1521,
+        1447,
+        1666
+      ],
+      "maxRssGrowthMiB": 4,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        1025,
+        930,
+        1014
+      ],
+      "maxRssGrowthMiB": 9,
+      "status": "success",
+      "colors": 18
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        3160,
+        2502,
+        2785
+      ],
+      "maxRssGrowthMiB": 20,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        1205,
+        1245,
+        1093
+      ],
+      "maxRssGrowthMiB": 9,
+      "status": "success",
+      "colors": 18
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "gradient",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        3444,
+        3544,
+        3654
+      ],
+      "maxRssGrowthMiB": 10,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        254,
+        212,
+        209
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        623,
+        832,
+        710
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        391,
+        385,
+        347
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        1228,
+        938,
+        962
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 7
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        679,
+        621,
+        646
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 12
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        1911,
+        1712,
+        1921
+      ],
+      "maxRssGrowthMiB": 9,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        724,
+        653,
+        700
+      ],
+      "maxRssGrowthMiB": 4,
+      "status": "success",
+      "colors": 9
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        2269,
+        2174,
+        2601
+      ],
+      "maxRssGrowthMiB": 4,
+      "status": "success",
+      "colors": 10
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        999,
+        1007,
+        1011
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        2843,
+        3004,
+        3010
+      ],
+      "maxRssGrowthMiB": 13,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        1539,
+        1503,
+        1508
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        4380,
+        4054,
+        3569
+      ],
+      "maxRssGrowthMiB": 10,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        1995,
+        1877,
+        2005
+      ],
+      "maxRssGrowthMiB": 2,
+      "status": "success",
+      "colors": 16
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        5903,
+        5939,
+        6356
+      ],
+      "maxRssGrowthMiB": 21,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        2277,
+        2246,
+        2281
+      ],
+      "maxRssGrowthMiB": 3,
+      "status": "success",
+      "colors": 16
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "cat-photo",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        8314,
+        8097,
+        7907
+      ],
+      "maxRssGrowthMiB": 11,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        176,
+        142,
+        138
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 16
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 32,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        405,
+        407,
+        363
+      ],
+      "maxRssGrowthMiB": 19,
+      "status": "success",
+      "colors": 16
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        194,
+        224,
+        236
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 16
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 32,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        700,
+        582,
+        584
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 16
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        341,
+        400,
+        414
+      ],
+      "maxRssGrowthMiB": 3,
+      "status": "success",
+      "colors": 20
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 48,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        1233,
+        1066,
+        1077
+      ],
+      "maxRssGrowthMiB": 6,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        594,
+        584,
+        623
+      ],
+      "maxRssGrowthMiB": 3,
+      "status": "success",
+      "colors": 20
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 48,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        1813,
+        1744,
+        1706
+      ],
+      "maxRssGrowthMiB": 6,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        569,
+        609,
+        639
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 20
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 64,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        1783,
+        2578,
+        2661
+      ],
+      "maxRssGrowthMiB": 8,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        1041,
+        1047,
+        1276
+      ],
+      "maxRssGrowthMiB": 4,
+      "status": "success",
+      "colors": 20
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 64,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        2887,
+        2546,
+        2682
+      ],
+      "maxRssGrowthMiB": 6,
+      "status": "success",
+      "colors": 11
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 1,
+      "durationsMs": [
+        1355,
+        1559,
+        1295
+      ],
+      "maxRssGrowthMiB": 1,
+      "status": "success",
+      "colors": 20
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "fast",
+      "candidates": 3,
+      "durationsMs": [
+        4071,
+        4249,
+        4430
+      ],
+      "maxRssGrowthMiB": 20,
+      "status": "success",
+      "colors": 20
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 1,
+      "durationsMs": [
+        2234,
+        2183,
+        2270
+      ],
+      "maxRssGrowthMiB": 0,
+      "status": "success",
+      "colors": 20
+    },
+    {
+      "paletteId": "mard-291",
+      "input": "transparent-edges",
+      "side": 96,
+      "mode": "quality",
+      "candidates": 3,
+      "durationsMs": [
+        5829,
+        5993,
+        6095
+      ],
+      "maxRssGrowthMiB": 21,
+      "status": "success",
+      "colors": 11
+    }
+  ]
+}

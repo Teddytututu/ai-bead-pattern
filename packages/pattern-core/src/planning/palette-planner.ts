@@ -55,6 +55,8 @@ interface PlannedRole {
   preferredColorId: string
   demand: number
   weight: number
+  /** Scoped to one plan, with this palette's prepared colors and distance method. */
+  costs: ReadonlyMap<PreparedColor, number>
 }
 
 interface AssignmentResult {
@@ -157,8 +159,9 @@ function buildRoles(
       mayShareColor: true,
       importance: valueRole.importance,
     }
+    const costs = new Map(allColors.map(color => [color, roleCost(colorRole, color, input.distanceMethod)]))
     const preferred = [...allColors].sort((first, second) =>
-      roleCost(colorRole, first, input.distanceMethod) - roleCost(colorRole, second, input.distanceMethod)
+      costs.get(first)! - costs.get(second)!
       || first.id.localeCompare(second.id))[0]!
     const idealChroma = Math.hypot(colorRole.idealLab[1], colorRole.idealLab[2])
     const hueCompatible = allColors.filter((color) =>
@@ -176,7 +179,7 @@ function buildRoles(
       .map((color) => ({
         color,
         substituteRank: substitutes.has(color.id) ? 0 : 1,
-        cost: roleCost(colorRole, color, input.distanceMethod),
+        cost: costs.get(color)!,
       }))
       .sort((first, second) => first.substituteRank - second.substituteRank
         || first.cost - second.cost || first.color.id.localeCompare(second.color.id))
@@ -189,6 +192,7 @@ function buildRoles(
       preferredColorId: preferred.id,
       demand: cells.length,
       weight: Math.max(0.05, cells.length * Math.max(0.1, valueRole.importance)),
+      costs,
     }
   })
 }
@@ -196,14 +200,13 @@ function buildRoles(
 function assignmentCost(
   roles: readonly PlannedRole[],
   selected: ReadonlySet<string>,
-  method: ColorDistanceMethod,
 ): number {
   if (selected.size === 0) return Number.POSITIVE_INFINITY
   return roles.reduce((total, role) => {
     const candidates = role.allowedColors.filter((color) => selected.has(color.id))
     if (candidates.length === 0) return total + 1_000_000 * role.weight
     const best = candidates.reduce((minimum, color) =>
-      Math.min(minimum, roleCost(role.colorRole, color, method)), Number.POSITIVE_INFINITY)
+      Math.min(minimum, role.costs.get(color)!), Number.POSITIVE_INFINITY)
     return total + best * role.weight
   }, 0)
 }
@@ -232,7 +235,7 @@ function selectColors(
     for (const color of selectable) {
       if (selected.has(color.id)) continue
       const trial = new Set(selected).add(color.id)
-      const cost = assignmentCost(roles, trial, input.distanceMethod)
+      const cost = assignmentCost(roles, trial)
       if (cost < bestCost || (cost === bestCost && color.id.localeCompare(bestColor?.id ?? '') < 0)) {
         bestCost = cost
         bestColor = color
@@ -248,7 +251,6 @@ function solveRegion(
   roles: readonly PlannedRole[],
   selectedColors: readonly PreparedColor[],
   remaining: Readonly<Record<string, number>>,
-  method: ColorDistanceMethod,
   minimumSeparationScale: 0 | 1,
   ordered: boolean,
 ): { assignments: readonly string[]; cost: number } | undefined {
@@ -276,12 +278,12 @@ function solveRegion(
       && (ordered === false
         || color.lab[0] >= previousLightness + role.valueRole.minimumSeparation * minimumSeparationScale))
       .sort((first, second) =>
-        roleCost(role.colorRole, first, method) - roleCost(role.colorRole, second, method)
+        role.costs.get(first)! - role.costs.get(second)!
         || first.id.localeCompare(second.id))
     for (const color of candidates) {
       const next = { ...capacities, [color.id]: capacities[color.id]! - role.demand }
       visit(index + 1, color.lab[0], next, [...assignments, color.id],
-        cost + roleCost(role.colorRole, color, method) * role.weight)
+        cost + role.costs.get(color)! * role.weight)
     }
   }
   visit(0, Number.NEGATIVE_INFINITY, { ...remaining }, [], 0)
@@ -312,9 +314,9 @@ function assignRoles(
     const orderedRoles = [...regionRoles].sort((first, second) =>
       first.valueRole.targetLightness - second.valueRole.targetLightness
       || first.valueRole.id.localeCompare(second.valueRole.id))
-    const strict = solveRegion(orderedRoles, selectedColors, remaining, input.distanceMethod, 1, true)
-    const monotone = strict ?? solveRegion(orderedRoles, selectedColors, remaining, input.distanceMethod, 0, true)
-    const solution = monotone ?? solveRegion(orderedRoles, selectedColors, remaining, input.distanceMethod, 0, false)
+    const strict = solveRegion(orderedRoles, selectedColors, remaining, 1, true)
+    const monotone = strict ?? solveRegion(orderedRoles, selectedColors, remaining, 0, true)
+    const solution = monotone ?? solveRegion(orderedRoles, selectedColors, remaining, 0, false)
     if (solution === undefined) throw new RangeError('Palette inventory cannot cover all planned roles')
     if (strict === undefined) relaxedRegionIds.push(regionId)
     orderedRoles.forEach((role, index) => {
@@ -347,7 +349,7 @@ export function buildPalettePlan(input: PalettePlanningInput): PalettePlanningRe
     roleId === undefined ? fallbackColorId : assignment.assignments[roleId] ?? fallbackColorId)
   const weightedCost = roles.reduce((total, role) => {
     const color = selectedColors.find((entry) => entry.id === assignment.assignments[role.valueRole.id])!
-    return total + roleCost(role.colorRole, color, input.distanceMethod) * role.weight
+    return total + role.costs.get(color)! * role.weight
   }, 0)
   const totalWeight = roles.reduce((sum, role) => sum + role.weight, 0)
   const plan: PalettePlan = {

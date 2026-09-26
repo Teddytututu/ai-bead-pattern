@@ -580,7 +580,7 @@ describe('deterministic pattern algorithm', () => {
     const oversizedPalette: MaterialPalette = {
       id: 'oversized',
       name: 'Oversized',
-      colors: Array.from({ length: 129 }, (_, index) => ({
+      colors: Array.from({ length: 513 }, (_, index) => ({
         id: `color-${index}`,
         name: `Color ${index}`,
         hex: '#000000',

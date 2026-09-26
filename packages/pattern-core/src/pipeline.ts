@@ -6,6 +6,8 @@ import {
   type PreparedColor,
 } from './color.js'
 import { adaptPattern } from './adaptation.js'
+import { patternLimits } from './limits.js'
+import { createPaletteVersion } from './palette.js'
 import {
   applyArtDirectionImportance,
   enforceTileSeams,
@@ -129,14 +131,8 @@ interface AssignedGrid {
 }
 
 const defaultStyles: readonly PatternStyle[] = ['faithful', 'simple', 'high-contrast']
-const maxImageSide = 2_048
-const maxImagePixels = 4_000_000
-const maxCanvasSide = 96
-const maxCanvasCells = 9_216
-const maxPaletteColors = 128
-const maxSelectedColors = 48
-const maxCanvasCandidates = 12
-const maxGeneratedCandidates = 20
+const { maxImageSide, maxImagePixels, maxCanvasSide, maxCanvasCells,
+  maxPaletteColors, maxSelectedColors, maxCanvasCandidates, maxGeneratedCandidates } = patternLimits
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
@@ -376,7 +372,8 @@ function validateRequest(request: PatternGenerationRequest): void {
   for (const color of request.palette.colors) {
     if (color.id.trim().length === 0) throw new RangeError('Palette color id is required')
     validateRgb(color.rgb, `Palette color ${color.id}`)
-    if (color.lab?.some((value) => Number.isFinite(value) === false)) {
+    if (color.lab !== undefined && (color.lab.length !== 3
+      || color.lab.some((value) => Number.isFinite(value) === false))) {
       throw new RangeError(`Palette color ${color.id} Lab values must be finite`)
     }
   }
@@ -1848,6 +1845,9 @@ function metadata(
   generatedAt: number,
 ): PatternMetadata {
   const result: PatternMetadata = {
+    paletteId: request.palette.id,
+    ...(request.palette.version === undefined ? {} : { paletteVersion: request.palette.version }),
+    ...(request.palette.brand === undefined ? {} : { paletteBrand: request.palette.brand }),
     sourceWidth: request.image.width,
     sourceHeight: request.image.height,
     totalBeads,
@@ -2698,6 +2698,8 @@ export class DeterministicPatternAlgorithm {
     let canvasPlanningMs = 0
     let candidateGenerationMs = 0
     validateRequest(request)
+    request = { ...request, palette: { ...request.palette,
+      version: request.palette.version ?? await createPaletteVersion(request.palette) } }
     const baseline = request.options.baseline ?? 'mvp'
     const sizes = resolveSizes(request.options)
     const styles = resolveStyles(request.options, baseline)
@@ -2869,6 +2871,8 @@ export class DeterministicPatternAlgorithm {
   }
 
   async adapt(request: PatternAdaptationRequest): Promise<PatternAdaptationResult> {
-    return adaptPattern(request, this.version, this.#clock())
+    const palette = { ...request.palette,
+      version: request.palette.version ?? await createPaletteVersion(request.palette) }
+    return adaptPattern({ ...request, palette }, this.version, this.#clock())
   }
 }

@@ -51,6 +51,23 @@ function valuePlan(): ValuePlan {
 }
 
 describe('PalettePlan', () => {
+  it('recomputes costs when color values or the distance method change between plans', () => {
+    const input: Parameters<typeof buildPalettePlan>[0] = {
+      valuePlan: valuePlan(), structurePlan: structurePlan(),
+      roleIdsByCell: ['region-0:shadow', 'region-0:base', 'region-0:light'],
+      plannedLabs: [[20, 0, 0], [50, 0, 0], [80, 0, 0]],
+      colors, maximumColors: 3, distanceMethod: 'delta-e-2000', featurePlacements: [],
+    }
+    const original = buildPalettePlan(input)
+    const changedColors = colors.map(color => ({ ...color, lab: [color.lab![0] + 5, 0, 0] as const }))
+    const changed = buildPalettePlan({ ...input, colors: changedColors })
+    const delta76 = buildPalettePlan({ ...input, colors: changedColors, distanceMethod: 'delta-e-76' })
+    assert.equal(original.plan.totalCost, 0)
+    assert.ok(changed.plan.totalCost > 0)
+    assert.notEqual(changed.plan.totalCost, delta76.plan.totalCost)
+    assert.deepEqual(buildPalettePlan(input), original)
+  })
+
   it('assigns ordered material colors to value roles within the global color limit', () => {
     const result = buildPalettePlan({
       valuePlan: valuePlan(),

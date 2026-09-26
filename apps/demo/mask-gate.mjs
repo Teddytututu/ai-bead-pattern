@@ -225,13 +225,19 @@ async function hashBlob(blob) {
 }
 
 async function blobPixels(blob, greyscale = false) {
-  const bitmap = await createImageBitmap(blob)
+  const url = URL.createObjectURL(blob)
+  const bitmap = new Image()
+  try {
+    bitmap.src = url
+    await bitmap.decode()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
   const canvas = document.createElement('canvas')
   canvas.width = bitmap.width
   canvas.height = bitmap.height
   const context = canvas.getContext('2d', { willReadFrequently: true })
   context.drawImage(bitmap, 0, 0)
-  bitmap.close()
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
   if (greyscale) {
     return {

@@ -18,10 +18,46 @@ importers:
         specifier: ^5.9.2
         version: 5.9.3
 
+  packages/material-palettes:
+    dependencies:
+      '@ai-bead-pattern/pattern-core':
+        specifier: workspace:*
+        version: link:../pattern-core
+
+  packages/pattern-api-contracts:
+    dependencies:
+      '@ai-bead-pattern/pattern-core':
+        specifier: workspace:*
+        version: link:../pattern-core
+
   packages/pattern-core: {}
+
+  packages/wechat-client:
+    dependencies:
+      '@ai-bead-pattern/pattern-api-contracts':
+        specifier: workspace:*
+        version: link:../pattern-api-contracts
 
   services/ai-gateway:
     dependencies:
+      '@ai-bead-pattern/pattern-core':
+        specifier: workspace:*
+        version: link:../../packages/pattern-core
+      sharp:
+        specifier: ^0.35.3
+        version: 0.35.3(@types/node@24.13.3)
+
+  services/pattern-api:
+    dependencies:
+      '@ai-bead-pattern/ai-gateway':
+        specifier: workspace:*
+        version: link:../ai-gateway
+      '@ai-bead-pattern/material-palettes':
+        specifier: workspace:*
+        version: link:../../packages/material-palettes
+      '@ai-bead-pattern/pattern-api-contracts':
+        specifier: workspace:*
+        version: link:../../packages/pattern-api-contracts
       '@ai-bead-pattern/pattern-core':
         specifier: workspace:*
         version: link:../../packages/pattern-core

@@ -23,6 +23,8 @@ export interface PixelImage {
 
 export interface MaterialColor {
   id: string
+  code?: string
+  group?: string
   name: string
   hex: string
   rgb: RGB
@@ -35,6 +37,10 @@ export type MaterialSubstitutionMap = Readonly<Record<string, readonly string[]>
 export interface MaterialPalette {
   id: string
   name: string
+  version?: string
+  brand?: string
+  rgbKind?: 'screen-reference' | 'measured'
+  source?: Readonly<Record<string, string>>
   colors: readonly MaterialColor[]
   /** Missing color ids represent unrestricted stock; supplied values are bead counts. */
   inventory?: MaterialInventory
@@ -261,6 +267,9 @@ export interface PatternCell {
 }
 
 export interface PatternMetadata {
+  paletteId?: string
+  paletteVersion?: string
+  paletteBrand?: string
   sourceWidth: number
   sourceHeight: number
   /** Occupied grid cells. Blank fitted margins are excluded. */
