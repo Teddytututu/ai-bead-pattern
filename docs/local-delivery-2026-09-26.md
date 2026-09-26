@@ -2,6 +2,8 @@
 
 用户选择先完成本地交付，之后再接入真机环境。本记录区分代码及自动化验证与微信环境验证。
 
+状态：本地交付完成；正式微信环境和真机验收待后续接入。
+
 ## 已落地
 
 - 完整 MARD 291 注册、严格校验、内容摘要版本；核心材料库容量 512，作品用色 1–48。数据唯一维护源仍为 `assets/palettes/mard-291.json`。
@@ -33,15 +35,15 @@ API：首次从 `services/pattern-api/.env.example` 复制 `.env`，然后 `pnpm
 | `pnpm test` | 702 项全部通过；含核心 396、API 7、SDK 4、色卡 6、契约 1 及既有 Gateway/评测/Demo 测试 |
 | `pnpm typecheck` | 通过，包含小程序源码 |
 | `pnpm wechat:build` | 通过，包含全部 workspace 构建及小程序 JS；最后的页面生命周期修正已重新编译 |
-| 浏览器 Playwright | 17 项完整回归运行中；新增 291 色切换及 PNG/JSON 实际下载单项已通过 |
+| 浏览器 Playwright | 全部 17 项通过；最终版本分两组执行，10 项蒙版/分析流程与 7 项模型路线/色卡导出/工作台流程均通过 |
 | OpenAPI | 3.1.0 JSON 可解析，13 个路径、158 个 schema 引用可解析 |
 | `git diff --check` | 通过 |
 
 已验证的重点包括 291 颜色匹配与大于 255 的索引、512/513 边界、用色预算、空白格统计、浏览器 PNG/JSON、HTTP 实际上传和 Worker 生成、质量导出条件、跨用户隔离、幂等冲突、取消/重启/过期、EXIF 方向与透明图、SDK 重试和会话失效。
 
-最终收尾中，配色规划增加了单次规划内的角色/材料距离复用，改变色值或距离方法时重新计算；保留完整搜索范围及旧测试时限。浏览器 PNG 导出和蒙版载入统一使用图片元素解码，修正 Chromium 中 SVG 与小尺寸 PNG 的兼容问题。评测路径测试同时去除了对仓库目录名的硬编码。
+配色规划增加了单次规划内的角色/材料距离复用，改变色值或距离方法时重新计算；保留完整搜索范围及旧测试时限。浏览器 PNG 导出和蒙版载入统一使用图片元素解码，修正 Chromium 中 SVG 与小尺寸 PNG 的兼容问题。评测路径测试同时去除了对仓库目录名的硬编码。
 
-性能矩阵共 288 次运行，原始数据和方法见[性能报告](palette-benchmark-2026-09-26.md)。本机截图与导出样例位于 `output/demo-mard-291.png` 和 `output/mard-291-pattern.png`，测试日志同在 `output/`；该目录不提交 Git。
+性能矩阵共 288 次运行，MARD 291 最大耗时 6,801 ms；另有 6 个独立进程的内存测量，最大峰值 271 MiB。原始数据和方法见[性能报告](palette-benchmark-2026-09-26.md)。本机截图与导出样例位于 `output/demo-mard-291.png` 和 `output/mard-291-pattern.png`；最终测试日志为 `output/final-tests.log`、`output/regression-e2e.log`、`output/final-e2e-remaining.log`。`output/` 不提交 Git，之前的失败日志仅保留作排错记录。
 
 ## 后续微信环境验证
 

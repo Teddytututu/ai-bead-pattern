@@ -1,5 +1,5 @@
 {
-  "date": "2026-09-26T04:27:35.415Z",
+  "date": "2026-09-26T14:18:38.476Z",
   "node": "v25.5.0",
   "cpu": "Intel(R) Core(TM) Ultra 9 185H",
   "platform": "win32",
@@ -12,14 +12,14 @@
       "mode": "quality",
       "candidates": 3,
       "durationsMs": [
-        1364,
-        1091,
-        1080
+        1359,
+        1127,
+        1063
       ],
-      "maxRssGrowthMiB": 91,
+      "maxRssGrowthMiB": 82,
       "status": "success",
       "colors": 7,
-      "processPeakRssMiB": 273
+      "processPeakRssMiB": 218
     },
     {
       "paletteId": "generic-24",
@@ -28,14 +28,14 @@
       "mode": "quality",
       "candidates": 3,
       "durationsMs": [
-        4734,
-        4677,
-        4615
+        4623,
+        4293,
+        4292
       ],
-      "maxRssGrowthMiB": 149,
+      "maxRssGrowthMiB": 136,
       "status": "success",
       "colors": 3,
-      "processPeakRssMiB": 250
+      "processPeakRssMiB": 229
     },
     {
       "paletteId": "generic-24",
@@ -44,14 +44,14 @@
       "mode": "quality",
       "candidates": 3,
       "durationsMs": [
-        3354,
-        2852,
-        2979
+        3148,
+        2919,
+        2848
       ],
-      "maxRssGrowthMiB": 137,
+      "maxRssGrowthMiB": 144,
       "status": "success",
       "colors": 9,
-      "processPeakRssMiB": 230
+      "processPeakRssMiB": 252
     },
     {
       "paletteId": "mard-291",
@@ -60,14 +60,14 @@
       "mode": "quality",
       "candidates": 3,
       "durationsMs": [
-        3084,
-        2759,
-        2762
+        2729,
+        2757,
+        2597
       ],
-      "maxRssGrowthMiB": 78,
+      "maxRssGrowthMiB": 89,
       "status": "success",
       "colors": 11,
-      "processPeakRssMiB": 271
+      "processPeakRssMiB": 270
     },
     {
       "paletteId": "mard-291",
@@ -76,14 +76,14 @@
       "mode": "quality",
       "candidates": 3,
       "durationsMs": [
-        7178,
-        6920,
-        6339
+        6463,
+        6183,
+        6124
       ],
-      "maxRssGrowthMiB": 155,
+      "maxRssGrowthMiB": 172,
       "status": "success",
       "colors": 11,
-      "processPeakRssMiB": 256
+      "processPeakRssMiB": 255
     },
     {
       "paletteId": "mard-291",
@@ -92,14 +92,14 @@
       "mode": "quality",
       "candidates": 3,
       "durationsMs": [
-        5358,
-        4871,
-        4626
+        4727,
+        4400,
+        4553
       ],
-      "maxRssGrowthMiB": 151,
+      "maxRssGrowthMiB": 150,
       "status": "success",
       "colors": 11,
-      "processPeakRssMiB": 273
+      "processPeakRssMiB": 271
     }
   ]
 }
