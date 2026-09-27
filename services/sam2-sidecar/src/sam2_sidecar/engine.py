@@ -778,6 +778,9 @@ class TransformersGroundingDinoBackend:
 
         scores = array(raw_scores).reshape(-1)
         boxes = array(raw_boxes).reshape((-1, 4))
+        # Transformers may leave one blank text label when no boxes survive.
+        if scores.size == 0 and boxes.shape[0] == 0:
+            return GroundingPrediction(detections=(), inference_ms=max(0.0, elapsed_ms), device=str(self._device))
         labels_output = list(raw_labels)
         if scores.shape[0] != boxes.shape[0] or scores.shape[0] != len(labels_output):
             raise RuntimeError("GroundingDINO output fields use different lengths")

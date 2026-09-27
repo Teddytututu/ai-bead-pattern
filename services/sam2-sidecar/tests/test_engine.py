@@ -376,12 +376,32 @@ class FakeGroundingProcessor:
         }]
 
 
+class EmptyGroundingProcessor(FakeGroundingProcessor):
+    def post_process_grounded_object_detection(self, *args, **kwargs):
+        return [{
+            "scores": np.array([], dtype=np.float32),
+            "boxes": np.empty((0, 4), dtype=np.float32),
+            "text_labels": [""],
+            "labels": [""],
+        }]
+
+
 class FakeGroundingModel:
     def __call__(self, **_inputs):
         return object()
 
 
 class GroundingDinoBackendTests(unittest.TestCase):
+    def test_empty_model_result_ignores_placeholder_text_label(self) -> None:
+        backend = TransformersGroundingDinoBackend(device="cpu")
+        backend._model = FakeGroundingModel()
+        backend._processor = EmptyGroundingProcessor()
+        backend._device = "cpu"
+
+        prediction = backend.detect(Image.new("RGB", (42, 42), "white"), ("a bird",))
+
+        self.assertEqual(prediction.detections, ())
+
     def test_normalizes_articles_case_and_periods_for_grounding_queries(self) -> None:
         self.assertEqual(
             normalize_detection_labels(("A CAT.", "an Owl", "the rabbit", "pet")),
