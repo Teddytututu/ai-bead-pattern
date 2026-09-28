@@ -2220,6 +2220,19 @@ function generateCandidate(
     .map((role) => role.id) ?? [])
   const plannedOutlineCells = valuePlanning?.roleIdsByCell.flatMap((roleId, cell) =>
     roleId !== undefined && outlineRoleIds.has(roleId) ? [cell] : []) ?? []
+  const trustedSemanticIds = new Set((request.analysis?.semanticRegions ?? [])
+    .filter((region) => region.confidence >= 0.5).map((region) => region.id))
+  const semanticBoundaryCells = mardFillPolicy && baseline === 'mvp' ? regionIds.flatMap((regionId, cell) => {
+    if (activeMask[cell] !== 1 || regionId === undefined || !trustedSemanticIds.has(regionId)) return []
+    const x = cell % size.width
+    const neighbors = [x > 0 ? cell - 1 : -1, x + 1 < size.width ? cell + 1 : -1,
+      cell - size.width, cell + size.width]
+    // Sparse feature masks need protection even when the neighboring body is unlabeled.
+    return neighbors.some((next) => next >= 0 && next < activeMask.length && activeMask[next] === 1
+      && regionIds[next] !== regionId) ? [cell] : []
+  }) : []
+  // Tone-bin boundaries are soft evidence, not hard locks on every shade change.
+  // Keep actual features, thin structures, occupancy anchors and ink protected.
   const protectedSet = new Set([
     ...landmarkProtected,
     ...(shapeRasterization?.protectedCells ?? []),
@@ -2228,9 +2241,7 @@ function generateCandidate(
     ...featurePlacements.flatMap((placement) => placement.occupiedCells),
     ...featurePlacements.flatMap((placement) => placement.reservedCells ?? []),
     ...(contourGeometry?.externalCells ?? []), ...(contourGeometry?.internalCells ?? []),
-    // Keep source region boundaries out of generic noise/stripe cleanup.
-    ...(mardFillPolicy && structurePlan ? Array.from(structurePlan.boundaryStrength)
-      .flatMap((strength, cell) => activeMask[cell] && strength >= 0.25 ? [cell] : []) : []),
+    ...semanticBoundaryCells,
   ])
   const semanticFeatureIds = new Set((request.analysis?.landmarks ?? [])
     .filter((landmark) => landmark.carrierRegionId !== undefined || landmark.provenance?.some(source => source.origin === 'manual'))
@@ -2783,7 +2794,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number; yieldControl?: () => Promise<void> }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.10.0-mard-ink-fill'
+    this.version = config.version ?? '0.10.1-mard-color-coherence'
     this.#clock = config.clock ?? Date.now
     this.#yieldControl = config.yieldControl
   }

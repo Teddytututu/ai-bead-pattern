@@ -15,7 +15,8 @@ const bytes = await readFile(resolve(input))
 const photo = await sharp(bytes).resize(256, 256, { fit: 'inside' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
 const image = { width: photo.info.width, height: photo.info.height, data: new Uint8ClampedArray(photo.data) }
 const configuration = {
-  width: 48, height: 48, baseline: 'mvp', styles: ['faithful'], maxCandidates: 1, refinementMode: 'fast',
+  width: 48, height: 48, baseline: 'mvp', styles: ['faithful'], maxCandidates: 1,
+  optimization: { refinementMode: 'fast' },
   structure: { valueMode: 'preserve', outlineMode: 'off', occupancyMode: 'full-frame' },
 }
 const sampled = resizePixels(image, { x: 0, y: 0, width: image.width, height: image.height }, 48, 48, 'cell-aware')

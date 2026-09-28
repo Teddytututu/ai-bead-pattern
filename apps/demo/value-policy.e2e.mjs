@@ -2,9 +2,12 @@ import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
 test('exports the selected tone policy and allows a true zero strength', async ({ page }) => {
-  // Initial auto search plus a second generation; each generation keeps its 30 s wait budget.
-  test.setTimeout(60_000)
+  // The neural part fixture intentionally fails feature quality. This policy/export
+  // test uses the bundled deterministic evidence without relaxing the quality gate.
+  test.setTimeout(90_000)
   await page.goto('/apps/demo/')
+  await expect(page.locator('#modelRouteSelect')).toBeEnabled({ timeout: 30_000 })
+  await page.selectOption('#modelRouteSelect', 'deterministic')
   await expect(page.locator('#downloadButton')).toBeEnabled({ timeout: 30_000 })
   await page.selectOption('#valueModeControl', 'preserve')
   await expect(page.locator('#valueStrengthControl')).toBeDisabled()
@@ -22,6 +25,6 @@ test('exports the selected tone policy and allows a true zero strength', async (
   const document = JSON.parse(await readFile(await (await downloaded).path(), 'utf8'))
   expect(document.metadata.valueMode).toBe('stylized')
   expect(document.metadata.valueStrength).toBe(0)
-  expect(document.metadata.algorithmVersion).toBe('0.10.0-mard-ink-fill')
+  expect(document.metadata.algorithmVersion).toBe('0.10.1-mard-color-coherence')
   await page.screenshot({ path: 'output/value-policy-demo.png', fullPage: true })
 })

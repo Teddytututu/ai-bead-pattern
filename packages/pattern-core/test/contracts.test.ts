@@ -182,7 +182,7 @@ describe('V2 planning contracts', () => {
   it('exposes the color-fidelity release identity on the baseline engine', () => {
     const algorithm = createPatternAlgorithm()
     assert.equal(algorithm.engine, 'baseline')
-    assert.equal(algorithm.version, '0.10.0-mard-ink-fill')
+    assert.equal(algorithm.version, '0.10.1-mard-color-coherence')
   })
 
   it('rejects inconsistent region graphs and feature constraints', () => {

@@ -2,7 +2,7 @@ import { deltaE2000, prepareColors, rgbToLab, type PreparedColor } from '../colo
 import type { GridEditRecord, Lab, MaterialColor } from '../types.js'
 
 /** Product constraints on the existing MARD catalog, not synthesized RGB colors. */
-export const mardFillPolicyVersion = 'mard-single-ink-source-fill-v1'
+export const mardFillPolicyVersion = 'mard-single-ink-source-fill-v2'
 export function isBlackFill(color: MaterialColor): boolean {
   // MARD's nominal black H7 is #010101, not exactly #000000.
   return color.id === 'H7' || Math.max(...color.rgb) <= 8
@@ -51,7 +51,9 @@ export function preserveFillEvidence(input: {
     if (!input.activeMask[cell] || input.excludedCells.has(cell) || id === original) return id
     const difference = deltaE2000(input.sourceLabs[cell]!, colors.get(id)!.lab)
       - deltaE2000(input.sourceLabs[cell]!, colors.get(original)!.lab)
-    if (difference <= 2) return id
+    // Nearby material tones may merge into readable clusters. A per-cell budget
+    // still restores high-contrast source details without undoing ordinary denoise.
+    if (difference <= 6) return id
     edits.push({ x: cell % input.width, y: Math.floor(cell / input.width), fromColorId: id,
       toColorId: original, reason: 'fill-fidelity' })
     return original
