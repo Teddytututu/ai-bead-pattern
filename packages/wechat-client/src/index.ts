@@ -1,5 +1,5 @@
 import type { ApiResponse, ApiErrorBody, CreateJobInput, JobView, ResultView, ImageView, SessionView, PaletteSummary, PaletteView } from '../../pattern-api-contracts/dist/index.js'
-export type { CreateJobInput, JobView, ResultView, ImageView, SessionView }
+export type { CreateJobInput, JobView, ResultView, ImageView, SessionView, PaletteSummary, PaletteView }
 export interface WxTask { abort(): void; onProgressUpdate?(callback: (value: { progress: number }) => void): void }
 interface WxFailure { errMsg: string }
 export interface WxTransport {

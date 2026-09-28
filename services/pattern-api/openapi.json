@@ -671,6 +671,9 @@
                           "colorCount": {
                             "type": "integer"
                           },
+                          "automaticColorCount": {
+                            "type": "integer"
+                          },
                           "brand": {
                             "type": "string"
                           }
@@ -2221,6 +2224,9 @@
           "colorCount": {
             "type": "integer"
           },
+          "automaticColorCount": {
+            "type": "integer"
+          },
           "rgbKind": {
             "type": "string"
           },
@@ -2254,6 +2260,20 @@
           },
           "group": {
             "type": "string"
+          },
+          "finish": {
+            "type": "string",
+            "enum": [
+              "solid",
+              "transparent",
+              "glow",
+              "metallic",
+              "pearl"
+            ]
+          },
+          "automaticMatch": {
+            "type": "boolean",
+            "description": "False excludes this material from automatic matching, not from physical bead counts."
           },
           "hex": {
             "type": "string",

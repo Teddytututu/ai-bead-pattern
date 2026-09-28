@@ -413,7 +413,6 @@ function transactionalBranchPath(
 function seedTargetOwners(
   mask: Uint8Array,
   width: number,
-  height: number,
   sourceLabels: Int32Array,
   sourceWidth: number,
   sourceHeight: number,
@@ -503,7 +502,6 @@ export function projectTopologyReference(
   const targetOwners = seedTargetOwners(
     mask,
     width,
-    height,
     sourceLabels,
     model.width,
     model.height,

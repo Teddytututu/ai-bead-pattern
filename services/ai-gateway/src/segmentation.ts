@@ -237,16 +237,6 @@ function significantConnectedMask(mask: DecodedMask, threshold: number): Decoded
   }
 }
 
-function rectangularMask(width: number, height: number, crop: CropRect): BinaryMask {
-  const values = new Float32Array(width * height)
-  const right = Math.min(width, crop.x + crop.width)
-  const bottom = Math.min(height, crop.y + crop.height)
-  for (let y = Math.max(0, crop.y); y < bottom; y += 1) {
-    for (let x = Math.max(0, crop.x); x < right; x += 1) values[y * width + x] = 1
-  }
-  return { width, height, values }
-}
-
 function subjectCrop(
   mask: DecodedMask,
   threshold: number,
@@ -276,7 +266,6 @@ function subjectCrop(
 
 function analysisFromMask(
   mask: DecodedMask,
-  image: PixelImage,
   model: SegmentationModel,
   cropThreshold: number,
   cropPaddingRatio: number,
@@ -289,8 +278,7 @@ function analysisFromMask(
     values: cleanedMask.values,
   }
   const confidence = maskCertaintyHeuristic(cleanedMask.values)
-  const componentCrop = subjectCrop(cleanedMask, cropThreshold, cropPaddingRatio)
-  const crop = componentCrop
+  const crop = subjectCrop(cleanedMask, cropThreshold, cropPaddingRatio)
   const provenance = [{
     origin: 'model' as const,
     provider: 'rembg-http',
@@ -462,7 +450,6 @@ export class RembgHttpSegmentationProvider implements SegmentationProvider {
         model,
         analysis: analysisFromMask(
           mask,
-          request.image,
           model,
           this.#cropThreshold,
           this.#cropPaddingRatio,

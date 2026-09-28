@@ -20,7 +20,7 @@ for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (((x - 64) / 48
 inputs.push({ name: 'transparent-edges', image: { width: size, height: size, data: transparent } })
 const algorithm = createPatternAlgorithm({ clock: () => 123 })
 const rows = []
-for (const paletteId of ['generic-24', 'mard-291']) {
+for (const paletteId of ['generic-24', 'perler-123', 'mard-291']) {
   if (selected && selected[0] !== paletteId) continue
   const palette = await getPalette(paletteId)
   await algorithm.generate({ image: inputs[0].image, palette, options: { width: 32, height: 32, maxColors: 20, styles: ['faithful'], maxCandidates: 1 } })

@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { resolve } from 'node:path'
 
 import {
   comparePreferenceModels,

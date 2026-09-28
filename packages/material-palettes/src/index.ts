@@ -6,6 +6,7 @@ import { palettes } from './data.js'
 export interface CatalogPalette extends MaterialPalette {
   version: string
   colorCount: number
+  automaticColorCount: number
   groups?: Readonly<Record<string, number>>
 }
 
@@ -48,6 +49,10 @@ export async function parsePalette(input: unknown): Promise<CatalogPalette> {
       codes.add(color.code)
     }
     if (value.id === 'mard-291' && color.code !== color.id) throw new RangeError('MARD id/code mismatch')
+    if (value.id === 'perler-123' && (color.code !== color.id || !/^(80-\d{5}|PER\d{5})$/.test(color.id))) throw new RangeError('Perler id/code must be its official SKU')
+    if (color.finish !== undefined && !['solid', 'transparent', 'glow', 'metallic', 'pearl'].includes(String(color.finish))) throw new TypeError('Invalid material finish')
+    if (color.automaticMatch !== undefined && typeof color.automaticMatch !== 'boolean') throw new TypeError('Invalid automaticMatch')
+    if (color.finish !== undefined && color.finish !== 'solid' && color.automaticMatch !== false) throw new RangeError('Special finishes require automaticMatch=false')
     if (!Array.isArray(color.rgb) || color.rgb.length !== 3
       || !color.rgb.every(v => Number.isInteger(v) && v >= 0 && v <= 255)) throw new RangeError('Invalid palette RGB')
     const hex = `#${color.rgb.map(v => v.toString(16).padStart(2, '0')).join('')}`
@@ -65,12 +70,17 @@ export async function parsePalette(input: unknown): Promise<CatalogPalette> {
       || Object.keys(groups).some(g => declared[g] !== groups[g])) throw new RangeError('Palette group mismatch')
   }
   if (value.id === 'mard-291' && (value.colors.length !== 291 || value.groups === undefined)) throw new RangeError('MARD requires all 291 colors and groups')
+  if (value.id === 'perler-123' && value.colors.length !== 123) throw new RangeError('Perler requires all 123 colors')
+  const automaticColorCount = value.colors.filter(color => color.automaticMatch !== false).length
+  if (automaticColorCount === 0) throw new RangeError('Palette requires automatic matching colors')
+  if (value.automaticColorCount !== undefined && value.automaticColorCount !== automaticColorCount) throw new RangeError('Automatic color count mismatch')
   if (value.brand !== undefined) text(value.brand)
   if (value.rgbKind !== undefined && !['screen-reference', 'measured'].includes(String(value.rgbKind))) throw new TypeError('Invalid rgbKind')
   if (value.source !== undefined) Object.values(object(value.source)).forEach(text)
   const palette = value as unknown as CatalogPalette
   palette.version = await createPaletteVersion(palette)
   palette.colorCount = palette.colors.length
+  palette.automaticColorCount = automaticColorCount
   return freeze(palette)
 }
 

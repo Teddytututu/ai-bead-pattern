@@ -4,7 +4,7 @@
 
 项目目标是把照片转换为兼顾主体特征、真实材料色卡和手工制作约束的网格图纸。底层围绕 `Material Palette + Grid Pattern` 设计，方便后续扩展到十字绣、钻石画、马赛克等网格手作。
 
-MARD 291 已接入生成、预览和 PNG/CSV/JSON 导出；支持完整材料色库，自动填色与描边遵守下方规则，单张图纸最多使用 48 色。产品 API、微信 TypeScript SDK 和原生小程序示例已落地，当前交付范围为本地运行与自动化验证。真实微信账号、HTTPS 部署和真机联调在后续接入。
+MARD 291、Perler 123 和通用 24 已接入生成、预览和 PNG/CSV/JSON 导出，单张图纸最多使用 48 色（通用色卡最多 24 色）。Perler 完整登记 123 个官方 SKU，照片自动配色使用 118 个普通颜色，5 个特殊材质色保留登记；色值为屏幕参考值，见[来源与接入说明](docs/perler-123.md)。产品 API、微信 TypeScript SDK 和原生小程序示例已落地，当前交付范围为本地运行与自动化验证。真实微信账号、HTTPS 部署和真机联调在后续接入。
 
 用户已于 2026-09-26 确认历史已实现部分全部验收通过。当前基线与归档见[项目总计划](docs/roadmap.md)；本期按[明暗、结构模板与纹理、编辑及 Perler 123 计划](docs/contours-features-editing-perler-123-plan.md)执行。首批明暗/保色修正已实装，见[实现与对照记录](docs/value-fidelity-2026-09-26.md)；其余阶段仍按计划推进。
 
@@ -39,27 +39,32 @@ pnpm api:dev
 ## 仓库结构
 
 ```text
+apps/demo/            浏览器工作台与内部评测入口
 apps/wechat-miniapp/   微信小程序客户端
 packages/pattern-core/ 平台无关的图像与图纸核心
-packages/material-palettes/ 291/24 色卡注册表与校验
+packages/material-palettes/ 291/123/24 色卡注册表与校验
 packages/pattern-api-contracts/ HTTP 请求校验与共享类型
 packages/wechat-client/ 微信 API 调用 SDK
 services/pattern-api/  产品 HTTP API、任务 Worker、SQLite 持久化
 services/ai-gateway/   AI 能力接入层
 services/pixel-proposal-sidecar/ 本地 Pixel Art + LCM 提案服务
 services/sam2-sidecar/ 本地 SAM 2.1 粗圈提示分割服务
+services/mmpose-sidecar/ 可选宠物姿态服务
+services/openclip-sidecar/ 可选视觉偏好评分服务
+services/dinov2-sidecar/ 可选身份相似度评分服务
+tools/                离线候选评测与质量门禁
 assets/palettes/       通用材料色卡资源
 tests/fixtures/        后续算法评估样例
 docs/                  架构、隐私与路线说明
 ```
 
-当前算法版本为 `0.9.0-contours-templates`。生成流程包含 CanvasPlan、FeaturePlacement、StructurePlan、ValuePlan、PalettePlan、蒙版轮廓、Unified Grid Refinement 和 Preference Aggregation。五官先确定离散格位，保留原图姿态；颜色按格匹配真实材料，轮廓与五官在后续精修中受保护。A/B/Tie 记录可进入 Bradley–Terry 聚合，输出候选效用分数和排序。
+当前算法版本为 `0.10.0-mard-ink-fill`。生成流程包含 CanvasPlan、FeaturePlacement、StructurePlan、ValuePlan、PalettePlan、蒙版轮廓、Unified Grid Refinement 和 Preference Aggregation。五官先确定离散格位，保留原图姿态；颜色按格匹配真实材料，轮廓与五官在后续精修中受保护。A/B/Tie 记录可进入 Bradley–Terry 聚合，输出候选效用分数和排序。
 
 v0.3.3.1 Evidence Performance Hardening 使用流式数值指纹处理大型 mask 和 importance map，并在 `pattern-core` 内规范化 landmark、semantic region 与 provenance 顺序，语义相同的分析输入会生成相同 identity。
 
 Mask Correction Engine 已加入粗略圈选、连通主体选择、空蒙版实心填充、添加/擦除软笔刷、草稿与确认分离，以及稳定 revision。`MaskEditSession` 使用完整操作历史和 cursor 支持撤销、重做与分支编辑。确认后的证据保留模型置信度和 provenance，并追加 `mask-editor` 人工来源。修正作用域限定为 subject occupancy，语义区域继续由独立视觉证据管理。
 
-Demo 的主体流程以“沿主体外侧粗略圈一圈”为默认操作。页面先调用 BiRefNet 获取基础主体，再用圈选区域选择完整连通组件并显示实心蒙版；补充和擦除保留为局部微调。识别结果、局部补充、局部擦除和圈选范围使用独立覆盖色显示；画布按原图比例 contain 显示，横图与竖图在桌面和手机宽度下保持比例。完整生成只在确认后触发一次，已确认操作在再次打开时继续保留。
+Demo 配置 Grounded-SAM-2 后优先取得模型主体与部件蒙版；BiRefNet 保留为主体分割来源。沿主体外侧粗略圈选作为 SAM2 网络提示，失败时保留当前蒙版；补充和擦除用于手工微调。识别结果、局部补充、局部擦除和圈选范围使用独立覆盖色显示；画布按原图比例 contain 显示，横图与竖图在桌面和手机宽度下保持比例。完整生成只在确认后触发一次，已确认操作在再次打开时继续保留。
 
 标准页面展示 Structure / Value / Palette / Grid Refinement 诊断、材料统计和候选结果。偏好标注工具收进内部入口 `?internal=1`，供自动评测与开发回放使用；偏好记录保存在浏览器本地，可对当前候选运行 Bradley–Terry 排序。
 
@@ -77,6 +82,7 @@ Demo 的主体流程以“沿主体外侧粗略圈一圈”为默认操作。页
 - [V2 算法升级方案](docs/algorithm-upgrade-v2.md)
 - [主体轮廓与目标格结构重构研究](docs/contour-reconstruction-research.md)
 - [系统架构](docs/architecture.md)
+- [当前实现梳理与剪枝检查](docs/implementation-pruning-2026-09-28.md)
 - [隐私设计](docs/privacy.md)
 
 ## 方向

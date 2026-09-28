@@ -29,6 +29,10 @@ export interface MaterialColor {
   hex: string
   rgb: RGB
   lab?: Lab
+  /** Physical finish; transparent beads still occupy board cells. */
+  finish?: 'solid' | 'transparent' | 'glow' | 'metallic' | 'pearl'
+  /** False keeps a material in the catalog but excludes it from automatic recoloring. */
+  automaticMatch?: boolean
 }
 
 export type MaterialInventory = Readonly<Record<string, number>>

@@ -4,7 +4,9 @@
   <button bindtap="chooseImage" disabled="{{busy}}">选择图片</button>
   <image wx:if="{{imagePath}}" src="{{imagePath}}" mode="aspectFit" class="source" />
   <view class="controls">
-    <picker range="{{paletteNames}}" value="{{paletteIndex}}" bindchange="changePalette" disabled="{{busy}}"><view>材料色卡：{{paletteNames[paletteIndex]}} ▾</view></picker>
+    <picker range="{{paletteNames}}" value="{{paletteIndex}}" bindchange="changePalette" disabled="{{busy || paletteLoading || !palettes.length}}"><view>材料色卡：{{paletteNames[paletteIndex]}} ▾</view></picker>
+    <button wx:if="{{!palettes.length && !paletteLoading}}" bindtap="loadPalettes">重新加载色卡</button>
+    <view wx:if="{{paletteNote}}" class="note">{{paletteNote}}</view>
     <picker range="{{sizes}}" value="{{sizeIndex}}" bindchange="changeSize" disabled="{{busy}}"><view>画布：{{sizes[sizeIndex]}} × {{sizes[sizeIndex]}} ▾</view></picker>
     <view>本张最多使用 {{maxColors}} 色</view>
     <slider min="1" max="{{colorLimit}}" value="{{maxColors}}" bindchange="changeColors" disabled="{{busy}}" activeColor="#315b48" />
@@ -15,7 +17,7 @@
     <view>内轮廓 <switch checked="{{internalContour}}" bindchange="changeInternalContour" disabled="{{busy}}" /></view>
     <view class="note">保色或强度 0 保留原始明暗；色卡匹配仍会有色差。</view>
   </view>
-  <button class="primary" bindtap="generate" disabled="{{!imagePath || busy}}">上传并生成图纸</button>
+  <button class="primary" bindtap="generate" disabled="{{!imagePath || busy || paletteLoading || !palettes.length}}">上传并生成图纸</button>
   <view class="status">{{status}}</view>
   <view wx:if="{{error}}" class="error">{{error}}</view>
   <button wx:if="{{busy && jobId}}" bindtap="cancel">取消生成</button>

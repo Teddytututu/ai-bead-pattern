@@ -45,7 +45,9 @@ export function patternMaterialsCsv(pattern: BeadPattern): string {
 }
 
 export function patternSvg(pattern: BeadPattern): string {
-  const doc = createPatternDocument(pattern), cell = 22, left = 42, top = 76
+  const doc = createPatternDocument(pattern), left = 42, top = 76
+  // Perler uses full purchase SKUs such as 80-19001; reserve room for every character.
+  const cell = Math.max(22, ...doc.colors.map(color => (color.code ?? color.id).length * 5 + 6))
   const width = Math.max(680, doc.width * cell + left + 24)
   const columns = Math.max(1, Math.floor((width - 48) / 150))
   const legendY = top + doc.height * cell + 42
@@ -57,7 +59,7 @@ export function patternSvg(pattern: BeadPattern): string {
     text(24, 26, `${doc.brand || doc.paletteId} | ${doc.width} x ${doc.height} | ${doc.totalBeads} beads`, 18),
     text(24, 46, doc.paletteVersion, 10)]
   for (let x = 0; x < doc.width; x++) parts.push(text(left + x * cell + cell / 2, top - 8, x + 1, 9, '#333', 'middle'))
-  for (let y = 0; y < doc.height; y++) parts.push(text(left - 8, top + y * cell + 14, y + 1, 9, '#333', 'end'))
+  for (let y = 0; y < doc.height; y++) parts.push(text(left - 8, top + y * cell + cell / 2 + 3, y + 1, 9, '#333', 'end'))
   doc.grid.forEach((index, i) => {
     const color = doc.colors[index], x = left + i % doc.width * cell, y = top + Math.floor(i / doc.width) * cell
     const fill = color?.hex ?? '#ffffff'
@@ -65,7 +67,7 @@ export function patternSvg(pattern: BeadPattern): string {
     parts.push(`<rect x="${x}" y="${y}" width="${cell}" height="${cell}" fill="${fill}" stroke="#aaa" stroke-width="0.5"/>`)
     if (color) {
       const [r = 0, g = 0, b = 0] = color.rgb
-      parts.push(text(x + cell / 2, y + 14, color.code ?? color.id, 7, r * .299 + g * .587 + b * .114 > 145 ? '#111' : '#fff', 'middle'))
+      parts.push(text(x + cell / 2, y + cell / 2 + 3, color.code ?? color.id, 7, r * .299 + g * .587 + b * .114 > 145 ? '#111' : '#fff', 'middle'))
     }
   })
   parts.push(text(24, legendY - 12, 'Color code / bead count', 13))

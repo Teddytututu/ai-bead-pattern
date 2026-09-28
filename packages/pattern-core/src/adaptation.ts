@@ -86,6 +86,8 @@ export function adaptPattern(
       let bestId = current.get(cellKey)!
       let bestEnergy = Number.POSITIVE_INFINITY
       for (const candidate of preparedPalette) {
+        // Preserve an explicitly placed special bead, without spreading it to neighbors.
+        if (candidate.automaticMatch === false && candidate.id !== targetColor.id) continue
         let energy = colorDistance(targetColor.lab, candidate.lab, 'delta-e-2000') / 45
         if (candidate.id !== targetColor.id) energy += 0.35
         for (const [offsetX, offsetY] of offsets) {

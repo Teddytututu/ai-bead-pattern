@@ -1,0 +1,1775 @@
+{
+  "source": {
+    "catalog": "https://perler.com/collections/shop-by-color/products.json?limit=250",
+    "collection": "https://perler.com/collections/1-000ct-bead-bags",
+    "repository": "https://github.com/maxcleme/beadcolors",
+    "revision": "c8e4892ac8bdd352465e9db6cdbd1e7b4cdcbd27",
+    "path": "raw/perler.csv",
+    "license": "MIT (95 RGB references); official product photography (28 derived screen estimates)",
+    "retrievedAt": "2026-09-28"
+  },
+  "selection": "Official titles beginning \"1,000 Perler Beads - \", excluding the Multi-Color tag (including Zebra Stripe).",
+  "productsSha256": "732eb19667810ed089bfefee7c3afcf97c69fed3a2272c11ebc081047e406642",
+  "beadcolorsSha256": "757aae3e0553ed3a74db691cf930ea3e27eed47d038c5cc74bcef71acf3d24d0",
+  "photoSampling": "Central 80% crop, resize to 256x256 sRGB; select pixels between luminance percentiles 35 and 75; take each channel median. Screen estimate only.",
+  "excludedProducts": [
+    {
+      "id": "80-15108",
+      "name": "1,000 Perler Beads - Zebra Stripe"
+    },
+    {
+      "id": "80-19067",
+      "name": "1,000 Perler Beads - Glow in the Dark Mix"
+    },
+    {
+      "id": "80-19039",
+      "name": "1,000 Perler Beads - Glitter Mix"
+    },
+    {
+      "id": "80-15186",
+      "name": "1,000 Perler Beads - Neon Mix"
+    },
+    {
+      "id": "80-19000",
+      "name": "1,000 Perler Beads - Multi Mix"
+    },
+    {
+      "id": "80-15185",
+      "name": "1,000 Perler Beads - Metallic Mix"
+    }
+  ],
+  "historicalRgbEntriesNotInCatalog": [
+    "80-15212",
+    "80-19070",
+    "80-15259",
+    "80-15089",
+    "80-15268",
+    "80-15269",
+    "80-15263",
+    "80-15239"
+  ],
+  "records": [
+    {
+      "id": "80-15105",
+      "name": "Pearl Silver",
+      "productId": 9309015933157,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-pearl-silver",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/80-15105_SWATCH__358622707.jpg?v=1759956866",
+      "swatchSha256": "e355bcbb5657d4aca40ccb78ec1f28992ab0565f1820d25e3e941984409f3ff5",
+      "rgb": [
+        115,
+        121,
+        133
+      ]
+    },
+    {
+      "id": "80-15179",
+      "name": "Evergreen",
+      "productId": 9309019308261,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-evergreen",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Evergreen",
+      "contributor": "Perlervault",
+      "rgb": [
+        48,
+        85,
+        69
+      ]
+    },
+    {
+      "id": "80-15181",
+      "name": "Light Grey",
+      "productId": 9309016260837,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-light-grey",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Light Grey",
+      "contributor": "Perlervault",
+      "rgb": [
+        179,
+        186,
+        184
+      ]
+    },
+    {
+      "id": "80-15182",
+      "name": "Lavender",
+      "productId": 9309016195301,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-lavender",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Lavender",
+      "contributor": "Perlervault",
+      "rgb": [
+        175,
+        159,
+        206
+      ]
+    },
+    {
+      "id": "80-15184",
+      "name": "Clear Blue",
+      "productId": 9309018685669,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-clear-blue",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/80-15184_SWATCH__584862707.jpg?v=1759954479",
+      "swatchSha256": "3414aa0da96731e3896d344a1d1a8fe84b9edc13e41272fc271a379560d01fb6",
+      "rgb": [
+        81,
+        202,
+        241
+      ]
+    },
+    {
+      "id": "80-15199",
+      "name": "Shamrock",
+      "productId": 9309016752357,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-shamrock",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Shamrock",
+      "contributor": "Perlervault",
+      "rgb": [
+        0,
+        143,
+        83
+      ]
+    },
+    {
+      "id": "80-15200",
+      "name": "Cobalt",
+      "productId": 9309015965925,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-cobalt",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Cobalt",
+      "contributor": "Perlervault",
+      "rgb": [
+        0,
+        101,
+        177
+      ]
+    },
+    {
+      "id": "80-15201",
+      "name": "Midnight",
+      "productId": 9309016391909,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-midnight",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Midnight",
+      "contributor": "Perlervault",
+      "rgb": [
+        47,
+        60,
+        85
+      ]
+    },
+    {
+      "id": "80-15202",
+      "name": "Robin's Egg",
+      "productId": 9309015834853,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-robins-egg",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Robin's Egg",
+      "contributor": "Perlervault",
+      "rgb": [
+        169,
+        205,
+        213
+      ]
+    },
+    {
+      "id": "80-15203",
+      "name": "Flamingo",
+      "productId": 9309017309413,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-flamingo",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Flamingo",
+      "contributor": "Perlervault",
+      "rgb": [
+        242,
+        175,
+        183
+      ]
+    },
+    {
+      "id": "80-15204",
+      "name": "Salmon",
+      "productId": 9309017440485,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-salmon",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Salmon",
+      "contributor": "Perlervault",
+      "rgb": [
+        225,
+        116,
+        122
+      ]
+    },
+    {
+      "id": "80-15205",
+      "name": "Fawn",
+      "productId": 9309016326373,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-fawn",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Fawn",
+      "contributor": "Perlervault",
+      "rgb": [
+        201,
+        163,
+        133
+      ]
+    },
+    {
+      "id": "80-15206",
+      "name": "Pewter",
+      "productId": 9309016228069,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-pewter",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Pewter",
+      "contributor": "Perlervault",
+      "rgb": [
+        148,
+        161,
+        157
+      ]
+    },
+    {
+      "id": "80-15207",
+      "name": "Charcoal",
+      "productId": 9309016031461,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-charcoal",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Charcoal",
+      "contributor": "Perlervault",
+      "rgb": [
+        79,
+        89,
+        90
+      ]
+    },
+    {
+      "id": "80-15208",
+      "name": "Toasted Marshmallow",
+      "productId": 9309017866469,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-toasted-marshmallow",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Toasted Marshmallow",
+      "contributor": "Perlervault",
+      "rgb": [
+        222,
+        218,
+        206
+      ]
+    },
+    {
+      "id": "80-15210",
+      "name": "Orchid",
+      "productId": 9309016817893,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-orchid",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Orchid",
+      "contributor": "Perlervault",
+      "rgb": [
+        177,
+        98,
+        142
+      ]
+    },
+    {
+      "id": "80-15211",
+      "name": "Tomato",
+      "productId": 9309015769317,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-tomato",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Tomato",
+      "contributor": "Perlervault",
+      "rgb": [
+        209,
+        67,
+        55
+      ]
+    },
+    {
+      "id": "80-15213",
+      "name": "Apricot",
+      "productId": 9309018816741,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-apricot",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Apricot",
+      "contributor": "Perlervault",
+      "rgb": [
+        245,
+        161,
+        104
+      ]
+    },
+    {
+      "id": "80-15214",
+      "name": "Sherbet",
+      "productId": 9309016981733,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-sherbet",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Sherbet",
+      "contributor": "Perlervault",
+      "rgb": [
+        216,
+        228,
+        124
+      ]
+    },
+    {
+      "id": "80-15215",
+      "name": "Mist",
+      "productId": 9309016522981,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-mist",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Mist",
+      "contributor": "Perlervault",
+      "rgb": [
+        147,
+        176,
+        189
+      ]
+    },
+    {
+      "id": "80-15216",
+      "name": "Sky",
+      "productId": 9309016686821,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-sky",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Sky",
+      "contributor": "Perlervault",
+      "rgb": [
+        74,
+        192,
+        216
+      ]
+    },
+    {
+      "id": "80-15217",
+      "name": "Lagoon",
+      "productId": 9309018587365,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-lagoon",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Lagoon",
+      "contributor": "Perlervault",
+      "rgb": [
+        0,
+        164,
+        172
+      ]
+    },
+    {
+      "id": "80-15218",
+      "name": "Teal",
+      "productId": 9309018652901,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-teal",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Teal",
+      "contributor": "Perlervault",
+      "rgb": [
+        4,
+        127,
+        138
+      ]
+    },
+    {
+      "id": "80-15219",
+      "name": "Fern",
+      "productId": 9309017637093,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-fern",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Fern",
+      "contributor": "Perlervault",
+      "rgb": [
+        127,
+        151,
+        26
+      ]
+    },
+    {
+      "id": "80-15220",
+      "name": "Olive",
+      "productId": 9309016850661,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-olive",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Olive",
+      "contributor": "Perlervault",
+      "rgb": [
+        105,
+        110,
+        49
+      ]
+    },
+    {
+      "id": "80-15240",
+      "name": "Mint",
+      "productId": 9309017014501,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-mint",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Mint",
+      "contributor": "BIORIO",
+      "rgb": [
+        179,
+        238,
+        213
+      ]
+    },
+    {
+      "id": "80-15241",
+      "name": "Sour Apple",
+      "productId": 9309018423525,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-sour-apple",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Sour Apple",
+      "contributor": "BIORIO",
+      "rgb": [
+        163,
+        222,
+        111
+      ]
+    },
+    {
+      "id": "80-15242",
+      "name": "Cotton Candy",
+      "productId": 9309016785125,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-cotton-candy",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Cotton Candy",
+      "contributor": "BIORIO",
+      "rgb": [
+        244,
+        121,
+        176
+      ]
+    },
+    {
+      "id": "80-15243",
+      "name": "Grape",
+      "productId": 9309017407717,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-grape",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Grape",
+      "contributor": "BIORIO",
+      "rgb": [
+        80,
+        59,
+        156
+      ]
+    },
+    {
+      "id": "80-15244",
+      "name": "Rose",
+      "productId": 9309016555749,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-rose",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Rose",
+      "contributor": "BIORIO",
+      "rgb": [
+        210,
+        93,
+        114
+      ]
+    },
+    {
+      "id": "80-15245",
+      "name": "Iris",
+      "productId": 9309018259685,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-iris",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Iris",
+      "contributor": "BIORIO",
+      "rgb": [
+        78,
+        86,
+        163
+      ]
+    },
+    {
+      "id": "80-15246",
+      "name": "Tangerine",
+      "productId": 9309017047269,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-tangerine",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Tangerine",
+      "contributor": "BIORIO",
+      "rgb": [
+        253,
+        89,
+        24
+      ]
+    },
+    {
+      "id": "80-15247",
+      "name": "Forest",
+      "productId": 9309018194149,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-forest",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Forest",
+      "contributor": "BIORIO",
+      "rgb": [
+        0,
+        93,
+        87
+      ]
+    },
+    {
+      "id": "80-15248",
+      "name": "Eggplant",
+      "productId": 9309018849509,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-eggplant",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Eggplant",
+      "contributor": "BIORIO",
+      "rgb": [
+        111,
+        50,
+        85
+      ]
+    },
+    {
+      "id": "80-15249",
+      "name": "Honey",
+      "productId": 9309016457445,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-honey",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Honey",
+      "contributor": "BIORIO",
+      "rgb": [
+        218,
+        140,
+        44
+      ]
+    },
+    {
+      "id": "80-15250",
+      "name": "Gingerbread",
+      "productId": 9309017211109,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-gingerbread",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Gingerbread",
+      "contributor": "BIORIO",
+      "rgb": [
+        126,
+        84,
+        70
+      ]
+    },
+    {
+      "id": "80-15251",
+      "name": "Thistle",
+      "productId": 9309016948965,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-thistle",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Thistle",
+      "contributor": "Exodeca1",
+      "rgb": [
+        140,
+        140,
+        167
+      ]
+    },
+    {
+      "id": "80-15252",
+      "name": "Slate Blue",
+      "productId": 9309018751205,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-slate-blue",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Slate Blue",
+      "contributor": "Exodeca1",
+      "rgb": [
+        94,
+        109,
+        123
+      ]
+    },
+    {
+      "id": "80-15253",
+      "name": "Denim",
+      "productId": 9309018161381,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-denim",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Denim",
+      "contributor": "Exodeca1",
+      "rgb": [
+        76,
+        99,
+        136
+      ]
+    },
+    {
+      "id": "80-15254",
+      "name": "Sage",
+      "productId": 9309018620133,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-sage",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Sage",
+      "contributor": "Exodeca1",
+      "rgb": [
+        154,
+        169,
+        142
+      ]
+    },
+    {
+      "id": "80-15255",
+      "name": "Orange Cream",
+      "productId": 9309018783973,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-orange-cream",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Orange Cream",
+      "contributor": "Exodeca1",
+      "rgb": [
+        239,
+        183,
+        155
+      ]
+    },
+    {
+      "id": "80-15256",
+      "name": "Fruit Punch",
+      "productId": 9309018357989,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-fruit-punch",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Fruit Punch",
+      "contributor": "Exodeca1",
+      "rgb": [
+        202,
+        59,
+        101
+      ]
+    },
+    {
+      "id": "80-15257",
+      "name": "Fuchsia",
+      "productId": 9309018554597,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-fuchsia",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Fuchsia",
+      "contributor": "Exodeca1",
+      "rgb": [
+        203,
+        89,
+        185
+      ]
+    },
+    {
+      "id": "80-15258",
+      "name": "Mulberry",
+      "productId": 9309017571557,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-mulberry",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Mulberry",
+      "contributor": "Exodeca1",
+      "rgb": [
+        113,
+        72,
+        117
+      ]
+    },
+    {
+      "id": "80-15260",
+      "name": "Stone",
+      "productId": 9309017178341,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-stone",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Stone",
+      "contributor": "Exodeca1",
+      "rgb": [
+        152,
+        140,
+        140
+      ]
+    },
+    {
+      "id": "80-15261",
+      "name": "Dark Spruce",
+      "productId": 9309018980581,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-dark-spruce",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Dark Spruce",
+      "contributor": "Exodeca1",
+      "rgb": [
+        20,
+        49,
+        59
+      ]
+    },
+    {
+      "id": "80-15262",
+      "name": "Cocoa",
+      "productId": 9309018325221,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-cocoa",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Cocoa",
+      "contributor": "Exodeca1",
+      "rgb": [
+        57,
+        41,
+        40
+      ]
+    },
+    {
+      "id": "80-15265",
+      "name": "Twilight Plum",
+      "productId": 9309017374949,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-twilight-plum",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Twilight Plum",
+      "contributor": "Exodeca1",
+      "rgb": [
+        198,
+        133,
+        177
+      ]
+    },
+    {
+      "id": "80-15266",
+      "name": "Caribbean Sea",
+      "productId": 9309016654053,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-caribbean-sea",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Caribbean Sea",
+      "contributor": "Exodeca1",
+      "rgb": [
+        108,
+        200,
+        173
+      ]
+    },
+    {
+      "id": "80-15267",
+      "name": "Frosted Lilac",
+      "productId": 9309017145573,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-frosted-lilac",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Frosted Lilac",
+      "contributor": "Exodeca1",
+      "rgb": [
+        205,
+        183,
+        195
+      ]
+    },
+    {
+      "id": "80-15272",
+      "name": "Coral",
+      "productId": 9309016490213,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-coral",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Coral",
+      "contributor": "SteelSkyStudios",
+      "rgb": [
+        255,
+        154,
+        139
+      ]
+    },
+    {
+      "id": "80-15273",
+      "name": "Brick",
+      "productId": 9309019242725,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-brick",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Brick",
+      "contributor": "toptierbeads.com",
+      "rgb": [
+        252,
+        149,
+        116
+      ]
+    },
+    {
+      "id": "80-15274",
+      "name": "Rich Butter",
+      "productId": 9309019406565,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-rich-butter",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Rich Butter",
+      "contributor": "toptierbeads.com",
+      "rgb": [
+        246,
+        202,
+        105
+      ]
+    },
+    {
+      "id": "80-15275",
+      "name": "Peacock",
+      "productId": 9309019209957,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-peacock",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Peacock",
+      "contributor": "toptierbeads.com",
+      "rgb": [
+        0,
+        144,
+        172
+      ]
+    },
+    {
+      "id": "80-15276",
+      "name": "Carnation",
+      "productId": 9309016424677,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-carnation",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Carnation Pink",
+      "contributor": "rYonder",
+      "rgb": [
+        248,
+        199,
+        201
+      ]
+    },
+    {
+      "id": "80-15961",
+      "name": "Cherry",
+      "productId": 9309019570405,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-cherry",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Cherry",
+      "contributor": "Perlervault",
+      "rgb": [
+        157,
+        43,
+        58
+      ]
+    },
+    {
+      "id": "80-19001",
+      "name": "White",
+      "productId": 9309019603173,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-white",
+      "rgbSource": "beadcolors",
+      "upstreamName": "White",
+      "contributor": "Perlervault",
+      "rgb": [
+        234,
+        239,
+        238
+      ]
+    },
+    {
+      "id": "80-19002",
+      "name": "Creme",
+      "productId": 9309017899237,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-creme",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Creme",
+      "contributor": "Perlervault",
+      "rgb": [
+        225,
+        226,
+        187
+      ]
+    },
+    {
+      "id": "80-19003",
+      "name": "Yellow",
+      "productId": 9309016588517,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-yellow",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Yellow",
+      "contributor": "Perlervault",
+      "rgb": [
+        231,
+        206,
+        62
+      ]
+    },
+    {
+      "id": "80-19004",
+      "name": "Orange",
+      "productId": 9309018390757,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-orange",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Orange",
+      "contributor": "Perlervault",
+      "rgb": [
+        235,
+        123,
+        49
+      ]
+    },
+    {
+      "id": "80-19005",
+      "name": "Red",
+      "productId": 9309019635941,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-red",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Red",
+      "contributor": "Perlervault",
+      "rgb": [
+        176,
+        53,
+        60
+      ]
+    },
+    {
+      "id": "80-19006",
+      "name": "Bubblegum",
+      "productId": 9309018226917,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-bubblegum",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Bubblegum",
+      "contributor": "Perlervault",
+      "rgb": [
+        216,
+        114,
+        154
+      ]
+    },
+    {
+      "id": "80-19007",
+      "name": "Purple",
+      "productId": 9309019504869,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-purple",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Purple",
+      "contributor": "Perlervault",
+      "rgb": [
+        104,
+        75,
+        134
+      ]
+    },
+    {
+      "id": "80-19008",
+      "name": "Dark Blue",
+      "productId": 9309019341029,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-dark-blue",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Dark Blue",
+      "contributor": "Perlervault",
+      "rgb": [
+        14,
+        80,
+        146
+      ]
+    },
+    {
+      "id": "80-19009",
+      "name": "Light Blue",
+      "productId": 9309019078885,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-light-blue",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Light Blue",
+      "contributor": "Perlervault",
+      "rgb": [
+        39,
+        140,
+        201
+      ]
+    },
+    {
+      "id": "80-19010",
+      "name": "Dark Green",
+      "productId": 9309019013349,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-dark-green",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Dark Green",
+      "contributor": "Perlervault",
+      "rgb": [
+        0,
+        123,
+        78
+      ]
+    },
+    {
+      "id": "80-19011",
+      "name": "Light Green",
+      "productId": 9309019046117,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-light-green",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Light Green",
+      "contributor": "Perlervault",
+      "rgb": [
+        24,
+        199,
+        177
+      ]
+    },
+    {
+      "id": "80-19012",
+      "name": "Brown",
+      "productId": 9309017276645,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-brown",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Brown",
+      "contributor": "Perlervault",
+      "rgb": [
+        103,
+        76,
+        68
+      ]
+    },
+    {
+      "id": "80-19017",
+      "name": "Gray",
+      "productId": 9309019439333,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-gray",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Grey",
+      "contributor": "Perlervault",
+      "rgb": [
+        144,
+        148,
+        151
+      ]
+    },
+    {
+      "id": "80-19018",
+      "name": "Black",
+      "productId": 9309015867621,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-black",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Black",
+      "contributor": "Perlervault",
+      "rgb": [
+        50,
+        50,
+        52
+      ]
+    },
+    {
+      "id": "80-19019",
+      "name": "Clear",
+      "productId": 9309019537637,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-clear",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/80-19019SWATCH__386172707.jpg?v=1759953851",
+      "swatchSha256": "ab4e06d413dab2b097d68971ee33f81c891763598c5049f0a81e565a394b4b41",
+      "rgb": [
+        204,
+        205,
+        200
+      ]
+    },
+    {
+      "id": "80-19020",
+      "name": "Rust",
+      "productId": 9309017964773,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-rust",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Rust",
+      "contributor": "Perlervault",
+      "rgb": [
+        153,
+        80,
+        67
+      ]
+    },
+    {
+      "id": "80-19021",
+      "name": "Light Brown",
+      "productId": 9309017080037,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-light-brown",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Light Brown",
+      "contributor": "Perlervault",
+      "rgb": [
+        147,
+        104,
+        72
+      ]
+    },
+    {
+      "id": "80-19033",
+      "name": "Peach",
+      "productId": 9309017702629,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-peach",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Peach",
+      "contributor": "Perlervault",
+      "rgb": [
+        233,
+        191,
+        185
+      ]
+    },
+    {
+      "id": "80-19035",
+      "name": "Tan",
+      "productId": 9309015998693,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-tan",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Tan",
+      "contributor": "Perlervault",
+      "rgb": [
+        197,
+        172,
+        144
+      ]
+    },
+    {
+      "id": "80-19038",
+      "name": "Magenta",
+      "productId": 9309018292453,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-magenta",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Magenta",
+      "contributor": "Perlervault",
+      "rgb": [
+        224,
+        66,
+        132
+      ]
+    },
+    {
+      "id": "80-19052",
+      "name": "Pastel Blue",
+      "productId": 9309018915045,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-pastel-blue",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Pastel Blue",
+      "contributor": "Perlervault",
+      "rgb": [
+        74,
+        156,
+        207
+      ]
+    },
+    {
+      "id": "80-19053",
+      "name": "Pastel Green",
+      "productId": 9309017342181,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-pastel-green",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Pastel Green",
+      "contributor": "Perlervault",
+      "rgb": [
+        109,
+        204,
+        148
+      ]
+    },
+    {
+      "id": "80-19054",
+      "name": "Pastel Lavender",
+      "productId": 9309016096997,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-pastel-lavender",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Pastel Lavender",
+      "contributor": "Perlervault",
+      "rgb": [
+        147,
+        127,
+        191
+      ]
+    },
+    {
+      "id": "80-19056",
+      "name": "Pastel Yellow",
+      "productId": 9309016064229,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-pastel-yellow",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Pastel Yellow",
+      "contributor": "Perlervault",
+      "rgb": [
+        233,
+        226,
+        144
+      ]
+    },
+    {
+      "id": "80-19057",
+      "name": "Cheddar",
+      "productId": 9309017243877,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-cheddar",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Cheddar",
+      "contributor": "Perlervault",
+      "rgb": [
+        251,
+        177,
+        70
+      ]
+    },
+    {
+      "id": "80-19058",
+      "name": "Toothpaste",
+      "productId": 9309017473253,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-toothpaste",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Toothpaste",
+      "contributor": "Perlervault",
+      "rgb": [
+        150,
+        209,
+        212
+      ]
+    },
+    {
+      "id": "80-19059",
+      "name": "Hot Coral",
+      "productId": 9309018882277,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-hot-coral",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Hot Coral",
+      "contributor": "Perlervault",
+      "rgb": [
+        221,
+        89,
+        91
+      ]
+    },
+    {
+      "id": "80-19060",
+      "name": "Plum",
+      "productId": 9309015802085,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-plum",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Plum",
+      "contributor": "Perlervault",
+      "rgb": [
+        167,
+        93,
+        157
+      ]
+    },
+    {
+      "id": "80-19061",
+      "name": "Kiwi Lime",
+      "productId": 9309018718437,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-kiwi-lime",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Kiwi Lime",
+      "contributor": "Perlervault",
+      "rgb": [
+        105,
+        184,
+        69
+      ]
+    },
+    {
+      "id": "80-19062",
+      "name": "Turquoise",
+      "productId": 9309019275493,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-turquoise",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Turquoise",
+      "contributor": "Perlervault",
+      "rgb": [
+        0,
+        152,
+        197
+      ]
+    },
+    {
+      "id": "80-19063",
+      "name": "Blush",
+      "productId": 9309017997541,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-blush",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Blush",
+      "contributor": "Perlervault",
+      "rgb": [
+        249,
+        146,
+        151
+      ]
+    },
+    {
+      "id": "80-19075",
+      "name": "Glow in the Dark Green",
+      "productId": 9309018095845,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-glow-in-the-dark-green",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/80-19075SWATCH_DETAIL_copy__092522707.jpg?v=1759954757",
+      "swatchSha256": "ff33011b7a99eba53c8278bf199ce8fe6d26f13a6d9b4caefeecddb2411ded4a",
+      "rgb": [
+        180,
+        220,
+        162
+      ]
+    },
+    {
+      "id": "80-19079",
+      "name": "Light Pink",
+      "productId": 9309019177189,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-light-pink",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Light Pink",
+      "contributor": "Perlervault",
+      "rgb": [
+        225,
+        188,
+        206
+      ]
+    },
+    {
+      "id": "80-19080",
+      "name": "Bright Green",
+      "productId": 9309019373797,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-bright-green",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Green",
+      "contributor": "Perlervault",
+      "rgb": [
+        77,
+        171,
+        100
+      ]
+    },
+    {
+      "id": "80-19083",
+      "name": "Pink",
+      "productId": 9309019111653,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-pink",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Pink",
+      "contributor": "Perlervault",
+      "rgb": [
+        212,
+        84,
+        150
+      ]
+    },
+    {
+      "id": "80-19085",
+      "name": "Gold Metallic",
+      "productId": 9309018063077,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-gold-metallic",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/80-19085_SWATCH__203542707.jpg?v=1759954774",
+      "swatchSha256": "c9e857c5dd6fbb5220c07dc43b3ca63ae9e508f9ee2b66f36bef8c72263cb7da",
+      "rgb": [
+        162,
+        86,
+        42
+      ]
+    },
+    {
+      "id": "80-19088",
+      "name": "Raspberry",
+      "productId": 9309016162533,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-raspberry",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Raspberry",
+      "contributor": "Perlervault",
+      "rgb": [
+        152,
+        56,
+        100
+      ]
+    },
+    {
+      "id": "80-19090",
+      "name": "Butterscotch",
+      "productId": 9309019144421,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-butterscotch",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Butterscotch",
+      "contributor": "Perlervault",
+      "rgb": [
+        218,
+        153,
+        100
+      ]
+    },
+    {
+      "id": "80-19091",
+      "name": "Parrot Green",
+      "productId": 9309018456293,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-parrot-green",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Parrot Green",
+      "contributor": "Perlervault",
+      "rgb": [
+        0,
+        145,
+        136
+      ]
+    },
+    {
+      "id": "80-19092",
+      "name": "Dark Grey",
+      "productId": 9309016916197,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-dark-grey",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Dark Grey",
+      "contributor": "Perlervault",
+      "rgb": [
+        88,
+        92,
+        97
+      ]
+    },
+    {
+      "id": "80-19093",
+      "name": "Blueberry Cream",
+      "productId": 9309016621285,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-blueberry-cream",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Blueberry Creme",
+      "contributor": "Perlervault",
+      "rgb": [
+        133,
+        168,
+        227
+      ]
+    },
+    {
+      "id": "80-19096",
+      "name": "Cranapple",
+      "productId": 9309017768165,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-cranapple",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Cranapple",
+      "contributor": "Perlervault",
+      "rgb": [
+        132,
+        57,
+        71
+      ]
+    },
+    {
+      "id": "80-19097",
+      "name": "Prickly Pear",
+      "productId": 9309015900389,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-prickly-pear",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Prickly Pear",
+      "contributor": "Perlervault",
+      "rgb": [
+        187,
+        201,
+        56
+      ]
+    },
+    {
+      "id": "80-19098",
+      "name": "Sand",
+      "productId": 9309019472101,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-sand",
+      "rgbSource": "beadcolors",
+      "upstreamName": "Sand",
+      "contributor": "Perlervault",
+      "rgb": [
+        229,
+        190,
+        158
+      ]
+    },
+    {
+      "id": "PER17646",
+      "name": "Toffee",
+      "productId": 9717265072357,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-toffee",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17646_SWATCH.jpg?v=1784741394",
+      "swatchSha256": "d658f0e37fd4254d3062fdbe381e8dfd101640d3dd6da0acb49884e0372fd189",
+      "rgb": [
+        149,
+        92,
+        46
+      ]
+    },
+    {
+      "id": "PER17647",
+      "name": "Amber",
+      "productId": 9717264253157,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-amber",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17647_SWATCH.jpg?v=1784741466",
+      "swatchSha256": "5c37ae7928f5ddad3e0a2de2e9d4489652043e63468878468466108b3cd0ab31",
+      "rgb": [
+        200,
+        90,
+        46
+      ]
+    },
+    {
+      "id": "PER17648",
+      "name": "Jade",
+      "productId": 9717264580837,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-jade",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17648_SWATCH.jpg?v=1784742447",
+      "swatchSha256": "2bfcf73aa3a9e21377dc75804ffdabf446e44c6ab1d658d78515c0c042d7c894",
+      "rgb": [
+        2,
+        199,
+        131
+      ]
+    },
+    {
+      "id": "PER17649",
+      "name": "Shark",
+      "productId": 9717264875749,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-shark",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17649_SWATCH.jpg?v=1784741607",
+      "swatchSha256": "6cc4692a0e680dfb65ef5f51da9676f9b203652fcf66927b69c613edf0583bf0",
+      "rgb": [
+        116,
+        139,
+        123
+      ]
+    },
+    {
+      "id": "PER17650",
+      "name": "Capri Blue",
+      "productId": 9717264318693,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-capri-blue",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17650_SWATCH.jpg?v=1784742323",
+      "swatchSha256": "5a4ceb85caba38bb4f74b8949d6f8015f00ec3b33cb5f9b98cabd2a27a39487f",
+      "rgb": [
+        30,
+        205,
+        222
+      ]
+    },
+    {
+      "id": "PER17651",
+      "name": "Seafoam",
+      "productId": 9717264810213,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-seafoam",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17651_SWATCH.jpg?v=1784742782",
+      "swatchSha256": "b8d4de9dde26313820ab1566978c3bfabb6bee8e178c118d846224bffcc1cb13",
+      "rgb": [
+        169,
+        200,
+        196
+      ]
+    },
+    {
+      "id": "PER17652",
+      "name": "Violet Frost",
+      "productId": 9717265170661,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-violet-frost",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17652_SWATCH.jpg?v=1784741948",
+      "swatchSha256": "61074a72956de9cbf5985dc37ab7e43fb08e8420d2ad91347f20c52d402150fc",
+      "rgb": [
+        202,
+        202,
+        219
+      ]
+    },
+    {
+      "id": "PER17653",
+      "name": "Indigo",
+      "productId": 9717264515301,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-indigo",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17653_SWATCH.jpg?v=1784742561",
+      "swatchSha256": "d461e02e202d88f406c844e75ea7c435c30ccc1804bc3be9564dc2b89b8f90b4",
+      "rgb": [
+        66,
+        72,
+        103
+      ]
+    },
+    {
+      "id": "PER17654",
+      "name": "Oyster",
+      "productId": 9717264744677,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-oyster",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17654_SWATCH.jpg?v=1784742863",
+      "swatchSha256": "162d017bb95dd413fa152f8860e17bb8bd816c1529d335a64fb0303b932a4b60",
+      "rgb": [
+        221,
+        203,
+        150
+      ]
+    },
+    {
+      "id": "PER17655",
+      "name": "Khaki",
+      "productId": 9717264613605,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-khaki",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17655_SWATCH.jpg?v=1784742829",
+      "swatchSha256": "71d055ce0f3caa8102e6cc10f842d3a1ffbe7f8b3c9b45eb5dbd2d99cd5b4cd5",
+      "rgb": [
+        176,
+        156,
+        98
+      ]
+    },
+    {
+      "id": "PER17656",
+      "name": "Seaweed",
+      "productId": 9717264842981,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-seaweed",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17656_SWATCH.jpg?v=1784741537",
+      "swatchSha256": "406d0027baa8c44f7cd1b2f344d45830f225bf9454668d8070e686437596bf42",
+      "rgb": [
+        156,
+        121,
+        62
+      ]
+    },
+    {
+      "id": "PER17657",
+      "name": "Steel",
+      "productId": 9717264908517,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-steel",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17657_SWATCH.jpg?v=1784741678",
+      "swatchSha256": "9c72e79f82be0e3a5e0231a78ff7a04f78475fad94beb510f6f4575333645156",
+      "rgb": [
+        74,
+        79,
+        82
+      ]
+    },
+    {
+      "id": "PER17658",
+      "name": "Champagne",
+      "productId": 9717264351461,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-champagne",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17658_SWATCH.jpg?v=1784742361",
+      "swatchSha256": "1bb08b38681d3c6d956a396aa83f26925e64f54f333ba6dadd35c344d5b73b59",
+      "rgb": [
+        227,
+        190,
+        138
+      ]
+    },
+    {
+      "id": "PER17659",
+      "name": "Wheat",
+      "productId": 9717265203429,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-wheat",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17659_SWATCH.jpg?v=1784742012",
+      "swatchSha256": "14f2d91d12d881e2c46bbea39f13dd2dc4ccc9f077293f396d4b014529926061",
+      "rgb": [
+        230,
+        187,
+        133
+      ]
+    },
+    {
+      "id": "PER17660",
+      "name": "Colonial Blue",
+      "productId": 9717264384229,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-colonial-blue",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17660_SWATCH.jpg?v=1784742387",
+      "swatchSha256": "1eac841b663e612a330002b028a3ab796b8a0cb5b23907396ed078d00226f521",
+      "rgb": [
+        102,
+        176,
+        200
+      ]
+    },
+    {
+      "id": "PER17661",
+      "name": "Faded Rose",
+      "productId": 9717264482533,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-faded-rose",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17661_SWATCH.jpg?v=1784742514",
+      "swatchSha256": "3cb29a5c3665ab55253df4c7c171d4f93a0710c38fb4c4315bf14fa665891e48",
+      "rgb": [
+        175,
+        101,
+        132
+      ]
+    },
+    {
+      "id": "PER17662",
+      "name": "Teaberry",
+      "productId": 9717265006821,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-teaberry",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17662_SWATCH.jpg?v=1784741813",
+      "swatchSha256": "97516f83b3766e01c75c0949af33637a5b52c0589507ac6653f905930a19db51",
+      "rgb": [
+        203,
+        129,
+        163
+      ]
+    },
+    {
+      "id": "PER17663",
+      "name": "Persimmon",
+      "productId": 9717264777445,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-persimmon",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17663_SWATCH.jpg?v=1784742757",
+      "swatchSha256": "7c4766031cf76f4b98a375967db06c1a1f9d0384a08641a70e7707a39773f1a3",
+      "rgb": [
+        221,
+        130,
+        113
+      ]
+    },
+    {
+      "id": "PER17664",
+      "name": "Violet",
+      "productId": 9717265137893,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-violet",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17664_SWATCH.jpg?v=1784741891",
+      "swatchSha256": "85ea26921ae1a83d3d4906aaad15f557b8107ae8ea4213fd608f6c56ad443895",
+      "rgb": [
+        156,
+        78,
+        192
+      ]
+    },
+    {
+      "id": "PER17665",
+      "name": "Deep Purple",
+      "productId": 9717264449765,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-deep-purple",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17665_SWATCH.jpg?v=1784742406",
+      "swatchSha256": "acffa9532edc849ce23de73b52d44bc431100b5fdaf27e070a3ff07050cf7caa",
+      "rgb": [
+        81,
+        48,
+        93
+      ]
+    },
+    {
+      "id": "PER17666",
+      "name": "Beige",
+      "productId": 9717264285925,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-beige",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17666_SWATCH.jpg?v=1784742290",
+      "swatchSha256": "9f5722440e5d2f6f9a340ee3d4968e170642c942f7ceb587600645fd297de042",
+      "rgb": [
+        180,
+        120,
+        84
+      ]
+    },
+    {
+      "id": "PER17667",
+      "name": "Iron",
+      "productId": 9717264548069,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-iron",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER17667_SWATCH.jpg?v=1784742697",
+      "swatchSha256": "ca4e3273026fab0aa0342b1ab466c82cdae2c3e9bf0e36cef1d6479ff063af84",
+      "rgb": [
+        56,
+        50,
+        44
+      ]
+    },
+    {
+      "id": "PER17668",
+      "name": "Lipstick",
+      "productId": 9717264711909,
+      "productUrl": "https://perler.com/products/1-000-perler-beads-lipstick",
+      "rgbSource": "official-photo-estimate",
+      "swatchUrl": "https://cdn.shopify.com/s/files/1/0773/0701/9493/files/PER_17668_SWATCH.jpg?v=1784742733",
+      "swatchSha256": "3daf220c4f6ad61d7b1b6cfa59731b3cf3fee6903c25d5adaf2dedf336843926",
+      "rgb": [
+        246,
+        56,
+        60
+      ]
+    }
+  ]
+}

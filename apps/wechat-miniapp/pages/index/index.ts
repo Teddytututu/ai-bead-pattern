@@ -1,4 +1,4 @@
-import { WechatPatternClient, ApiError, type ResultView, type JobView, type CreateJobInput } from '../../vendor/sdk'
+import { WechatPatternClient, ApiError, type ResultView, type JobView, type CreateJobInput, type PaletteSummary } from '../../vendor/sdk'
 import { config } from '../../config'
 const client = new WechatPatternClient({ baseUrl: config.apiBaseUrl, wx,
   token: String(wx.getStorageSync('patternToken') || ''),
@@ -9,7 +9,8 @@ let result: ResultView | undefined
 let waiter: ReturnType<WechatPatternClient['waitForPatternJob']> | undefined
 let visible = true
 Page({
-  data: { imagePath: '', paletteId: 'mard-291', paletteNames: ['MARD 291', '通用 24 色'], paletteIndex: 0,
+  data: { imagePath: '', paletteId: 'mard-291', paletteNames: ['正在加载色卡'], paletteIndex: 0,
+    palettes: [] as PaletteSummary[], paletteLoading: false, paletteNote: '',
     sizes: [32, 48, 64, 96], sizeIndex: 1, maxColors: 20, colorLimit: 48, busy: false,
     valueModes: ['随风格（还原默认保色）', '保色', '适度增强', '风格化'], valueModeIndex: 0, valueStrength: 100,
     externalContour: true, internalContour: true, contourStatus: '',
@@ -18,11 +19,25 @@ Page({
   },
   onShow() {
     visible = true
+    if (!this.data.palettes.length && !this.data.paletteLoading) void this.loadPalettes()
     const id = wx.getStorageSync('activePatternJob')
     if (typeof id === 'string' && id) { this.setData({ jobId: id }); void this.watch(id) }
   },
   onHide() { visible = false; waiter?.stop() },
   onUnload() { visible = false; waiter?.stop() },
+  async loadPalettes() {
+    if (this.data.paletteLoading) return
+    this.setData({ paletteLoading: true, error: '' })
+    try {
+      const palettes = await client.listPalettes()
+      if (!palettes.length) throw new Error('没有可用色卡')
+      const index = Math.max(0, palettes.findIndex(palette => palette.id === this.data.paletteId))
+      this.setData({ palettes, paletteNames: palettes.map(palette => palette.name) })
+      this.changePalette({ detail: { value: String(index) } })
+    } catch (error) {
+      this.setData({ error: error instanceof Error ? error.message : '色卡加载失败，请重试' })
+    } finally { this.setData({ paletteLoading: false }) }
+  },
   chooseImage() {
     wx.chooseMedia({ count: 1, mediaType: ['image'], sizeType: ['compressed'],
       success: value => { wx.removeStorageSync('pendingPatternRequest'); this.setData({ imagePath: value.tempFiles[0]?.tempFilePath ?? '', error: '' }) },
@@ -30,9 +45,12 @@ Page({
     })
   },
   changePalette(event: { detail: { value: string } }) {
-    const index = Number(event.detail.value), limit = index === 0 ? 48 : 24
-    wx.removeStorageSync('pendingPatternRequest')
-    this.setData({ paletteIndex: index, paletteId: index === 0 ? 'mard-291' : 'generic-24', colorLimit: limit, maxColors: Math.min(this.data.maxColors, limit) })
+    const index = Number(event.detail.value), palette = this.data.palettes[index]
+    if (!palette) return
+    const automaticCount = palette.automaticColorCount ?? palette.colorCount, limit = Math.min(48, automaticCount)
+    if (palette.id !== this.data.paletteId) wx.removeStorageSync('pendingPatternRequest')
+    this.setData({ paletteIndex: index, paletteId: palette.id, colorLimit: limit, maxColors: Math.min(this.data.maxColors, limit),
+      paletteNote: automaticCount < palette.colorCount ? `${palette.colorCount} 色登记，自动配色使用 ${automaticCount} 色；特殊材质色不参与。` : '' })
   },
   changeSize(event: { detail: { value: string } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ sizeIndex: Number(event.detail.value) }) },
   changeColors(event: { detail: { value: number } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ maxColors: event.detail.value }) },
@@ -41,7 +59,7 @@ Page({
   changeExternalContour(event: { detail: { value: boolean } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ externalContour: event.detail.value }) },
   changeInternalContour(event: { detail: { value: boolean } }) { wx.removeStorageSync('pendingPatternRequest'); this.setData({ internalContour: event.detail.value }) },
   async generate() {
-    if (!this.data.imagePath || this.data.busy) return
+    if (!this.data.imagePath || this.data.busy || !this.data.palettes.length || this.data.paletteLoading) return
     waiter?.stop(); result = undefined; wx.removeStorageSync('activePatternJob')
     this.setData({ busy: true, hasResult: false, error: '', jobId: '', status: '登录中' })
     try {

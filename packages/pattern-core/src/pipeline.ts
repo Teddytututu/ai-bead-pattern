@@ -16,7 +16,6 @@ import {
 import {
   normalizeEvidenceProvenance,
   resolvedSubjectMask,
-  subjectMaskConfidence,
   subjectMaskTrust,
 } from './analysis-evidence.js'
 import { scoreCraftQuality } from './candidate-evaluation.js'
@@ -379,6 +378,9 @@ function validateRequest(request: PatternGenerationRequest): void {
   }
   for (const color of request.palette.colors) {
     if (color.id.trim().length === 0) throw new RangeError('Palette color id is required')
+    if (color.automaticMatch !== undefined && typeof color.automaticMatch !== 'boolean') throw new TypeError('Invalid automaticMatch')
+    validateEnum(color.finish, new Set(['solid', 'transparent', 'glow', 'metallic', 'pearl']), 'material finish')
+    if (color.finish !== undefined && color.finish !== 'solid' && color.automaticMatch !== false) throw new RangeError('Special finishes require automaticMatch=false')
     validateRgb(color.rgb, `Palette color ${color.id}`)
     if (color.lab !== undefined && (color.lab.length !== 3
       || color.lab.some((value) => Number.isFinite(value) === false))) {
@@ -610,8 +612,8 @@ function validateRequest(request: PatternGenerationRequest): void {
   validateEnum(request.options.structure?.valueMode, new Set(['preserve', 'adaptive', 'stylized']), 'valueMode')
   validateContourOptions(request.options.structure?.contours)
   const contourColorId = request.options.structure?.contours?.colorId
-  if (contourColorId !== undefined && (!request.palette.colors.some(color => color.id === contourColorId)
-    || (request.palette.inventory?.[contourColorId] ?? Infinity) <= 0)) throw new RangeError('Contour color must be known and in stock')
+  if (contourColorId !== undefined && (!request.palette.colors.some(color => color.id === contourColorId && color.automaticMatch !== false)
+    || (request.palette.inventory?.[contourColorId] ?? Infinity) <= 0)) throw new RangeError('Contour color must be known, eligible for automatic matching and in stock')
   if (request.palette.id === 'mard-291' && contourColorId !== undefined
     && !isDeepSaturatedInk(request.palette.colors.find(color => color.id === contourColorId)!)) throw new RangeError('MARD contour color must be deep and highly saturated')
   if ((request.options.structure?.valueStrength ?? 1) > 1) throw new RangeError('valueStrength must be within 0..1')
@@ -1323,7 +1325,6 @@ function referenceMetrics(
   crop: CropRect,
   fit: CanvasFit,
   width: number,
-  height: number,
   colorIds: readonly string[],
   palette: readonly PreparedColor[],
   activeMask: Uint8Array,
@@ -2138,7 +2139,7 @@ function generateCandidate(
   })
   const excludedFillColors = mardFillPolicy ? context.preparedPalette.filter(isBlackFill).map(color => color.id) : []
   const availablePalette = paletteColorsInStock(request.palette, context.preparedPalette).filter(color => !excludedFillColors.includes(color.id))
-  if (!availablePalette.length) throw new RangeError('No non-black MARD fill colors are in stock')
+  if (!availablePalette.length) throw new RangeError(mardFillPolicy ? 'No non-black MARD fill colors are in stock' : 'No eligible fill colors are in stock')
   if (mardFillPolicy && contourGeometry && contourGeometry.diagnostics.selectedCells > 0) {
     const colorId = selectSingleInk({ colors: availablePalette, pixelLabs: structuredPixels.map(rgbToLab),
       referenceMask: contourSubjectMask ?? activeMask,
@@ -2401,7 +2402,6 @@ function generateCandidate(
     crop,
     resized.fit,
     size.width,
-    size.height,
     finalColorIds,
     selectedPalette,
     activeMask,
@@ -2803,7 +2803,8 @@ export class DeterministicPatternAlgorithm {
     const sizes = resolveSizes(request.options)
     const styles = resolveStyles(request.options, baseline)
     const crop = normalizeCrop(request.image, resolvedCrop(request))
-    const preparedPalette = prepareColors(request.palette.colors)
+    const preparedPalette = prepareColors(request.palette.colors.filter(color => color.automaticMatch !== false))
+    if (preparedPalette.length === 0) throw new RangeError('Palette requires automatic matching colors')
     const sourceGuidance = buildSourceGuidance(
       request.image,
       request.analysis,

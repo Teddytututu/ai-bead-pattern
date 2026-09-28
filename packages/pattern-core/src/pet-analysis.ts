@@ -315,7 +315,6 @@ function flatGeometricNegativeEvidence(
 }
 
 function strongestPoint(
-  image: PixelImage,
   mask: BinaryMask,
   bounds: Bounds,
   scoreAt: (x: number, y: number) => number,
@@ -349,7 +348,7 @@ function profileTipCandidate(
     width: bounds.width,
     height: Math.max(1, headBottom - headTop + 1),
   }
-  return strongestPoint(image, mask, band, (x, y) => {
+  return strongestPoint(mask, band, (x, y) => {
     const forward = clamp(direction * (x - headCenterX) / Math.max(1, headWidth * 0.5), 0, 1)
     const vertical = clamp(1 - Math.abs(y - (headTop + band.height * 0.48)) / Math.max(1, band.height * 0.42), 0, 1)
     const support = localMaskDensity(
@@ -394,7 +393,7 @@ function profileFeature(
     width: Math.max(1, Math.ceil(radiusX * 2)),
     height: Math.max(1, Math.ceil(radiusY * 2)),
   }
-  return strongestPoint(image, mask, bounds, (x, y) => {
+  return strongestPoint(mask, bounds, (x, y) => {
     const distance = Math.hypot(
       (x - expectedX) / Math.max(1, radiusX),
       (y - expectedY) / Math.max(1, radiusY),
@@ -490,7 +489,7 @@ function inferProfileAnalysis(
     profileFeature(image, mask, eyeExpectedX, eyeExpectedY, headWidth * 0.2, headHeight * 0.28),
     headWidth * 0.06,
   )
-  const uprightEar = strongestPoint(image, mask, {
+  const uprightEar = strongestPoint(mask, {
     left: headLeft,
     right: headRight,
     top: bounds.top,
@@ -505,7 +504,7 @@ function inferProfileAnalysis(
   })
   const foldedEarExpectedX = eye.x - direction * headWidth * 0.2
   const foldedEarExpectedY = eye.y + headHeight * 0.05
-  const foldedEar = strongestPoint(image, mask, {
+  const foldedEar = strongestPoint(mask, {
     left: direction === 1 ? headLeft : Math.max(headLeft, Math.floor(eye.x + headWidth * 0.06)),
     right: direction === 1 ? Math.min(headRight, Math.ceil(eye.x - headWidth * 0.06)) : headRight,
     top: Math.max(bounds.top, Math.floor(eye.y - headHeight * 0.18)),
@@ -1377,7 +1376,6 @@ function nearestMaskPoint(
 }
 
 function profileBodyStructure(
-  image: PixelImage,
   mask: BinaryMask,
   bounds: Bounds,
   direction: -1 | 1,
@@ -1416,12 +1414,12 @@ function profileBodyStructure(
     0,
     1,
   )
-  const tail = strongestPoint(image, mask, lowerBody, (x, y) =>
+  const tail = strongestPoint(mask, lowerBody, (x, y) =>
     backwardness(x) * 0.72
       + clamp(1 - Math.abs(y - (bounds.top + bounds.height * 0.72)) / Math.max(1, bounds.height * 0.3), 0, 1) * 0.28)
-  const frontPaw = strongestPoint(image, mask, frontBand, (x, y) =>
+  const frontPaw = strongestPoint(mask, frontBand, (x, y) =>
     bottomness(y) * 0.78 + forwardness(x) * 0.22)
-  const rearPaw = strongestPoint(image, mask, rearBand, (x, y) =>
+  const rearPaw = strongestPoint(mask, rearBand, (x, y) =>
     bottomness(y) * 0.82 + backwardness(x) * 0.18)
   const at = (x: number, y: number, radiusX = 0.2, radiusY = 0.16) => nearestMaskPoint(
     mask,
@@ -1629,7 +1627,7 @@ function inferSinglePetAnalysis(image: PixelImage, mask: BinaryMask): PetAnalysi
     const faceMask = profileFaceMask(analysisMask, profile)
     const bodyAvailable = profileBodyEvidence(analysisMask, faceMask, bounds, profile) >= 0.58
     const body = bodyAvailable
-      ? profileBodyStructure(image, analysisMask, bounds, profile.direction)
+      ? profileBodyStructure(analysisMask, bounds, profile.direction)
       : undefined
     const bodyRegions = body === undefined
       ? []

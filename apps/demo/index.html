@@ -783,7 +783,8 @@
         </div>
         <div class="control-group">
           <label class="control-label" for="paletteSelect"><span>材料色卡</span><span class="control-value" id="paletteCount">291 色</span></label>
-          <select id="paletteSelect" aria-label="材料色卡"><option value="mard-291">MARD 291</option><option value="generic-24">通用 24 色</option></select>
+          <select id="paletteSelect" aria-label="材料色卡"></select>
+          <div id="paletteNote" class="control-label" hidden></div>
         </div>
         <div class="control-group">
           <label class="control-label" for="maxColors"><span>本张最多用色</span><span class="control-value" id="colorValue">20 色</span></label>
@@ -1191,7 +1192,6 @@
     import { createFeatureEditor } from './feature-editor.mjs'
     import { featureTemplateLibrary, prepareFeatureEvidence, validateFeatureOverrides } from '/packages/pattern-core/dist/index.js'
     import {
-      createBlindCandidatePair,
       loadPreferenceRecords,
       resolveCandidatePreference,
       savePreferenceRecords,
@@ -1206,9 +1206,10 @@
     } from './ai-runtime.mjs'
     import { createPreferenceRuntime } from './preference-runtime.mjs'
 
-    import { getPalette } from '../../packages/material-palettes/dist/index.js'
+    import { getPalette, listPalettes } from '../../packages/material-palettes/dist/index.js'
     import { downloadPatternFile } from './pattern-download.mjs'
     let palette = await getPalette('mard-291')
+    document.querySelector('#paletteSelect').replaceChildren(...(await listPalettes()).map(entry => new Option(entry.name, entry.id)))
     const algorithm = createPatternAlgorithm({ yieldControl: () => new Promise(resolve => setTimeout(resolve, 0)) })
     const preferenceRuntime = createPreferenceRuntime({
       core: {
@@ -2593,7 +2594,10 @@
       try {
         palette = await getPalette(event.target.value)
         document.querySelector('#paletteCount').textContent = `${palette.colorCount} 色`
-        elements.maxColors.max = String(Math.min(48, palette.colorCount))
+        const paletteNote = document.querySelector('#paletteNote')
+        paletteNote.hidden = palette.automaticColorCount === palette.colorCount
+        paletteNote.textContent = `自动配色使用 ${palette.automaticColorCount} 色；透明、夜光、金属和珠光色不参与。`
+        elements.maxColors.max = String(Math.min(48, palette.automaticColorCount))
         elements.maxColors.value = String(Math.min(Number(elements.maxColors.value), Number(elements.maxColors.max)))
         elements.colorValue.textContent = `${elements.maxColors.value} 色`
         await generate()

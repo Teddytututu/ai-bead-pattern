@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { createServer, type IncomingMessage } from 'node:http'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
@@ -204,7 +204,7 @@ export async function createPatternApi(options: ApiOptions) {
         store.put('session', { id: hash(token), owner, expiresAt })
         return send({ token, expiresAt })
       }
-      if (path === '/v1/palettes' && method === 'GET') return send((await listPalettes()).map(({ id, name, version, colorCount, brand }) => ({ id, name, version, colorCount, brand })))
+      if (path === '/v1/palettes' && method === 'GET') return send((await listPalettes()).map(({ id, name, version, colorCount, automaticColorCount, brand }) => ({ id, name, version, colorCount, automaticColorCount, brand })))
       const paletteRoute = /^\/v1\/palettes\/([a-z0-9-]+)$/.exec(path)
       if (paletteRoute && method === 'GET') {
         let palette
@@ -280,8 +280,8 @@ export async function createPatternApi(options: ApiOptions) {
           if (raced.fingerprint !== fingerprint) throw new HttpError(409, 'IDEMPOTENCY_CONFLICT', '同一幂等键的参数不同')
           return send(view(owned<JobRecord>('job', String(raced.jobId), owner)), 202)
         }
-        if (input.options.maxColors > palette.colorCount) throw new HttpError(422, 'COLOR_LIMIT', '用色数量超过当前色卡')
-        if (input.options.structure?.contours?.colorId !== undefined && !palette.colors.some(color => color.id === input.options.structure!.contours!.colorId)) throw new HttpError(422, 'INVALID_CONTOUR_COLOR', '轮廓色必须属于当前色卡')
+        if (input.options.maxColors > palette.automaticColorCount) throw new HttpError(422, 'COLOR_LIMIT', '用色数量超过当前色卡可自动匹配的颜色数')
+        if (input.options.structure?.contours?.colorId !== undefined && !palette.colors.some(color => color.id === input.options.structure!.contours!.colorId && color.automaticMatch !== false)) throw new HttpError(422, 'INVALID_CONTOUR_COLOR', '轮廓色必须属于当前色卡且可自动匹配')
         if (palette.id === 'mard-291' && input.options.structure?.contours?.colorId !== undefined
           && !isDeepSaturatedInk(palette.colors.find(color => color.id === input.options.structure!.contours!.colorId)!)) throw new HttpError(422, 'INVALID_CONTOUR_COLOR', `MARD 291 描边必须选用深色高饱和子集：${palette.colors.filter(isDeepSaturatedInk).map(color => color.id).join('、')}`)
         if (input.route === 'neural-analysis' && remoteAnalysis && input.consentToRemoteAnalysis !== true) throw new HttpError(422, 'REMOTE_CONSENT_REQUIRED', '使用此分析服务前需要单独同意图片传输')

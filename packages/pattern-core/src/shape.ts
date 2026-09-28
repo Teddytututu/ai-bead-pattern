@@ -1135,7 +1135,6 @@ function supportedStructuralPath(
 }
 
 function connectStructuralLandmarkPaths(
-  model: SourceShapeModel,
   landmarks: readonly ImageLandmark[],
   crop: CropRect,
   fit: CanvasFit,
@@ -1338,7 +1337,6 @@ export function rasterizeSourceShape(
     activeMask,
   )
   const structuralPaths = connectStructuralLandmarkPaths(
-    model,
     landmarks,
     crop,
     fit,

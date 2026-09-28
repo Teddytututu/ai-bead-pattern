@@ -17,7 +17,7 @@ test('validates and freezes the complete versioned catalog', async () => {
   assert.equal(Object.keys(palette.groups).length, 15)
   assert.match(palette.version, /^sha256:[a-f0-9]{64}$/)
   assert.equal(palette.version, await createPaletteVersion(palette))
-  assert.deepEqual((await listPalettes()).map(p => p.id), ['mard-291', 'generic-24'])
+  assert.deepEqual((await listPalettes()).map(p => p.id), ['mard-291', 'perler-123', 'generic-24'])
   assert.throws(() => { palette.colors[0].rgb[0] = 0 }, TypeError)
   await assert.rejects(getPalette('missing'), /Unknown/)
   await assert.rejects(getPalette('mard-291', 'stale'), /Unknown/)
@@ -46,8 +46,10 @@ test('version tracks content, preserves key-order equivalence, excludes stock', 
   assert.notEqual(await createPaletteVersion(changed), palette.version)
 })
 
-test('all 291 colors remain reachable, including indices above 255', async () => {
-  const palette = await getPalette()
+test('all 291 catalog colors remain addressable, including indices above 255', async () => {
+  // Exercise catalog indexing independently of the MARD-specific automatic fill policy.
+  const catalog = { ...await getPalette(), id: 'catalog-indexing-test' }
+  const palette = { ...catalog, version: await createPaletteVersion(catalog) }
   // Every unique RGB must round-trip to its exact physical code with a single-color input.
   const seen = new Set()
   for (const color of palette.colors) {
@@ -58,7 +60,20 @@ test('all 291 colors remain reachable, including indices above 255', async () =>
     assert.equal(result.status, 'success')
     assert.equal(result.pattern.cells[0].colorId, color.id)
     assert.equal(result.pattern.metadata.paletteVersion, palette.version)
-    assert.equal(result.pattern.metadata.paletteId, 'mard-291')
+    assert.equal(result.pattern.metadata.paletteId, palette.id)
+  }
+})
+
+test('MARD automatic fill excludes H7 while retaining it in the complete catalog', async () => {
+  const palette = await getPalette()
+  const black = palette.colors.find(color => color.id === 'H7')
+  assert.ok(black)
+  for (const baseline of ['a0', 'a1', 'mvp']) {
+    const result = await algorithm.generate({ palette, image: image([black]), options: { ...options, baseline } })
+    assert.equal(result.status, 'success')
+    assert.notEqual(result.pattern.cells[0].colorId, 'H7')
+    assert.ok(palette.colors.some(color => color.id === result.pattern.cells[0].colorId))
+    assert.equal(result.pattern.metadata.paletteVersion, palette.version)
   }
 })
 

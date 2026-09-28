@@ -1,4 +1,4 @@
-import type { PatternOptions, PatternStyle, PatternDocument, GenerationStatus, StructureOptions, FeatureOverride, PatternCandidate } from '../../pattern-core/dist/index.js'
+import type { MaterialColor, PatternOptions, PatternStyle, PatternDocument, GenerationStatus, StructureOptions, FeatureOverride, PatternCandidate } from '../../pattern-core/dist/index.js'
 import { validateFeatureOverrides } from '../../pattern-core/dist/index.js'
 export type Route = 'deterministic' | 'neural-analysis'
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
@@ -36,9 +36,9 @@ export interface ResultView {
   generationId: string; generationStatus: GenerationStatus; actualRoute: Route
   recommendedId?: string; bestEffortId?: string; candidates: CandidateView[]; warnings: string[]
 }
-export interface PaletteSummary { id: string; name: string; version: string; colorCount: number; brand?: string }
+export interface PaletteSummary { id: string; name: string; version: string; colorCount: number; automaticColorCount?: number; brand?: string }
 export interface PaletteView extends PaletteSummary {
-  colors: { id: string; code?: string; name: string; hex: string; rgb: readonly number[]; group?: string }[]
+  colors: MaterialColor[]
   rgbKind?: string
 }
 export const apiLimits = Object.freeze({

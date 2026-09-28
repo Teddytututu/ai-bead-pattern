@@ -58,6 +58,42 @@ test('real multipart -> persistent async MARD 291 -> exact grid, CSV and PNG', a
   assert.equal((await h.call(`/v1/pattern-jobs/${jobId}/result`, { token })).json.data.generationId, result.generationId)
 })
 
+test('Perler 123 reaches worker, API catalog and all exports with real SKUs', async t => {
+  const h = await harness(t), token = await h.auth()
+  const summaries = (await h.call('/v1/palettes')).json.data
+  const summary = summaries.find(p => p.id === 'perler-123')
+  assert.equal(summary.colorCount, 123); assert.equal(summary.automaticColorCount, 118)
+  const palette = (await h.call('/v1/palettes/perler-123')).json.data
+  assert.equal(palette.version, summary.version); assert.equal(palette.colors.length, 123)
+  const imageId = (await h.upload(token)).json.data.imageId
+  const data = { imageId, paletteId: palette.id, paletteVersion: palette.version,
+    options: { canvas: { mode: 'fixed', size: { width: 32, height: 32 } }, maxCandidates: 1, styles: ['faithful'] } }
+  assert.equal((await h.call('/v1/pattern-jobs', { method: 'POST', token, key: 'perler-stale', data: { ...data, paletteVersion: 'stale' } })).status, 404)
+  const badInk = await h.call('/v1/pattern-jobs', { method: 'POST', token, key: 'perler-transparent-ink',
+    data: { ...data, options: { ...data.options, structure: { contours: { colorId: '80-19019' } } } } })
+  assert.equal(badInk.status, 422); assert.equal(badInk.json.error.code, 'INVALID_CONTOUR_COLOR')
+  const job = await h.call('/v1/pattern-jobs', { method: 'POST', token, key: 'perler', data })
+  assert.equal(job.status, 202)
+  const jobId = job.json.data.jobId
+  assert.equal((await h.done(jobId, token)).state, 'succeeded')
+  const result = (await h.call(`/v1/pattern-jobs/${jobId}/result`, { token })).json.data
+  assert.equal(result.generationStatus, 'success')
+  const candidate = result.candidates[0], doc = candidate.pattern
+  assert.equal(doc.paletteId, 'perler-123'); assert.equal(doc.paletteVersion, palette.version)
+  assert.equal(doc.brand, 'Perler'); assert.ok(doc.colors.every(c => c.automaticMatch && c.finish === 'solid'))
+  assert.ok(doc.materials.every(m => /^(80-\d{5}|PER\d{5})$/.test(m.code)))
+  assert.equal(doc.materials.reduce((n, m) => n + m.count, 0), doc.grid.filter(i => i >= 0).length)
+  const path = `/v1/pattern-jobs/${jobId}/exports/${candidate.id}`
+  assert.deepEqual((await h.call(`${path}?format=json`, { token })).json, doc)
+  const csv = await h.call(`${path}?format=csv`, { token })
+  assert.match(csv.text, /"Perler","perler-123"/)
+  for (const material of doc.materials) assert.ok(csv.text.includes(`"${material.code}"`))
+  const png = await fetch(`${h.base}${path}?format=png`, { headers: { Authorization: `Bearer ${token}` } })
+  assert.equal(png.status, 200)
+  const metadata = await sharp(Buffer.from(await png.arrayBuffer())).metadata()
+  assert.equal(metadata.format, 'png'); assert.ok(metadata.width >= 32 * 46)
+})
+
 test('manual feature coordinates and contour switches reach the worker and final result', async t => {
   const h = await harness(t), token = await h.auth(), uploaded = (await h.upload(token)).json.data
   const base = { imageId: uploaded.imageId, options: { canvas: { mode: 'fixed', size: { width: 32, height: 32 } }, styles: ['faithful'], maxCandidates: 1,

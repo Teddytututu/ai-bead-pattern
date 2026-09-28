@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 
 import {
   composeCandidateEvaluationV2,
