@@ -15,7 +15,7 @@
 | `services/ai-gateway` / 5 个 Python sidecar | 统一模型合同；分割、姿态、提案、视觉评分 | 能力不同，不能按目录数量简单合并或删除 |
 | `tools/*-gate` / `tools/auto-eval` | 不同评测协议、候选生产、偏好记录 | 保留质量门禁；优先修正证据路线差异 |
 
-运行关系和当前算法阶段统一见[架构文档](architecture.md)。历史验收状态、本期 P0–P10 排期仍由[总计划](roadmap.md)与[本期计划](contours-features-editing-perler-123-plan.md)维护。
+运行关系和当前算法阶段统一见[架构文档](architecture.md)。历史验收状态由[历史交付基线](roadmap.md)维护，本期 P0–P10 排期统一从[计划入口](plans/README.md)进入。
 
 ## 本次已剪枝
 

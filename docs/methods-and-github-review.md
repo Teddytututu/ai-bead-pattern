@@ -3,7 +3,7 @@
 查询日期：2026-09-03
 
 本文承接 [拼豆生成算法完整调研](algorithm-research.md) 与
-[V2 算法升级方案](algorithm-upgrade-v2.md)，集中回答三个工程问题：
+[V2 算法升级方案](plans/archive/algorithm-upgrade-v2.md)，集中回答三个工程问题：
 
 1. 哪些方法适合直接进入 AI Gateway 与 `pattern-core`。
 2. 哪些仓库适合建立强基线、离线教师或竞品对照。

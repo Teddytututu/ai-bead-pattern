@@ -6,7 +6,7 @@
 
 MARD 291、Perler 123 和通用 24 已接入生成、预览和 PNG/CSV/JSON 导出，单张图纸最多使用 48 色（通用色卡最多 24 色）。Perler 完整登记 123 个官方 SKU，照片自动配色使用 118 个普通颜色，5 个特殊材质色保留登记；色值为屏幕参考值，见[来源与接入说明](docs/perler-123.md)。产品 API、微信 TypeScript SDK 和原生小程序示例已落地，当前交付范围为本地运行与自动化验证。真实微信账号、HTTPS 部署和真机联调在后续接入。
 
-用户已于 2026-09-26 确认历史已实现部分全部验收通过。当前基线与归档见[项目总计划](docs/roadmap.md)；本期按[明暗、结构模板与纹理、编辑及 Perler 123 计划](docs/contours-features-editing-perler-123-plan.md)执行。首批明暗/保色修正已实装，见[实现与对照记录](docs/value-fidelity-2026-09-26.md)；其余阶段仍按计划推进。
+当前进度、执行顺序和计划归档统一从 [docs/plans](docs/plans/README.md) 进入。Perler 123 已接入现有生成链路；当前优先处理生成选色色差，再准备模板训练样本。35 个五官规则模板已实现，三套色卡的模板学习尚未完成。用户于 2026-09-26 确认的历史验收范围保留在[历史交付基线](docs/roadmap.md)。
 
 ## 本地使用
 
@@ -70,16 +70,14 @@ Demo 配置 Grounded-SAM-2 后优先取得模型主体与部件蒙版；BiRefNet
 
 ## 文档
 
-- [项目总计划与验收状态](docs/roadmap.md)
-- [明暗与色差、结构模板与纹理、图纸编辑及 Perler 123 色实施计划](docs/contours-features-editing-perler-123-plan.md)
-- [MARD 291 与微信接口原计划（已实现范围验收通过）](docs/mard-291-wechat-api-plan.md)
+- [当前计划、优先级与历史方案入口](docs/plans/README.md)
+- [历史交付与验收基线](docs/roadmap.md)
+- [选色色差排查记录](docs/color-fidelity-triage-2026-09-28.md)
 - [本地交付与验证记录](docs/local-delivery-2026-09-26.md)
 - [24/291 色性能对照](docs/palette-benchmark-2026-09-26.md)
 - [从绘画过程到拼豆图纸：生成方法论](docs/drawing-to-bead-method.md)
 - [拼豆生成算法完整调研](docs/algorithm-research.md)
 - [可采用方法与 GitHub 项目复核](docs/methods-and-github-review.md)
-- [拼豆生成算法实现规划](docs/algorithm-implementation-plan.md)
-- [V2 算法升级方案](docs/algorithm-upgrade-v2.md)
 - [主体轮廓与目标格结构重构研究](docs/contour-reconstruction-research.md)
 - [系统架构](docs/architecture.md)
 - [当前实现梳理与剪枝检查](docs/implementation-pruning-2026-09-28.md)

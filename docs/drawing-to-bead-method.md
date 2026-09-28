@@ -224,7 +224,7 @@ L =
 5. 连通域、长条、2×2 拓扑和局部搜索修整。
 6. 多候选规则评分与成对偏好记录。
 
-具体模型、参数、许可证、实验设计和部署安排见 [拼豆生成算法完整调研](algorithm-research.md)；工程里程碑见 [拼豆生成算法实现规划](algorithm-implementation-plan.md)。
+具体模型、参数、许可证、实验设计和部署安排见 [拼豆生成算法完整调研](algorithm-research.md)；工程里程碑见 [拼豆生成算法实现规划](plans/archive/algorithm-implementation-plan.md)。
 
 五篇核心论文的逐篇结论、项目模块映射和固定实验矩阵见
 [拼豆生成核心论文精读与实验映射](core-paper-reading-notes.md)。
