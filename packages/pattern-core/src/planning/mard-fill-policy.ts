@@ -1,5 +1,6 @@
-import { deltaE2000, prepareColors, rgbToLab, type PreparedColor } from '../color.js'
-import type { GridEditRecord, Lab, MaterialColor } from '../types.js'
+import { deltaE2000, prepareColors, rgbToLab } from '../color.js'
+import type { Lab, MaterialColor } from '../types.js'
+export { preserveFillEvidence } from './fill-fidelity.js'
 
 /** Product constraints on the existing MARD catalog, not synthesized RGB colors. */
 export const mardFillPolicyVersion = 'mard-single-ink-source-fill-v2'
@@ -36,27 +37,4 @@ export function selectSingleInk(input: {
   const target: Lab = [18, a * scale, b * scale]
   return [...candidates].sort((first, second) => deltaE2000(target, first.lab) - deltaE2000(target, second.lab)
     || first.id.localeCompare(second.id))[0]!.id
-}
-
-/** Bound damage from existing cleanup passes; never recolor features or ink. */
-export function preserveFillEvidence(input: {
-  width: number; activeMask: Uint8Array; excludedCells: ReadonlySet<number>
-  sourceLabs: readonly Lab[]; referenceColorIds: readonly string[]; colorIds: readonly string[]
-  colors: readonly PreparedColor[]
-}): { colorIds: readonly string[]; edits: readonly GridEditRecord[] } {
-  const colors = new Map(input.colors.map(color => [color.id, color]))
-  const edits: GridEditRecord[] = []
-  const colorIds = input.colorIds.map((id, cell) => {
-    const original = input.referenceColorIds[cell]!
-    if (!input.activeMask[cell] || input.excludedCells.has(cell) || id === original) return id
-    const difference = deltaE2000(input.sourceLabs[cell]!, colors.get(id)!.lab)
-      - deltaE2000(input.sourceLabs[cell]!, colors.get(original)!.lab)
-    // Nearby material tones may merge into readable clusters. A per-cell budget
-    // still restores high-contrast source details without undoing ordinary denoise.
-    if (difference <= 6) return id
-    edits.push({ x: cell % input.width, y: Math.floor(cell / input.width), fromColorId: id,
-      toColorId: original, reason: 'fill-fidelity' })
-    return original
-  })
-  return { colorIds, edits }
 }

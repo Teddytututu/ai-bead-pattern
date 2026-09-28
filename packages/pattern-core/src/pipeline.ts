@@ -83,7 +83,8 @@ import { buildSourceGuidance, type SourceGuidance } from './structure.js'
 import { boundedValueLab, resolveValuePolicy } from './planning/value-policy.js'
 import { colorStageError } from './planning/color-diagnostics.js'
 import { planContours, preferredContourColors, resolveContourColors, finalizeContourPlan, resolveContourOptions, validateContourOptions } from './planning/contour-planner.js'
-import { isBlackFill, isDeepSaturatedInk, preserveFillEvidence, selectSingleInk } from './planning/mard-fill-policy.js'
+import { isBlackFill, isDeepSaturatedInk, selectSingleInk } from './planning/mard-fill-policy.js'
+import { preserveFillEvidence } from './planning/fill-fidelity.js'
 import type {
   AlgorithmEngine,
   BaselineMode,
@@ -1893,6 +1894,7 @@ function generateCandidate(
   const startedAt = performance.now()
   const { request, crop, size, style, baseline, resizeMethod, distanceMethod } = context
   const mardFillPolicy = request.palette.id === 'mard-291'
+  const sourceFillPolicy = mardFillPolicy || request.palette.id === 'perler-123'
   const structureOptions = request.options.structure ?? {}
   const valuePolicy = resolveValuePolicy(style, structureOptions)
   const focusLandmarks = (request.analysis?.landmarks ?? [])
@@ -2062,7 +2064,7 @@ function generateCandidate(
       sourceGuidance: context.sourceGuidance,
       featurePlacements,
       featureConstraints: plannedFeatureConstraints(request.analysis, context.canvasPlan, featurePlacements),
-      maximumSourceShiftCells: mardFillPolicy ? 0 : 0.35,
+      maximumSourceShiftCells: mardFillPolicy || (sourceFillPolicy && valuePolicy.strength === 0) ? 0 : 0.35,
     })
     : undefined
   const structurePlanningActive = baseline === 'mvp'
@@ -2222,7 +2224,7 @@ function generateCandidate(
     roleId !== undefined && outlineRoleIds.has(roleId) ? [cell] : []) ?? []
   const trustedSemanticIds = new Set((request.analysis?.semanticRegions ?? [])
     .filter((region) => region.confidence >= 0.5).map((region) => region.id))
-  const semanticBoundaryCells = mardFillPolicy && baseline === 'mvp' ? regionIds.flatMap((regionId, cell) => {
+  const semanticBoundaryCells = sourceFillPolicy && baseline === 'mvp' ? regionIds.flatMap((regionId, cell) => {
     if (activeMask[cell] !== 1 || regionId === undefined || !trustedSemanticIds.has(regionId)) return []
     const x = cell % size.width
     const neighbors = [x > 0 ? cell - 1 : -1, x + 1 < size.width ? cell + 1 : -1,
@@ -2351,10 +2353,11 @@ function generateCandidate(
       ...(refinementBudgets === undefined ? {} : { budgets: refinementBudgets }),
     })
     : undefined
-  const fillFidelity = mardFillPolicy && baseline === 'mvp' ? preserveFillEvidence({
+  const fillFidelity = sourceFillPolicy && baseline === 'mvp' ? preserveFillEvidence({
     width: size.width, activeMask, excludedCells: protectedSet, sourceLabs: pixelLabs,
     referenceColorIds: plannedColorIds, colorIds: gridRefinement?.colorIds ?? optimization.colorIds,
     colors: selectedPalette,
+    maximumAdditionalDeltaE: mardFillPolicy ? 6 : 4,
   }) : undefined
   const preSeamColorIds = fillFidelity?.colorIds ?? gridRefinement?.colorIds ?? optimization.colorIds
   const tileSeams = explicitArtDirection && request.options.artDirection?.mode === 'tile'
@@ -2794,7 +2797,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number; yieldControl?: () => Promise<void> }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.10.1-mard-color-coherence'
+    this.version = config.version ?? '0.10.2-perler-color-fidelity'
     this.#clock = config.clock ?? Date.now
     this.#yieldControl = config.yieldControl
   }

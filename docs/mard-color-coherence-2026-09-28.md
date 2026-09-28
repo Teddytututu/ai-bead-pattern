@@ -1,6 +1,6 @@
 # MARD 291 配色协调性修复
 
-用户确认此前满意的色卡为 MARD 291。本次修复其生成结果变碎、相邻近似色显得杂乱的问题；算法版本更新为 `0.10.1-mard-color-coherence`，MARD 策略版本为 `mard-single-ink-source-fill-v2`。
+MARD 291 是用户此前满意的参照色卡。当时误将这条回复理解为问题对应 MARD，先完成了下面的 MARD 协调性修正。用户随后澄清反馈指向新加的 Perler 123，其修复见 [Perler 配色记录](perler-color-fidelity-2026-09-28.md)。本页保留 `0.10.1-mard-color-coherence` 时点的实验与修复，MARD 策略版本为 `mard-single-ink-source-fill-v2`。
 
 ## 定位结果
 

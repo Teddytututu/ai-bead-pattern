@@ -1,6 +1,6 @@
 # 当前实现架构
 
-更新日期：2026-09-28。算法版本为 `0.10.1-mard-color-coherence`；实施状态见[项目总计划](roadmap.md)，代码收敛建议见[实现梳理与剪枝检查](implementation-pruning-2026-09-28.md)。MARD 后处理修正见[配色协调性记录](mard-color-coherence-2026-09-28.md)。
+更新日期：2026-09-28。算法版本为 `0.10.2-perler-color-fidelity`；实施状态见[项目总计划](roadmap.md)，代码收敛建议见[实现梳理与剪枝检查](implementation-pruning-2026-09-28.md)。Perler 123 配色修正见[保真记录](perler-color-fidelity-2026-09-28.md)，MARD 后处理修正见[协调性记录](mard-color-coherence-2026-09-28.md)。
 
 ## 两条运行入口
 

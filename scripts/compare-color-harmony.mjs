@@ -12,10 +12,11 @@ const sharp = createRequire(new URL('../services/ai-gateway/package.json', impor
 const argument = (name, fallback) => process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : fallback
 const label = argument('--label', 'current').replace(/[^a-z0-9_-]/gi, '_')
 const baseline = argument('--baseline', undefined)
+const palette = await getPalette(argument('--palette', 'mard-291'))
 const variants = baseline ? [['Before', (await import(pathToFileURL(resolve(baseline)).href)).createPatternAlgorithm], ['After', createPatternAlgorithm]]
   : [['Current', createPatternAlgorithm]]
-const palette = await getPalette('mard-291')
-const byId = new Map(palette.colors.map(color => [color.id, color.rgb]))
+const reference = argument('--reference', undefined)
+if (reference) variants.push(['Reference', createPatternAlgorithm, await getPalette(reference)])
 const directory = resolve('output/color-harmony', label)
 await mkdir(directory, { recursive: true })
 const sources = [['cat', 'apps/demo/assets/sample-cat.png'], ['kitten', 'test.jfif'], ['frog', 'frog.jpg']]
@@ -43,25 +44,28 @@ for (const [name, file] of sources) {
   }
   for (const [scenario, analysis, structure] of scenarios) {
     const results = []
-    for (const [variant, algorithm] of variants) {
-      const result = await algorithm({ clock: () => 123 }).generate({ image, palette,
+    for (const [variant, algorithm, comparisonPalette = palette] of variants) {
+      const result = await algorithm({ clock: () => 123 }).generate({ image, palette: comparisonPalette,
         ...(analysis ? { analysis } : {}), options: { ...options, structure } })
       const candidate = result.recommended ?? result.bestEffort
       assert.ok(candidate, `${name}/${scenario}/${variant} needs a comparable candidate`)
       assert.ok(candidate.pattern.palette.length <= options.maxColors)
-      assert.ok(candidate.pattern.cells.every(cell => cell.colorId !== 'H7'))
+      const byId = new Map(comparisonPalette.colors.map(color => [color.id, color.rgb]))
+      assert.ok(candidate.pattern.cells.every(cell => comparisonPalette.colors.some(color => color.id === cell.colorId && color.automaticMatch !== false)))
+      if (comparisonPalette.id === 'mard-291') assert.ok(candidate.pattern.cells.every(cell => cell.colorId !== 'H7'))
       const pixels = Buffer.alloc(64 * 64 * 4)
       for (const cell of candidate.pattern.cells) pixels.set([...byId.get(cell.colorId), 255], (cell.y * 64 + cell.x) * 4)
       const png = await sharp(pixels, { raw: { width: 64, height: 64, channels: 4 } }).resize(248, 248, { kernel: 'nearest' }).png().toBuffer()
       const filename = `${name}-${scenario}-${variant.toLowerCase()}.png`
       await writeFile(resolve(directory, filename), png)
-      results.push({ name, scenario, variant, input: file, inputSha256: createHash('sha256').update(bytes).digest('hex'),
+      results.push({ name, scenario, variant, paletteId: comparisonPalette.id, paletteVersion: comparisonPalette.version,
+        input: file, inputSha256: createHash('sha256').update(bytes).digest('hex'),
         configuration: { ...options, structure }, status: result.status, pattern: candidate.pattern,
         metrics: candidate.metrics, contourPlan: candidate.contourPlan, colorDiagnostics: candidate.colorDiagnostics, image: filename, png })
       console.log(JSON.stringify({ name, scenario, variant, isolated: candidate.metrics.isolatedCells,
         meanDeltaE00: candidate.metrics.sourceMeanColorDistance, usedColors: candidate.pattern.palette.length }))
     }
-    if (results.length === 2) assert.deepEqual(results[1].pattern.cells.map(cell => [cell.x, cell.y]),
+    if (baseline) assert.deepEqual(results[1].pattern.cells.map(cell => [cell.x, cell.y]),
       results[0].pattern.cells.map(cell => [cell.x, cell.y]), 'color cleanup must not change occupancy')
     rows.push(...results.map(({ png, ...record }) => record))
     // Show the plain-photo matrix and the actual bundled-mask route; synthetic evidence stays in JSON.
