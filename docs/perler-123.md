@@ -27,7 +27,7 @@
 - 全部标记 `rgbKind: screen-reference`。这不是实物仪器测色，照片曝光、阴影和批次会影响实际匹配。特殊材质的透光、夜光、反射效果不能由单个 RGB 模拟。
 - 没有把上游历史 103 项直接改名为 123。其 8 项不在本次官方目录中：Spice、Periwinkle Blue、Slime、Neon Blue、Sunflower、Lemon、Celery、Mocha。这里只报告目录差异，不推断其停产状态。
 
-导入脚本 `node scripts/import-perler-palette.mjs [下载目录]` 从本地原始下载重建色卡和来源记录，不联网。默认输入 `output/perler-sources`，需要 `perler-products.json`、固定提交的 `beadcolors-perler.csv`、`beadcolors-LICENSE` 和 28 个 `swatches/<SKU>.jpg`。脚本核对源 JSON/CSV SHA-256，来源记录保存每张色样图片 SHA-256；图片不提交到仓库。已有构建只读取冻结的色卡 JSON，不需要下载数据或联网。
+导入脚本 `node scripts/maintenance/import-perler-palette.mjs [下载目录]` 从本地原始下载重建色卡和来源记录，不联网。默认输入 `output/perler-sources`，需要 `perler-products.json`、固定提交的 `beadcolors-perler.csv`、`beadcolors-LICENSE` 和 28 个 `swatches/<SKU>.jpg`。脚本核对源 JSON/CSV SHA-256，来源记录保存每张色样图片 SHA-256；图片不提交到仓库。已有构建只读取冻结的色卡 JSON，不需要下载数据或联网。
 
 ## 接入行为
 
@@ -42,8 +42,8 @@
 
 ## 校验与复现
 
-- 数据、生成与导出回归：`pnpm test`、`pnpm typecheck`、`pnpm exec playwright test apps/demo/palette.e2e.mjs`。
+- 数据、生成与导出回归：`pnpm test`、`pnpm typecheck`、`pnpm exec playwright test apps/demo/tests/e2e/palette.e2e.mjs`。
 - 覆盖普通色精确映射、特殊材质过滤、透明豆与空格区分、来源哈希、陈旧版本拒绝，以及 PNG/CSV/JSON 色号与材料计数。
-- 构建后可用 `node scripts/benchmark-palette.mjs --case perler-123 cat-photo 64 fast 1` 检查性能，其他色卡替换 ID。
+- 构建后可用 `node scripts/benchmarks/benchmark-palette.mjs --case perler-123 cat-photo 64 fast 1` 检查性能，其他色卡替换 ID。
 
 实物色差校准、完整多场景质量门禁和微信真机联调仍未完成。一次本地测试或性能冒烟不能替代这些验收。

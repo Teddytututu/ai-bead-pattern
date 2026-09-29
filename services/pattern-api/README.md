@@ -93,4 +93,4 @@ MARD 291 默认使用单色深描边，候选为 B22、B23、C12、C18、D4、D1
 
 当前不支持多实例同时调度同一个数据库。域名、微信账号绑定、体验版和真机验收需部署方配置，本地自动化不代表这些步骤已完成。
 
-验证：`pnpm test:api`、`pnpm typecheck`、`pnpm test:e2e`。OpenAPI 在根目录运行 `node scripts/generate-pattern-openapi.mjs` 生成。SQLite 参考 [Node v24.13 官方文档](https://github.com/nodejs/node/blob/v24.13.0/doc/api/sqlite.md)。
+验证：`pnpm test:api`、`pnpm typecheck`、`pnpm test:e2e`。OpenAPI 在根目录运行 `node scripts/maintenance/generate-pattern-openapi.mjs` 生成。SQLite 参考 [Node v24.13 官方文档](https://github.com/nodejs/node/blob/v24.13.0/doc/api/sqlite.md)。

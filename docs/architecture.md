@@ -19,9 +19,19 @@ flowchart TD
   Palettes[Material Palettes] --> Core
 ```
 
-- **浏览器工作台**：`apps/demo/index.html` 在浏览器执行核心算法；`scripts/serve-demo.mjs` 提供静态资源和 `/api/ai/*`，由 `scripts/demo-ai-api.mjs` 接入 Gateway。它不经过产品任务 API。
+- **浏览器工作台**：`apps/demo/index.html` 在浏览器执行核心算法；`apps/demo/server/serve.mjs` 提供静态资源和 `/api/ai/*`，由 `apps/demo/server/ai-api.mjs` 接入 Gateway。它不经过产品任务 API。
 - **小程序产品链路**：`apps/wechat-miniapp` → `packages/wechat-client` → `services/pattern-api` → `src/worker.ts`。服务负责会话、上传校正、资源归属、幂等任务、取消/恢复、持久化和导出，Worker 执行分析与生成。默认一个计算 Worker，具体契约见 [API 说明](../services/pattern-api/README.md)。
 - **离线评测**：`tools/auto-eval` 生成候选、取得视觉评分并应用偏好判断；`mask-gate`、`vision-gate`、`feature-gate` 分别维护蒙版、视觉证据和特征规划的评测协议与报告。评测入口不等同于产品入口。
+
+## 依赖与构建边界
+
+- `apps/demo` 是独立 pnpm 工作区，`src` 保存浏览器模块，`server` 保存 Node 服务，`tests` 区分单元测试、浏览器测试和服务替身。服务按文件位置定位仓库根目录，从工作区启动时仍使用相同资源 URL。
+- 运行包在自己的 `package.json` 声明直接依赖；工作区依赖使用 `workspace:*`。Demo 服务通过声明的 Gateway 包导入，浏览器模块仍使用静态构建路径，不额外引入打包器。
+- 根目录管理编译／测试工具和维护脚本所需的 `sharp`；Demo 的 `sharp` 用于浏览器测试并登记为开发依赖。脚本直接导入自己的依赖，不从其他服务的 `node_modules` 借用。已有 `sharp` 统一锁定在 0.35.3，本次只调整引用归属。
+- 各 Python sidecar 保留独立 `pyproject.toml`、`uv.lock` 与虚拟环境。SAM2、姿态、生成提案和视觉评分的 Torch／CUDA 组合不因目录整理而合并或升级。
+- 根 `pnpm build` 保持现有构建顺序。`pnpm install --frozen-lockfile` 校验 Node 锁文件；更改依赖时只更新相应引用并检查锁文件差异，不顺带升级全部包。
+
+开发启动脚本集中在 `scripts/dev`；维护生成器在 `scripts/maintenance`；性能和质量诊断分别在 `scripts/benchmarks`、`scripts/diagnostics`。测试截图与 trace 进入 `output/tests/playwright`，性能 JSON 进入 `output/benchmarks`，临时诊断进入 `output/diagnostics`。数据集与评测记录保持各自原路径，避免破坏来源及会话关联。
 
 ## 图纸核心
 
@@ -76,6 +86,6 @@ Gateway 统一 Provider 注册、请求校验、超时/取消、证据融合和�
 
 常规检查使用根目录的 `pnpm test`、`pnpm typecheck`、`pnpm test:e2e`。真实质量标准分别由[蒙版](mask-failure-gate.md)、[人像视觉](vision-gate.md)、[五官](feature-planning-gate.md)协议维护。
 
-构建后可运行 `node scripts/triage-color-fidelity.mjs` 做分阶段色差对照，或运行 `node scripts/compare-color-harmony.mjs --palette perler-123 --reference mard-291 --baseline <旧版 dist/index.js> --label perler-before-after` 比较版本。输入、配置、算法与色卡版本须一起固定；旧版本从 Git 取回，不保留多套说明文档。
+构建后可运行 `node scripts/diagnostics/triage-color-fidelity.mjs` 做分阶段色差对照，或运行 `node scripts/diagnostics/compare-color-harmony.mjs --palette perler-123 --reference mard-291 --baseline <旧版 dist/index.js> --label perler-before-after` 比较版本。输入、配置、算法与色卡版本须一起固定；旧版本从 Git 取回，不保留多套说明文档。
 
-`pnpm benchmark:palette` 和 `node scripts/benchmark-palette-memory.mjs` 用于性能回归。[24/291 耗时数据](palette-benchmark-2026-09-26.json)与[内存数据](palette-memory-benchmark-2026-09-26.json)保留为历史机器可读样本，不代表当前版本或三套色卡完整质量验收。
+`pnpm benchmark:palette` 和 `node scripts/benchmarks/benchmark-palette-memory.mjs` 用于性能回归。[24/291 耗时数据](../tests/fixtures/benchmarks/palette-2026-09-26.json)与[内存数据](../tests/fixtures/benchmarks/palette-memory-2026-09-26.json)保留为历史机器可读样本，不代表当前版本或三套色卡完整质量验收。

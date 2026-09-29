@@ -14,9 +14,28 @@ importers:
       '@types/node':
         specifier: ^24.3.0
         version: 24.13.3
+      sharp:
+        specifier: ^0.35.3
+        version: 0.35.3(@types/node@24.13.3)
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
+
+  apps/demo:
+    dependencies:
+      '@ai-bead-pattern/ai-gateway':
+        specifier: workspace:*
+        version: link:../../services/ai-gateway
+      '@ai-bead-pattern/material-palettes':
+        specifier: workspace:*
+        version: link:../../packages/material-palettes
+      '@ai-bead-pattern/pattern-core':
+        specifier: workspace:*
+        version: link:../../packages/pattern-core
+    devDependencies:
+      sharp:
+        specifier: ^0.35.3
+        version: 0.35.3(@types/node@24.13.3)
 
   packages/material-palettes:
     dependencies:

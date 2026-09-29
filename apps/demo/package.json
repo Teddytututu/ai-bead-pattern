@@ -1,0 +1,18 @@
+{
+  "name": "@ai-bead-pattern/demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server/serve.mjs",
+    "test": "node --test tests/unit/*.test.mjs"
+  },
+  "dependencies": {
+    "@ai-bead-pattern/ai-gateway": "workspace:*",
+    "@ai-bead-pattern/material-palettes": "workspace:*",
+    "@ai-bead-pattern/pattern-core": "workspace:*"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3"
+  }
+}

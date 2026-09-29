@@ -1175,11 +1175,11 @@
     import {
       createInstancePromptFromLasso,
       createMaskEditorController,
-    } from './mask-editor.mjs'
+    } from './src/mask-editor.mjs'
     import {
       applyCorrectedSubjectEvidence,
       createAnalysisDebugViewer,
-    } from './analysis-debug-viewer.mjs'
+    } from './src/analysis-debug-viewer.mjs'
     import {
       createBlindComparison,
       createGatePatternSnapshot,
@@ -1187,27 +1187,27 @@
       detectMaskGateDevice,
       downloadMaskGateAttempt,
       loadMaskGateSample,
-    } from './mask-gate.mjs'
-    import { inferSubjectAnalysis } from './subject-mask.mjs'
-    import { createFeatureEditor } from './feature-editor.mjs'
+    } from './src/mask-gate.mjs'
+    import { inferSubjectAnalysis } from './src/subject-mask.mjs'
+    import { createFeatureEditor } from './src/feature-editor.mjs'
     import { featureTemplateLibrary, prepareFeatureEvidence, validateFeatureOverrides } from '/packages/pattern-core/dist/index.js'
     import {
       loadPreferenceRecords,
       resolveCandidatePreference,
       savePreferenceRecords,
-    } from './preference-lab.mjs'
-    import { createPreferenceWorkbenchController } from './preference-workbench-ui.mjs'
+    } from './src/preference-lab.mjs'
+    import { createPreferenceWorkbenchController } from './src/preference-workbench-ui.mjs'
     import {
       fetchAiHealth,
       projectSourceAnalysisToProposal,
       routeAvailability,
       runAiRoute,
       selectLearnedProposal,
-    } from './ai-runtime.mjs'
-    import { createPreferenceRuntime } from './preference-runtime.mjs'
+    } from './src/ai-runtime.mjs'
+    import { createPreferenceRuntime } from './src/preference-runtime.mjs'
 
     import { getPalette, listPalettes } from '../../packages/material-palettes/dist/index.js'
-    import { downloadPatternFile } from './pattern-download.mjs'
+    import { downloadPatternFile } from './src/pattern-download.mjs'
     let palette = await getPalette('mard-291')
     document.querySelector('#paletteSelect').replaceChildren(...(await listPalettes()).map(entry => new Option(entry.name, entry.id)))
     const algorithm = createPatternAlgorithm({ yieldControl: () => new Promise(resolve => setTimeout(resolve, 0)) })

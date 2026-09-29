@@ -14,7 +14,7 @@
 要求 Node 24.13+、pnpm 11.19。在仓库根目录执行：
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm demo
 ```
 
@@ -28,7 +28,7 @@ pnpm build
 pnpm demo:net
 ```
 
-模型配置、权重版本及故障处理见 [SAM2 服务说明](services/sam2-sidecar/README.md)。侧栏的“五官定位与模板”支持原图点选、模板选择、隐藏与锁定；应用校正后重新生成。外／内轮廓独立开关，两眼保留原图高差与大小关系。`node scripts/render-contours-features-demo.mjs` 可生成模板总览和合成对照。
+模型配置、权重版本及故障处理见 [SAM2 服务说明](services/sam2-sidecar/README.md)。侧栏的“五官定位与模板”支持原图点选、模板选择、隐藏与锁定；应用校正后重新生成。外／内轮廓独立开关，两眼保留原图高差与大小关系。`node scripts/diagnostics/render-contours-features-demo.mjs` 可生成模板总览和合成对照。
 
 另开终端启动产品 API：
 
@@ -43,17 +43,26 @@ pnpm api:dev
 
 | 目录 | 职责 |
 | --- | --- |
-| `apps/demo` | 浏览器生成、分析编辑与内部评测入口 |
+| `apps/demo/src` | 浏览器生成、分析编辑与偏好工作台模块 |
+| `apps/demo/server` | Demo 静态服务与 AI HTTP 接口 |
+| `apps/demo/tests` | `unit` 单元测试、`e2e` 浏览器测试、`fixtures` 服务替身 |
 | `apps/wechat-miniapp` | 原生小程序客户端 |
 | `packages/pattern-core` | 画布、结构、模板、材料配色、精修与导出 |
 | `packages/material-palettes` | 291／123／24 色卡注册和校验 |
 | `packages/pattern-api-contracts`、`packages/wechat-client` | 共享协议与微信 SDK |
 | `services/pattern-api` | HTTP API、Worker 与 SQLite |
 | `services/ai-gateway`、各 `*-sidecar` | 模型接入、分割、可选提案和视觉评分 |
-| `tools`、`tests` | 数据集工具、质量门禁与回归测试 |
+| `tools` | 数据集采集、质量门禁和离线评测；各工具独立维护 |
+| `tests/fixtures` | 共享图片、数据格式和历史性能基准；模块测试留在所属包内 |
+| `scripts/dev` | Demo 联合启动与本地模型命令 |
+| `scripts/benchmarks`、`scripts/diagnostics` | 性能测量、颜色／模板诊断 |
+| `scripts/maintenance` | 色卡导入和 OpenAPI 生成 |
 | `assets/palettes` | 色卡、来源和许可 |
 | `docs/plans` | 当前产品计划及五官模板专项 |
-| `output`、`work` | 本地生成结果、数据集和评测数据；不提交 Git |
+| `output` | 本地产物按 `benchmarks`、`diagnostics`、`previews`、`tests`、`scratch` 分类；下载图纸仍在 `datasets` |
+| `work` | 已冻结的评测会话与人工记录；不提交 Git |
+
+根目录的 `pnpm demo`、`demo:quick`、`demo:net`、`test` 等常用命令保持可用。`apps/demo` 是独立工作区包；依赖规则见[架构](docs/architecture.md#依赖与构建边界)。模型缓存 `.tools`、各 sidecar 的 `.venv`、本地备份和已有数据集路径保持稳定。
 
 ## 验证
 
