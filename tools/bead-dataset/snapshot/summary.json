@@ -1,0 +1,25 @@
+{
+  "total": 2435,
+  "categories": {
+    "anime": 1606,
+    "animal": 829
+  },
+  "focus": {
+    "face": 115,
+    "character": 528,
+    "eyes": 23,
+    "animal-face": 73,
+    "character-candidate": 882,
+    "animal-candidate": 700,
+    "animal-face-candidate": 114
+  },
+  "originalBytes": 141971432,
+  "exactDuplicates": 0,
+  "allOriginalsDecode": true,
+  "allHashesMatch": true,
+  "excludedAfterQualityReview": 25,
+  "reviewed": 739,
+  "facePriorityIncludingCandidates": 138,
+  "pendingVisualReview": 1696,
+  "trainingEligible": 0
+}

@@ -73,6 +73,7 @@ Demo 配置 Grounded-SAM-2 后优先取得模型主体与部件蒙版；BiRefNet
 - [当前计划、优先级与历史方案入口](docs/plans/README.md)
 - [历史交付与验收基线](docs/roadmap.md)
 - [选色色差排查记录](docs/color-fidelity-triage-2026-09-28.md)
+- [拼豆图纸数据集：2,435 张参考与采集工具](tools/bead-dataset/README.md)
 - [本地交付与验证记录](docs/local-delivery-2026-09-26.md)
 - [24/291 色性能对照](docs/palette-benchmark-2026-09-26.md)
 - [从绘画过程到拼豆图纸：生成方法论](docs/drawing-to-bead-method.md)
