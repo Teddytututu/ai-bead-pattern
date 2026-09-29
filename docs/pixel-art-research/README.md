@@ -1,27 +1,14 @@
-# 像素画美术精读资料库
+# 像素画参考资料
 
-本目录收录 511 条全文、完整字幕、官方文档或 GitHub README 级别的结构化精读记录，并给出面向拼豆生成产品的规则映射。
+保留 511 条结构化来源记录及技巧手册，用于查找五官、轮廓、配色和纹理参考。当前实现和待办统一维护在[架构](../architecture.md)与[产品计划](../plans/contours-features-editing-perler-123-plan.md)，本目录不再复制实现清单或完成报告。
 
-## 文件
+| 文件 | 用途 |
+| --- | --- |
+| [技巧手册](pixel-art-techniques-handbook.md) | 中文美术技巧与来源引用 |
+| [逐源记录](close-readings.jsonl) | 原文锚点、技巧、步骤和拼豆映射 |
+| [来源索引](source-index.csv) | 作者、URL、主题及来源筛选 |
+| [记录格式](record.schema.json) | JSON Schema |
 
-| 文件 | 内容 |
-|---|---|
-| `implementation-brief.md` | 直接面向代码的优先级、模块位置和验收条件 |
-| `pixel-art-techniques-handbook.md` | 中文像素画技巧手册 |
-| `bead-product-rules.md` | 拼豆生成算法与产品规则 |
-| `close-readings.jsonl` | 511 条逐篇结构化记录 |
-| `source-index.csv` | 来源索引，适合筛选和检索 |
-| `record.schema.json` | 精读记录 JSON Schema |
-| `methodology.md` | 来源、精读门槛、去重和质量等级 |
-| `qa-report.md` | 数量、字段、重复项和覆盖检查 |
+记录基于正文、完整字幕、官方页面或 README；同 URL 去重，转载优先保留原始发布页。A 级为作者教程、官方文档及 Lospec 收录且有完整字幕的视频；B 级为其他完整教程、主题视频与方法明确的仓库说明。
 
-## 数据规模
-
-- 视频完整字幕：363
-- 教程文章：95
-- 官方文档：40
-- GitHub README：13
-- A 级来源：213
-- B 级来源：298
-
-每条记录含原文锚点、具体技巧、操作步骤、适用对象、画布尺度、常见症状、修正方法和拼豆映射。258 条记录的失败模式来自方法归纳，字段中带有明确标记。
+`techniques`、`workflow_steps`、`anchors` 保留来源表达；`failure_modes` 中标记“方法归纳”的内容及 `bead_mapping` 是整理时的推导。字幕可能存在误识别，关键规则须回查原文；资料条数不代表已实现能力或可用于模型训练的数据量。

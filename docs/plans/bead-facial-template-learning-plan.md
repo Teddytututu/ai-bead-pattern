@@ -48,7 +48,7 @@
 
 已有基础如下：
 
-- [当前模型配置](../../services/sam2-sidecar/src/sam2_sidecar/contracts.py)固定 Tiny + Small；[部件处理](../../services/sam2-sidecar/src/sam2_sidecar/parts.py)已提供眼鼻嘴蒙版及几何证据。接入及真实猫图验证见[模型记录](../neural-masks-2026-09-27.md)，尚未证明在本批图纸上达标。
+- [当前模型配置](../../services/sam2-sidecar/src/sam2_sidecar/contracts.py)固定 Tiny + Small；[部件处理](../../services/sam2-sidecar/src/sam2_sidecar/parts.py)已提供眼鼻嘴蒙版及几何证据。接入与验证范围见[模型服务说明](../../services/sam2-sidecar/README.md)，尚未证明在本批图纸上达标。
 - [图纸参考集](../../tools/bead-dataset/README.md)有 2,435 张有效图片，确认动漫脸部 115 张、眼部 23 张。题材目视核对不是五官、角色或尺寸真值；多数扩充图纸的格数尚未解析，符合 ≤64×64 格条件的数量仍需清点。
 - [现有模板接口](../../packages/pattern-core/src/planning/feature-template.ts)已有宽高、锚点和逐格角色，[规则库](../../packages/pattern-core/src/planning/feature-template-library.ts)有 35 个模板，后续可复用颜色解析、姿态放置与双眼联合搜索。
 - 数据资格当前全部记录为 `authorizationStatus: pending`、`trainingEligible: false`。派生数据继承来源状态；可用训练集应单独筛选，必要时补自绘或已确认可用的样本。

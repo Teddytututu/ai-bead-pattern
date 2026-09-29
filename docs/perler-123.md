@@ -1,6 +1,6 @@
-# Perler 123 色卡接入（2026-09-28）
+# Perler 123 色卡来源与使用
 
-后续选色反馈的定位与算法修正见 [Perler 配色与细节记录](perler-color-fidelity-2026-09-28.md)。下面保留接入时点的数据来源和验证范围；色卡 RGB 本轮没有修改。
+本页维护冻结目录、RGB 来源、材质边界与重建方法。算法中的保色和细节保护见[当前架构](architecture.md#配色与五官的当前行为)。
 
 ## 数据口径
 
@@ -40,23 +40,10 @@
 
 本次贯通现有生成、适配接口、统计与导出。计划中的完整逐格编辑器、移动端全套色号预览与微信真机联调仍由各自阶段处理。
 
-## 验证
+## 校验与复现
 
-- `pnpm test`：**749 项通过**，包括完整构建、核心算法、色卡、API/SDK、Gateway、各 gate、auto-eval 和网页/小程序逻辑测试。
-- `pnpm typecheck`：通过，包含原生小程序 TypeScript。
-- `pnpm exec playwright test apps/demo/palette.e2e.mjs`：1 项通过（20.4 秒），通过界面切换 MARD / Perler / 通用色卡，验证 Perler PNG/CSV/JSON 实际下载、色号、计数与特殊材质排除。
-- 专项回归覆盖全部 118 个普通色的精确色号映射、5 个特殊色的三基线过滤、透明豆与空格区分、固定透明豆的适配、数据损坏和陈旧版本拒绝、小程序接口目录顺序变化与失败重试。
-- PNG 人工检查：完整 Perler SKU 位于格内，品牌、版本、坐标与材料清单完整。示例为本机 `output/perler-123-pattern.png`。
-- `git diff --check`：通过。
+- 数据、生成与导出回归：`pnpm test`、`pnpm typecheck`、`pnpm exec playwright test apps/demo/palette.e2e.mjs`。
+- 覆盖普通色精确映射、特殊材质过滤、透明豆与空格区分、来源哈希、陈旧版本拒绝，以及 PNG/CSV/JSON 色号与材料计数。
+- 构建后可用 `node scripts/benchmark-palette.mjs --case perler-123 cat-photo 64 fast 1` 检查性能，其他色卡替换 ID。
 
-浏览器用例先等待初次生成结束，再从真实界面切到固定 32 格、Fast、还原风格、确定性路线。测试替身的神经眼睛蒙版与真实猫照片不匹配，会触发现有质量门槛，不能要求该候选可下载；没有绕过或放宽生产质量门槛。全量测试初次遇到沙箱子进程限制，获准后重跑；回归中保留了 MARD 无可用非黑色时原有错误说明。
-
-性能入口 `scripts/benchmark-palette.mjs` 已加入 Perler 123。以下为相同 `sample-cat.png`、64×64、Fast、还原单候选、最多 20 色的各一次独立进程冒烟结果（Windows / Node 25；进程先预热一次）。这是接入后的量级检查，不是统计性能基线或真实模型质量验收。
-
-| 色卡 | 本次生成耗时 | 进程峰值 RSS | 结果 |
-| --- | ---: | ---: | --- |
-| 通用 24 | 632 ms | 142 MiB | success，9 色 |
-| Perler 123（自动 118） | 795 ms | 143 MiB | success，20 色 |
-| MARD 291 | 831 ms | 149 MiB | success，20 色 |
-
-复现命令：`node scripts/benchmark-palette.mjs --case perler-123 cat-photo 64 fast 1`（其他色卡替换 ID）。日志在 `output/perler-tests.log`、`output/perler-typecheck.log`、`output/perler-e2e.log` 和 `output/perler-benchmark-*.log`。未进行实物色差校准、完整多场景质量 gate 或微信真机联调。
+实物色差校准、完整多场景质量门禁和微信真机联调仍未完成。一次本地测试或性能冒烟不能替代这些验收。

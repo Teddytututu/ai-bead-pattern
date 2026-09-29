@@ -386,4 +386,4 @@
 
 拼豆候选图按以下顺序评价：主体辨识度、关键特征、轮廓、明度分层、实体色差、像素簇、制作复杂度。
 
-完整的算法参数和验收规则见 `bead-product-rules.md`。
+当前算法参数与行为见[架构](../architecture.md)，实施范围和验收规则见[产品计划](../plans/contours-features-editing-perler-123-plan.md)。本手册提供美术参考，不单独维护开发待办。

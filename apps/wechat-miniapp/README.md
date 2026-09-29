@@ -6,7 +6,7 @@
 
 ## 使用
 
-外/内轮廓提供独立开关，默认开启；候选下方显示实际轮廓格数、对比不足和证据缺失提示。SDK 同时支持 `options.featureOverrides` 手动五官参数，点选编辑入口目前在浏览器 Demo，详见[轮廓与五官说明](../../docs/contours-features-2026-09-27.md)。
+外/内轮廓提供独立开关，默认开启；候选下方显示实际轮廓格数、对比不足和证据缺失提示。SDK 同时支持 `options.featureOverrides` 手动五官参数，点选编辑入口目前在浏览器 Demo，详见 [API 五官参数](../../services/pattern-api/README.md#轮廓与五官参数)。
 
 1. 按 [Pattern API 说明](../../services/pattern-api/README.md)启动服务。
 2. `config.ts` 已使用本机调试配置 `apiBaseUrl: http://127.0.0.1:7105` 和 `devUserId: local-demo`；真实微信登录时清空 `devUserId` 并改为 HTTPS API 地址。
