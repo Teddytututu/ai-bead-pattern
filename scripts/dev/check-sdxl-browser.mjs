@@ -66,7 +66,8 @@ try {
   assert.equal(audit.accepted.length, 0)
   // Real main-workbench handoff uses its existing generated pattern document.
   await page.goto(base + '/apps/demo/')
-  await page.waitForFunction(() => !document.querySelector('#downloadButton').disabled, { timeout: 60000 })
+  // A real analysis can produce a repairable candidate that fails the export quality gate.
+  await page.locator('#candidateList .candidate[aria-pressed="true"]').waitFor({ timeout: 180000 })
   const popupPromise = page.waitForEvent('popup')
   await page.locator('#regionExperiment').click()
   const popup = await popupPromise
