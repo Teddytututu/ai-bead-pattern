@@ -14,7 +14,7 @@ async function clickCell(page, id, x, y) {
 test('grid-only annotation edits, restores, saves remotely, exports and protects locks', async ({ page }, testInfo) => {
   const errors = []
   page.on('pageerror', e => errors.push(e.message))
-  await page.goto('/apps/demo/annotation.html')
+  await page.goto('/apps/demo/annotation-pair.html')
   await expect(page.locator('#reference')).toHaveCount(0)
   await page.locator('#import').setInputFiles({ name: 'grid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(request)) })
   await page.locator('#confirmContext').click()
@@ -62,7 +62,7 @@ test('grid-only annotation edits, restores, saves remotely, exports and protects
   expect(errors).toEqual([])
 })
 test('malformed imported target and original-photo condition cannot enter annotation', async ({ page }) => {
-  await page.goto('/apps/demo/annotation.html')
+  await page.goto('/apps/demo/annotation-pair.html')
   await page.locator('#import').setInputFiles({ name: 'bad.json', mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ ...request, sourceImage: { data: 'not-used' } })) })
   await expect(page.locator('#message')).toContainText('不接收原图')
@@ -74,7 +74,7 @@ test('malformed imported target and original-photo condition cannot enter annota
   await expect(page.locator('#message')).toContainText('越过')
 })
 
-test('regional masks transfer to annotation without a source image', async ({ page, context }) => {
+test('regional full grid transfers to eye annotation without source images or old masks', async ({ page, context }) => {
   await page.route('**/api/ai/region/health', route => route.fulfill({ json: { status: 'cached', adapterConfigured: false } }))
   await page.route('**/api/ai/region/example', route => route.fulfill({ json: request }))
   await page.goto('/apps/demo/region.html')
@@ -85,9 +85,9 @@ test('regional masks transfer to annotation without a source image', async ({ pa
   const annotationPage = await opened
   await annotationPage.waitForLoadState()
   await expect(annotationPage.locator('#gridInfo')).toContainText('4 × 3')
-  const saved = await annotationPage.evaluate(() => JSON.parse(localStorage.getItem('region-annotation-workspace-v1')))
-  expect(saved.annotation.editMask).toEqual(request.editMask)
-  expect(saved.annotation.lockedMask).toEqual(request.lockedMask)
+  const saved = await annotationPage.evaluate(() => JSON.parse(localStorage.getItem('eye-annotation-workspace-v1')))
+  expect(saved.annotation.eyeBoxes).toEqual([])
+  expect(saved.annotation.currentGrid).toEqual(grid)
   expect(saved.annotation.conditioning).toBe('bead-grid-only')
   expect(saved.annotation).not.toHaveProperty('sourceImage')
 })
@@ -100,7 +100,7 @@ test('main workbench transfers the full selected bead grid', async ({ page, cont
   const annotationPage = await opened
   await annotationPage.waitForLoadState()
   await expect(annotationPage.locator('#gridInfo')).toContainText('格')
-  const saved = await annotationPage.evaluate(() => JSON.parse(localStorage.getItem('region-annotation-workspace-v1')))
+  const saved = await annotationPage.evaluate(() => JSON.parse(localStorage.getItem('eye-annotation-workspace-v1')))
   expect(saved.annotation.currentGrid.cells.length).toBe(saved.annotation.currentGrid.width * saved.annotation.currentGrid.height)
   expect(saved.annotation.currentGrid.width).toBeLessThanOrEqual(64)
   expect(saved.annotation.source.kind).toBe('workbench')

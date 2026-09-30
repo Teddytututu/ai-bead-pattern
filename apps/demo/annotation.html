@@ -1,42 +1,30 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>区域配对标注 · 拼豆工作台</title>
-<link rel="stylesheet" href="./annotation.css">
-</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>眼睛标注 · 拼豆工作台</title><link rel="stylesheet" href="./eye-annotation.css"></head>
 <body>
-<header><div><a class="back" href="/apps/demo/">← 拼豆工作台</a><h1>区域配对标注</h1></div><div class="header-actions"><span id="saveState" role="status">尚未载入图纸</span><button id="saveRemote" class="primary" disabled>保存到远端</button><button id="exportDraft" disabled>导出标注文件</button></div></header>
+<header><div class="brand"><a href="/apps/demo/">← 拼豆工作台</a><span class="divider"></span><h1>眼睛标注</h1></div><span id="saveState" class="status">正在载入图库</span></header>
 <main>
-<div class="intro"><div><span class="eyebrow">SDXL · 人工配对目标</span><p>只使用完整拼豆格图：在格图上选择蒙版、观察另一只眼和周边，只修改指定区域。用你确认的目标图告诉模型，这一块应该画成什么样。</p></div><a href="/output/template-learning/ft1-preannotation-v1/pilot/review/" target="_blank" rel="noopener">查看旧部件审核页 ↗</a></div>
-<div class="steps"><span>① 载入完整格图</span><span>② 选区域、核对肤色</span><span>③ 逐格修正目标</span><span>④ 人工确认与保存</span></div>
-<div id="message" role="status" aria-live="polite">从工作台带入图纸，或导入格图 JSON。也可以先用教学样例熟悉操作。</div>
+<div class="intro"><div><span class="eyebrow">EYE ANNOTATION</span><h2>框出眼睛，确认这一张。</h2><p>每只眼睛一个框。填写 prompt，从图中点选肤色，最后一次确认全部内容。</p></div><span class="tag">原图保持不变</span></div>
+<section class="queue" aria-label="图库批次"><div><strong id="batchInfo">正在读取服务器图库…</strong><p id="progress" class="muted">每批 20 张</p></div><div class="queue-controls"><button id="batchPrevious" disabled aria-label="上一批">← 上一批</button><label class="sr-only" for="batchItems">选择本批图纸</label><select id="batchItems"><option value="">正在加载</option></select><button id="batchNext" disabled>下一批 →</button></div></section>
+<div id="message" role="status" aria-live="polite">自动读取已有拼豆格图。</div>
 <div class="workspace">
+<section class="board-panel">
+<div class="board-heading"><div><h3 id="title">完整拼豆图</h3><p id="gridInfo" class="muted">未载入</p></div><label class="zoom">缩放 <select id="zoom"><option value="1">适合画布</option><option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option></select></label></div>
+<div class="toolbar"><div class="modes" aria-label="画布操作"><button id="boxMode" aria-pressed="true">▣ 框选眼睛</button><button id="skinMode" aria-pressed="false">◉ 肤色取色器</button></div><button id="undo" class="quiet" disabled>撤销上一个框</button></div>
+<div id="canvasFrame" class="canvas-frame"><canvas id="gridCanvas" width="720" height="600" aria-label="原始拼豆格图，拖动框选眼睛或点击取肤色"></canvas><p id="emptyState">正在载入拼豆图…</p></div>
+<div class="canvas-caption"><span id="modeHint">拖动鼠标框住一只眼睛，可继续画多个框。</span><span id="cursor">格坐标</span></div>
+<div class="board-bottom"><span><i class="legend-mask"></i>眼睛蒙版 <i class="legend-skin"></i>肤色取样点</span><div><button id="previous" class="quiet" disabled>上一张</button><button id="next" class="quiet" disabled>暂存并跳过 →</button></div></div>
+</section>
 <aside>
-<section class="batch-card"><h2>服务器图库 · 每批 20 张</h2><p id="batchInfo" class="hint">正在读取格图 JSON…</p><label>本批文件<select id="batchItems"><option value="">正在加载</option></select></label><div class="row"><button id="batchPrevious" disabled>上一批</button><button id="batchStart" disabled>打开本批</button><button id="batchNext" disabled>下一批</button></div><div class="row batch-navigation"><button id="itemPrevious" disabled>上一张</button><button id="itemNext" disabled>下一张</button><button id="saveNext" class="primary" disabled>保存并下一张</button></div><p class="hint">只读取已提取的完整格图 JSON。切换先保存修改；到本批末尾自动接下一批，刷新恢复当前位置。</p></section>
-<section><h2>样本与进度</h2><label>完整输入／标注文件<input id="import" type="file" accept=".json,application/json"></label><button id="example" class="wide">载入教学样例</button><p class="hint">教学样例用于熟悉操作，不属于人工真值。无需原照片或插画，蒙版只依据拼豆格图。</p>
-<label>远端已保存<select id="records"><option value="">选择一条标注</option></select></label><div class="row"><button id="refresh">刷新列表</button><button id="loadRemote">载入所选</button></div>
-<label>样本名称<input id="title" maxlength="200"></label><label>标注者<input id="reviewer" maxlength="200" placeholder="你的姓名或固定标识"></label><p id="sourceInfo" class="hint"></p></section>
-<section><h2>修改意图</h2><label>区域修改指令<textarea id="prompt" rows="4" maxlength="1500" placeholder="例如：补齐画面左侧眼睛，匹配另一只眼的眼形、虹膜和单格高光。"></textarea></label><p class="hint">训练提示建议使用英文；可先写清楚意图，再统一整理。</p>
-<label>蒙版内肤色底色<select id="skin"></select></label>
-<button id="confirmContext" class="wide" disabled>确认周边与肤色</button><p id="contextStatus" class="hint">先载入图纸并选出可改区。</p>
+<section class="details-card"><div class="card-heading"><h3>本张标注</h3><span id="recordStatus" class="tag">草稿</span></div>
+<label for="prompt">Prompt <span class="required">必填</span></label><textarea id="prompt" rows="4" maxlength="1500" placeholder="例如：Draw dark brown eyes with a small white highlight, matching the face and surrounding bead colors."></textarea><p class="muted">描述希望生成的眼形、颜色与神态。</p>
+<div class="field-heading"><label>肤色 <span class="required">图中取色</span></label><button id="pickSkin" class="text-button">用取色器 ↗</button></div>
+<div class="skin-card"><span id="skinSwatch"></span><div><strong id="skinValue">尚未选取</strong><p id="skinLocation" class="muted">点击“点选肤色”，再点图中肤色格。</p></div></div>
+<div class="field-heading"><label>眼睛区域</label><span id="boxCount" class="muted">0 个框</span></div><div id="boxes" class="boxes"><p class="muted">在左侧图中拖动框选。</p></div>
 </section>
+<section class="seal-card"><h3>一次确认，完整封存</h3><p>点击即确认：当前拼豆图、全部眼睛框、所选肤色和 prompt。</p><p id="readiness" class="readiness">请完成标注。</p><button id="seal" class="primary" disabled>确认全部并封存 →</button><p class="muted">保存成功后自动下一张。封存内容固定，只读查看。</p><p id="sealTime" class="muted" hidden></p></section>
+<details class="utilities"><summary>文件与记录</summary><div class="utility-buttons"><label class="file-button">导入 JSON<input id="import" type="file" accept=".json,application/json"></label><button id="export" disabled>导出本张</button><button id="saveDraft" disabled>保存草稿</button><button id="reloadRemote" disabled>重新载入远端版本</button><button id="openBatch" disabled>打开当前批次</button></div><label for="records">远端记录</label><select id="records"><option value="">选择记录</option></select><button id="loadRecord">载入所选记录</button><p class="muted"><a href="./annotation-pair.html">旧配对标注记录 ↗</a></p></details>
 </aside>
-<div class="editor">
-<section id="inputReviewPanel" hidden><h2>先核对输入格图</h2><p id="inputReviewInfo" class="hint"></p><p class="hint">这些是从拼豆图纸读取的 RGB 格图，尚未审定空板与白珠。橙点代表占用未知；色卡为采样 RGB，不是已匹配的品牌色号。请核对完整范围、格点和颜色后再确认。</p><div class="row"><button id="markOccupied">全图暂设为有珠</button><button id="pickEmpty">点空板颜色初填占用</button><button id="confirmInput" class="primary">我已核对格图与全部占用</button></div><p class="hint">初填只是草稿，白珠不能当空板。确认后输入固定；格数或颜色读错的样本先跳过，不能直接进入目标标注。</p></section>
-<section>
-<div class="section-top"><div><h2>完整输入与目标图</h2><p id="gridInfo" class="hint">未载入</p></div><div class="row"><button id="undo" disabled>撤销</button><button id="redo" disabled>重做</button></div></div>
-<div class="tools"><label>操作<select id="tool"><option value="edit">画可改区域</option><option value="unedit">擦除可改区域</option><option value="lock">锁定格子</option><option value="unlock">解除锁定</option><option value="paint">涂目标颜色</option><option value="pick">吸取格子颜色</option><option value="empty">目标恢复空格（仅原空格）</option><option value="input-occupied">输入占用：有珠</option><option value="input-blank">输入占用：空板</option><option value="input-unknown">输入占用：未知</option><option value="input-empty-color">输入占用：按所点空板颜色初填</option></select></label><label>放大<select id="zoom"><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option></select></label><label class="check"><input id="overlay" type="checkbox" checked>显示区域</label><span id="cursor" class="hint">悬停查看格坐标</span></div>
-<details class="rectangle"><summary>用矩形快速选择区域</summary><div class="row"><label>x<input id="boxX" type="number" value="0" min="0"></label><label>y<input id="boxY" type="number" value="0" min="0"></label><label>宽<input id="boxW" type="number" value="1" min="1"></label><label>高<input id="boxH" type="number" value="1" min="1"></label><button id="addBox">添加矩形</button><button id="clearMask">清空可改区</button></div></details>
-<div class="boards"><div><h3>修改前 · 完整输入</h3><div class="canvas-frame"><canvas id="before" width="640" height="640" aria-label="完整输入与可改区域"></canvas></div></div><div><h3>修改后 · 人工目标</h3><div class="canvas-frame"><canvas id="target" width="640" height="640" aria-label="人工逐格修改目标"></canvas></div></div></div>
-<p class="legend"><span class="teal-dot"></span>青色：可改区　<span class="orange-dot"></span>橙色：锁定　斜线：空格（白色珠子仍是珠子）</p>
-<div class="palette-heading"><h3>目标画笔颜色</h3><span id="selectedColor" class="hint">从当前材料色卡选择</span></div><div id="palette" class="palette" aria-label="材料色卡"></div>
-<div class="row target-actions"><button id="fillSkin" disabled>目标可改区填肤色</button><label class="file-button">导入完整目标图<input id="importTarget" type="file" accept=".json,application/json"></label></div>
-<details><summary>查看实际模型输入：全图＋蒙版肤色底图</summary><canvas id="conditioning" width="640" height="640" aria-label="完整模型输入肤色底图"></canvas></details>
-</section>
-<section class="review-card"><h2>目标复核</h2><p id="validation" class="hint">可改区必须全部填充，范围外和锁定格保持原样。</p><label>修改依据／验收说明<textarea id="notes" rows="2" maxlength="4000" placeholder="说明眼形、表情、高光或配色为何这样修改；不确定时先存草稿。"></textarea></label><div class="row"><button id="confirmTarget" class="primary" disabled>我已核对目标图</button><button id="exportPair" disabled>导出已确认配对目标</button></div><p id="reviewStatus" class="hint">尚未确认。任何相关修改都会使确认失效。</p></section>
-<section><details><summary>设计分组与来源记录（可先保存草稿）</summary><div class="metadata-grid"><div><label>设计／身份组<input id="groupId" maxlength="500" placeholder="同一设计、镜像和换色版本使用同一组名"></label><label class="check"><input id="groupConfirmed" type="checkbox">已核对分组</label></div><div><label>使用资格<select id="rightsDecision"><option value="pending">待确认</option><option value="granted">有明确训练依据</option><option value="denied">不用于训练</option></select></label><label>依据类型<select id="rightsBasis"><option value="pending">待补</option><option value="owned">自有作品</option><option value="author-permission">作者许可</option><option value="license">适用许可</option></select></label></div></div><label>来源／许可记录<textarea id="rightsEvidence" rows="2" maxlength="4000"></textarea></label><p class="hint">标好目标图不自动启动训练。独立训练／验证切分和数据集质量检查另行完成。</p></details></section>
-</div></div>
-</main>
-<script type="module" src="./annotation.mjs"></script>
+</div>
+</main><script type="module" src="./eye-annotation.mjs"></script>
 </body></html>

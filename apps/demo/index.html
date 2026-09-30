@@ -685,7 +685,7 @@
       <h1>拼豆工作台</h1>
     </div>
     <button class="secondary" id="regionExperiment" type="button">局部生成实验</button>
-    <button class="secondary" id="annotationWorkspace" type="button">人工配对标注</button>
+    <button class="secondary" id="annotationWorkspace" type="button">眼睛标注</button>
     <div class="status" id="status" data-state="busy" role="status" aria-live="polite">
       <span class="status-dot" aria-hidden="true"></span>
       <span id="statusText">正在准备</span>
@@ -2829,7 +2829,7 @@
         let url = '/apps/demo/annotation.html'
         if (selectedCandidate?.pattern) {
           const pattern = selectedCandidate.pattern
-          if (pattern.width > 64 || pattern.height > 64) throw new Error('配对标注目前支持不超过 64×64 格的完整图纸。')
+          if (pattern.width > 64 || pattern.height > 64) throw new Error('眼睛标注目前支持不超过 64×64 格的完整图纸。')
           const key = 'annotation-input-' + crypto.randomUUID()
           localStorage.setItem(key, JSON.stringify(createPatternDocument(pattern)))
           url += '?input=' + encodeURIComponent(key)

@@ -15,7 +15,7 @@ test('automatically loads 20 JSON grids, saves when switching, and resumes acros
     const offset = Number(new URL(route.request().url()).searchParams.get('offset') || 0)
     return route.fulfill({ json:{available:true,datasetId,offset,batchSize:20,total:24,items:items.slice(offset,offset+20),hasNext:offset+20<24} })
   })
-  await page.goto('/apps/demo/annotation.html')
+  await page.goto('/apps/demo/annotation-pair.html')
   await expect(page.locator('#batchInfo')).toContainText('本批 20 张')
   await expect(page.locator('#batchInfo')).toContainText('当前 1/24')
   await expect(page.locator('#batchItems option')).toHaveCount(21)
