@@ -50,7 +50,11 @@ if not (node_root / 'bin/node').exists():
 
 uv_version = '0.12.19'
 uv_path = root / '.tools/bootstrap/bin/uv'
-if not uv_path.exists():
+try:
+    uv_ready = subprocess.check_output([str(uv_path), '--version'], text=True).strip() == 'uv ' + uv_version
+except (OSError, subprocess.CalledProcessError):
+    uv_ready = False
+if not uv_ready:
     metadata = json.load(urllib.request.urlopen('https://pypi.org/pypi/uv/' + uv_version + '/json', timeout=30))
     wheels = [item for item in metadata['urls'] if item['filename'].endswith('.whl') and 'manylinux' in item['filename'] and 'x86_64' in item['filename']]
     if len(wheels) != 1:
@@ -62,8 +66,10 @@ if not uv_path.exists():
         members = [name for name in archive.namelist() if name.endswith('/uv')]
         if len(members) != 1:
             raise RuntimeError('Expected one uv executable in wheel')
-        uv_path.write_bytes(archive.read(members[0]))
-    uv_path.chmod(0o755)
+        staged_uv = uv_path.with_suffix('.new')
+        staged_uv.write_bytes(archive.read(members[0]))
+    staged_uv.chmod(0o755)
+    staged_uv.replace(uv_path)
 print('Bootstrap tools ready', flush=True)
 PY
 source scripts/dev/remote-env.sh

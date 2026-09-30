@@ -20,6 +20,30 @@ pnpm exec playwright install chromium
 
 每次进入工作目录后执行 `source scripts/dev/remote-env.sh`。工具与缓存位于该副本的 `.tools`，虚拟环境位于各服务 `.venv`；默认 CPU 线程数为 4，可显式覆盖。GPU 编号必须按当前分配选择，脚本不预占 GPU。
 
+家目录可能存在 `df`／`quota` 未显示的服务端配额。若安装报 `Disk quota exceeded`，可将 `.tools`、根 `node_modules` 和各服务 `.venv` 放到个人临时盘目录，再用符号链接连接回仓库。先确认目标目录归自己所有，已有目录不能直接覆盖。临时缓存被清理后需要重新建立链接和运行安装脚本；它不能作为标注、代码或训练成果的唯一存储。
+
+## 本机 SSH 入口
+
+PowerShell 7 可使用 `scripts/dev/remote.ps1`。个人配置写在忽略路径 `.tools/remote/connection.json`，格式如下；私钥内容不放入配置：
+
+```json
+{
+  "destination": "user@host",
+  "root": "/persistent/path/image-pindou",
+  "identityFile": "C:/Users/you/.ssh/project_key",
+  "forwards": [{ "local": 4180, "remote": 4177 }]
+}
+```
+
+```powershell
+pwsh -NoProfile -File scripts/dev/remote.ps1 -Action status
+pwsh -NoProfile -File scripts/dev/remote.ps1 -Action pull
+pwsh -NoProfile -File scripts/dev/remote.ps1 -Command 'pnpm test'
+pwsh -NoProfile -File scripts/dev/remote.ps1 -Action tunnel
+```
+
+入口在远端切换到工作目录、加载工具环境并执行 Bash；显式发送 LF，避免 Windows 管道末尾的 CRLF 被 tcsh／Bash 当成命令字符。`-ScriptFile` 可发送本机保存的 Bash 脚本；`tunnel` 保持运行直到关闭。
+
 ## 更新与验证
 
 ```bash
