@@ -77,7 +77,7 @@ test('malformed imported target and original-photo condition cannot enter annota
 test('regional full grid transfers to eye annotation without source images or old masks', async ({ page, context }) => {
   await page.route('**/api/ai/region/health', route => route.fulfill({ json: { status: 'cached', adapterConfigured: false } }))
   await page.route('**/api/ai/region/example', route => route.fulfill({ json: request }))
-  await page.goto('/apps/demo/region.html')
+  await page.goto('/apps/demo/region.html?internal=1')
   await page.locator('#example').click()
   await expect(page.locator('#status')).toContainText('自有程序')
   const opened = context.waitForEvent('page')
@@ -93,7 +93,7 @@ test('regional full grid transfers to eye annotation without source images or ol
 })
 test('main workbench transfers the full selected bead grid', async ({ page, context }) => {
   test.setTimeout(60_000)
-  await page.goto('/apps/demo/')
+  await page.goto('/apps/demo/?internal=1')
   await expect(page.locator('#candidateList .candidate[aria-pressed="true"]')).toBeVisible({ timeout: 45000 })
   const opened = context.waitForEvent('page')
   await page.locator('#annotationWorkspace').click()

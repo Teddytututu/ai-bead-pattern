@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
-import { createEyeAnnotation } from '../../eye-annotation-state.mjs'
+import { createEyeAnnotation } from '../../../training-annotation/state.mjs'
 const grid={width:8,height:6,paletteId:'test',paletteVersion:'1',colors:[{id:'skin',rgb:[234,191,160]},{id:'dark',rgb:[30,25,20]}],cells:Array.from({length:48},(_,i)=>[18,19,21,22].includes(i)?1:0)}
 async function point(page,x,y){
   const c=page.locator('#gridCanvas');await c.scrollIntoViewIfNeeded();const box=await c.boundingBox()
@@ -20,6 +20,8 @@ test('single image supports eye boxes and a skin eyedropper, seals all content o
   await page.locator('.utilities').evaluate(el=>el.open=true)
   await page.locator('#import').setInputFiles({name:'eyes.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(grid))})
   await expect(page.locator('#gridInfo')).toContainText('8 × 6')
+  await expect(page).toHaveURL(/\/apps\/training-annotation\//)
+  await expect(page.locator('h1')).toHaveText('训练数据标注')
   await expect(page.locator('canvas')).toHaveCount(1)
   expect(await page.locator('#canvasFrame').evaluate(frame=>frame.scrollHeight<=frame.clientHeight+1)).toBe(true)
   await expect(page.locator('#target, #confirmContext, #confirmInput, #reviewer')).toHaveCount(0)

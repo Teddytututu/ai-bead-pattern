@@ -674,6 +674,10 @@
     #featureEditor .feature-coordinates label { min-width: 0; flex: 1; }
     #featureEditor p { font-size: 12px; color: var(--muted); line-height: 1.6; }
     #featureStatus { overflow-wrap: anywhere; margin: 0; }
+    .product-mask-tools p { font-size: 12px; color: var(--muted); line-height: 1.7; }
+    .mask-subtools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+    .mask-subtools button { justify-content: center; }
+    .product-mask-tools .mask-tool-note { font-size: 11px; }
   </style>
 </head>
 <body>
@@ -684,8 +688,7 @@
       </div>
       <h1>拼豆工作台</h1>
     </div>
-    <button class="secondary" id="regionExperiment" type="button">局部生成实验</button>
-    <button class="secondary" id="annotationWorkspace" type="button">眼睛标注</button>
+    <button class="secondary" id="annotationWorkspace" type="button" hidden>训练数据标注 ↗</button>
     <div class="status" id="status" data-state="busy" role="status" aria-live="polite">
       <span class="status-dot" aria-hidden="true"></span>
       <span id="statusText">正在准备</span>
@@ -707,10 +710,6 @@
                 选择图片
                 <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp">
               </label>
-              <button class="file-button" id="openMaskEditorButton" type="button">
-                <span aria-hidden="true">◉</span>
-                圈选主体
-              </button>
             </div>
           </div>
         </div>
@@ -726,6 +725,15 @@
         </div>
       </section>
 
+      <section class="section product-mask-tools" id="maskTools" aria-label="工作台蒙版">
+        <h2 class="section-title">蒙版</h2>
+        <p>辅助确定主体和眼睛的生成区域。</p>
+        <div class="mask-subtools">
+          <button class="file-button" id="openMaskEditorButton" type="button">圈选主体</button>
+          <button class="file-button" id="regionExperiment" type="button" disabled>眼睛蒙版</button>
+        </div>
+        <p class="mask-tool-note">主体：圈选后自动贴合并重新生成。眼睛：在完整格图上确定辅助区域，再局部生成。</p>
+      </section>
       <section class="section" id="featureEditor"></section>
       <p class="section analysis-source" id="featureStatus" aria-live="polite"></p>
       <section class="section mask-gate-panel" id="maskGatePanel" hidden>
@@ -1373,6 +1381,7 @@
     }
 
     const internalToolsEnabled = new URLSearchParams(location.search).get('internal') === '1'
+    document.querySelector('#annotationWorkspace').hidden = !internalToolsEnabled
     elements.preferencePanel.hidden = internalToolsEnabled === false
     elements.preferenceWorkbenchDialog.hidden = internalToolsEnabled === false
 
@@ -1573,6 +1582,7 @@
       document.querySelector('#paletteSelect').disabled = busy
       if (busy) elements.downloadButton.disabled = true
       elements.generateButton.disabled = busy
+      document.querySelector('#regionExperiment').disabled = busy || !selectedCandidate?.pattern || selectedCandidate.pattern.width > 64 || selectedCandidate.pattern.height > 64
       elements.modelRouteSelect.disabled = busy
       elements.preferenceStartButton.disabled = busy || candidates.length < 2
       elements.openMaskEditorButton.disabled = busy || (maskGateContext !== undefined
@@ -2826,10 +2836,10 @@
     elements.downloadButton.addEventListener('click', downloadPattern)
     document.querySelector('#annotationWorkspace').addEventListener('click', () => {
       try {
-        let url = '/apps/demo/annotation.html'
+        let url = '/apps/training-annotation/'
         if (selectedCandidate?.pattern) {
           const pattern = selectedCandidate.pattern
-          if (pattern.width > 64 || pattern.height > 64) throw new Error('眼睛标注目前支持不超过 64×64 格的完整图纸。')
+          if (pattern.width > 64 || pattern.height > 64) throw new Error('训练数据标注目前支持不超过 64×64 格的完整图纸。')
           const key = 'annotation-input-' + crypto.randomUUID()
           localStorage.setItem(key, JSON.stringify(createPatternDocument(pattern)))
           url += '?input=' + encodeURIComponent(key)
@@ -2839,13 +2849,13 @@
     })
     document.querySelector('#regionExperiment').addEventListener('click', () => {
       try {
-        let url = '/apps/demo/region.html'
+        let url = '/apps/demo/region.html?mode=eye-guidance'
         if (selectedCandidate?.pattern) {
           const pattern = selectedCandidate.pattern
           if (pattern.width > 64 || pattern.height > 64) throw new Error('局部生成实验目前支持不超过 64×64 格的图纸。')
           const key = `sdxl-region-${crypto.randomUUID()}`
           localStorage.setItem(key, JSON.stringify(createPatternDocument(pattern)))
-          url += `?input=${encodeURIComponent(key)}`
+          url += `&input=${encodeURIComponent(key)}`
         }
         window.open(url, '_blank', 'noopener')
       } catch (error) { setStatus(error.message, 'error') }

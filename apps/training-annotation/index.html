@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>训练数据标注 · 眼睛目标</title><link rel="stylesheet" href="./style.css"></head>
+<body>
+<header><div class="brand"><a href="/apps/demo/" target="_blank" rel="noopener">拼豆工作台 ↗</a><span class="divider"></span><h1>训练数据标注</h1></div><span id="saveState" class="status">正在载入图库</span></header>
+<main>
+<div class="intro"><div><span class="eyebrow">TRAINING DATA ANNOTATION</span><h2>标明眼睛目标，封存训练样本。</h2><p>这里的蒙版明确指定标注目标。每眼一个框，取肤色并填写 prompt，最后统一确认封存。</p></div><span class="tag">原图保持不变</span></div>
+<section class="queue" aria-label="图库批次"><div><strong id="batchInfo">正在读取服务器图库…</strong><p id="progress" class="muted">每批 20 张</p></div><div class="queue-controls"><button id="batchPrevious" disabled aria-label="上一批">← 上一批</button><label class="sr-only" for="batchItems">选择本批图纸</label><select id="batchItems"><option value="">正在加载</option></select><button id="batchNext" disabled>下一批 →</button></div></section>
+<div id="message" role="status" aria-live="polite">自动读取已有拼豆格图。</div>
+<div class="workspace">
+<section class="board-panel">
+<div class="board-heading"><div><h3 id="title">完整拼豆图</h3><p id="gridInfo" class="muted">未载入</p></div><label class="zoom">缩放 <select id="zoom"><option value="1">适合画布</option><option value="1.5">150%</option><option value="2">200%</option><option value="3">300%</option></select></label></div>
+<div class="toolbar"><div class="modes" aria-label="画布操作"><button id="boxMode" aria-pressed="true">▣ 框选眼睛</button><button id="skinMode" aria-pressed="false">◉ 肤色取色器</button></div><button id="undo" class="quiet" disabled>撤销上一个框</button></div>
+<div id="canvasFrame" class="canvas-frame"><canvas id="gridCanvas" width="720" height="600" aria-label="原始拼豆格图，拖动框选眼睛或点击取肤色"></canvas><p id="emptyState">正在载入拼豆图…</p></div>
+<div class="canvas-caption"><span id="modeHint">拖动鼠标框住一只眼睛，可继续画多个框。</span><span id="cursor">格坐标</span></div>
+<div class="board-bottom"><span><i class="legend-mask"></i>眼睛蒙版 <i class="legend-skin"></i>肤色取样点</span><div><button id="previous" class="quiet" disabled>上一张</button><button id="next" class="quiet" disabled>暂存并跳过 →</button></div></div>
+</section>
+<aside>
+<section class="details-card"><div class="card-heading"><h3>本张标注</h3><span id="recordStatus" class="tag">草稿</span></div>
+<label for="prompt">Prompt <span class="required">必填</span></label><textarea id="prompt" rows="4" maxlength="1500" placeholder="例如：Draw dark brown eyes with a small white highlight, matching the face and surrounding bead colors."></textarea><p class="muted">描述希望生成的眼形、颜色与神态。</p>
+<div class="field-heading"><label>肤色 <span class="required">图中取色</span></label><button id="pickSkin" class="text-button">用取色器 ↗</button></div>
+<div class="skin-card"><span id="skinSwatch"></span><div><strong id="skinValue">尚未选取</strong><p id="skinLocation" class="muted">点击“点选肤色”，再点图中肤色格。</p></div></div>
+<div class="field-heading"><label>眼睛区域</label><span id="boxCount" class="muted">0 个框</span></div><div id="boxes" class="boxes"><p class="muted">在左侧图中拖动框选。</p></div>
+</section>
+<section class="seal-card"><h3>一次确认，完整封存</h3><p>点击即确认：当前拼豆图、全部眼睛框、所选肤色和 prompt。</p><p id="readiness" class="readiness">请完成标注。</p><button id="seal" class="primary" disabled>确认全部并封存 →</button><p class="muted">保存成功后自动下一张。封存内容固定，只读查看。</p><p id="sealTime" class="muted" hidden></p></section>
+<details class="utilities"><summary>文件与记录</summary><div class="utility-buttons"><label class="file-button">导入 JSON<input id="import" type="file" accept=".json,application/json"></label><button id="export" disabled>导出本张</button><button id="saveDraft" disabled>保存草稿</button><button id="reloadRemote" disabled>重新载入远端版本</button><button id="openBatch" disabled>打开当前批次</button></div><label for="records">远端记录</label><select id="records"><option value="">选择记录</option></select><button id="loadRecord">载入所选记录</button><p class="muted"><a href="/apps/demo/annotation-pair.html">旧配对标注记录 ↗</a></p></details>
+</aside>
+</div>
+</main><script type="module" src="./app.mjs"></script>
+</body></html>

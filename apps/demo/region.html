@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>局部生成实验 · SDXL</title>
+<title>蒙版 · 眼睛辅助区域</title>
 <style>
   :root { font-family: system-ui, sans-serif; color: #253242; background: #f2f5f7; }
   * { box-sizing: border-box; } body { margin: 0; } header { background: #fff; padding: 18px 28px; border-bottom: 1px solid #d8e1e7; display: flex; align-items: center; gap: 24px; }
@@ -16,19 +16,23 @@
   #status { padding: 12px 0; min-height: 45px; } #status[data-error="true"] { color: #b32828; } .tools { margin-bottom: 12px; }
   .previews { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; } .previews img { width: 100%; background: #f2f5f7; } pre { white-space: pre-wrap; font-size: 12px; overflow-wrap: anywhere; }
   details { margin-top: 14px; } #health { margin-left: auto; font-size: 13px; } .wide { width: 100%; margin-top: 14px; }
+  [hidden] { display: none !important; }
+  .boards.with-source { display: block; max-width: 720px; margin: 14px auto 0; }
+  .preview-tabs button[aria-selected="true"] { background: #126b68; color: #fff; border-color: #126b68; }
+  header h1 { font-size: 19px; }
   @media (max-width: 850px) { .layout, .boards, .boards.with-source { grid-template-columns: 1fr; } header { flex-wrap: wrap; } }
 </style>
-<header><h1>局部生成实验</h1><a href="/apps/demo/">返回拼豆工作台</a><button id="annotatePair" type="button">带入眼睛标注</button><span id="health">检查本地 SDXL…</span></header>
+<header><a href="/apps/demo/#maskTools">工作台 / 蒙版</a><h1>眼睛蒙版</h1><button id="annotatePair" type="button" hidden>带入独立训练标注</button><span id="health">检查本地 SDXL…</span></header>
 <main>
-  <p class="note"><strong>先周边，再蒙版区。</strong> 先用工作台生成完整拼豆图，确认周边配色，再在蒙版区铺肤色并生成细节。青色＝编辑区，橙色＝锁定区。可编辑区必须全部有珠色，周边保持原样。操作暂存在本页，离开前请导出。</p>
+  <p class="note"><strong>生成辅助蒙版。</strong> 每只眼可以单独框选；这里的区域用于引导本次生成。先周边，再蒙版区。 先用工作台生成完整拼豆图，确认周边配色，再在蒙版区铺肤色并生成细节。青色＝编辑区，橙色＝锁定区。可编辑区必须全部有珠色，周边保持原样。操作暂存在本页，离开前请导出。</p>
   <div class="layout">
     <aside>
-      <h2>输入与生成</h2>
-      <button id="example">载入自有诊断样例</button>
+      <h2>眼睛区域生成</h2>
+      <button id="example">载入示例</button>
       <label>导入格图 JSON（≤64×64）<input id="import" type="file" accept=".json,application/json"></label>
       <p class="note">保留肤色底图逻辑：模型查看完整拼豆图，蒙版区先铺与周边协调的肤色，再生成局部细节。请在确认周边时核对肤色色号。</p>
       <label>蒙版区底色<select id="skin"><option value="">自动建议周边主要色（请核对）</option></select></label>
-      <label>任务<select id="task"><option value="detail-repair">补充局部结构（眼／鼻／嘴等）</option><option value="harmonize">填充与色调协调</option></select></label>
+      <label>任务<select id="task"><option value="detail-repair">补充眼睛结构</option><option value="harmonize">填充与色调协调</option></select></label>
       <label>区域修改指令<textarea id="prompt" rows="4">flat pixel art face, two open turquoise eyes with a single bright highlight, crisp square pixels, limited flat colors, consistent expression</textarea></label>
       <details><summary>负面指令</summary><textarea id="negative" rows="3">text, watermark, blurry, gradients, noisy texture, unfilled hole, blank patch</textarea></details>
       <div class="row"><label>工作分辨率<select id="size"><option>512</option><option>768</option><option>1024</option></select></label><label>步数<input id="steps" type="number" min="2" max="50" value="20"></label></div>
@@ -42,8 +46,8 @@
       <p class="note">首次加载较慢。请求正在执行时，不关闭页面；关闭或网络超时不会中止 GPU 计算。</p>
     </aside>
     <section>
-      <div class="tools row"><label>画笔<select id="brush"><option value="edit">添加编辑区</option><option value="erase">擦除编辑区</option><option value="lock">锁定格</option><option value="unlock">解除锁定</option></select></label><button id="clear">清空编辑区</button><button id="undo" disabled>撤销上次接受</button></div>
-      <div class="boards with-source" id="boards"><div><h2>周边图纸 · 在图上涂选</h2><canvas id="before" width="640" height="640" aria-label="当前格图及编辑区域"></canvas></div><div><h2>模型输入 · 蒙版内铺肤色</h2><canvas id="sourceBoard" width="640" height="640" aria-label="完整拼豆图与肤色底图"></canvas></div><div><h2 id="candidateTitle">填充候选 · 尚未生成</h2><canvas id="after" width="640" height="640" aria-label="生成候选格图"></canvas></div></div>
+      <div class="tools row"><label>画笔<select id="brush"><option value="eye-box">框选眼睛区域</option><option value="skin-pick">肤色取色器</option><option value="edit">补充辅助区域</option><option value="erase">擦除编辑区</option><option value="lock">锁定格</option><option value="unlock">解除锁定</option></select></label><button id="removeEyeBox">撤销眼睛框</button><button id="clear">清空辅助区域</button><button id="undo" disabled>撤销上次接受</button></div>
+      <p class="note" id="guidanceStatus">在完整格图上框选需要处理的眼睛。</p><div class="row preview-tabs" role="tablist" aria-label="区域预览"><button id="showBefore" role="tab" aria-selected="true">格图与辅助蒙版</button><button id="showInput" role="tab" aria-selected="false">模型输入</button><button id="showCandidate" role="tab" aria-selected="false">生成候选</button></div><div class="boards with-source" id="boards"><div id="beforeView"><h2>完整格图 · 每眼一个框</h2><canvas id="before" width="640" height="640" aria-label="当前格图及编辑区域"></canvas></div><div id="inputView" hidden><h2>模型输入 · 蒙版内铺肤色</h2><canvas id="sourceBoard" width="640" height="640" aria-label="完整拼豆图与肤色底图"></canvas></div><div id="candidateView" hidden><h2 id="candidateTitle">填充候选 · 尚未生成</h2><canvas id="after" width="640" height="640" aria-label="生成候选格图"></canvas></div></div>
       <div id="status" role="status">载入样例或导入格图后开始。</div>
       <label>接受／拒绝原因（必填）<input id="reason" placeholder="例如：眼型符合原表情；仍有额外高光，拒绝"></label>
       <div class="row" style="margin-top:12px"><button id="accept" class="primary" disabled>接受候选</button><button id="reject" disabled>拒绝候选</button><button id="export" disabled>导出当前格图</button><button id="audit" disabled>导出回放记录</button></div>

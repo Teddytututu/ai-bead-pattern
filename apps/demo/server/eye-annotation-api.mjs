@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, writeFile, rename, unlink, link } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { createAnnotationDataset } from './annotation-dataset.mjs'
-import { UUID, eyeAnnotationFromDataset, validateEyeAnnotation, sealEyeAnnotation } from '../eye-annotation-state.mjs'
+import { UUID, eyeAnnotationFromDataset, validateEyeAnnotation, sealEyeAnnotation } from '../../training-annotation/state.mjs'
 
 const sha = value => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const contentHash = a => sha({ ...a, status:'draft', confirmation:null })

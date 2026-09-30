@@ -1,11 +1,16 @@
-import { importGrid, verifyCandidate, exportDocument, resolveSkinIndex } from './region-state.mjs'
+import { importProductGrid, eyeRectangle, mergeEyeGuidance, PRODUCT_MASK_PURPOSE } from './src/eye-region-guidance.mjs'
+import { verifyCandidate, exportDocument, resolveSkinIndex } from './region-state.mjs'
 const $ = (id) => document.getElementById(id)
 let grid = null, original = null, editMask = [], lockedMask = [], prepared = null
+let paintedMask = [], eyeBoxes = [], eyeDrag = null
 let candidate = null, pendingRequest = null, busy = false, history = [], accepted = [], events = [], revision = 0
 const status = (message, error = false) => { $('status').textContent = message; $('status').dataset.error = String(error) }
 const clone = (v) => structuredClone(v)
 function updateButtons() {
   $('prepare').disabled = busy || !grid
+  $('clear').disabled = busy || !grid
+  $('removeEyeBox').disabled = busy || !eyeBoxes.length
+  $('guidanceStatus').textContent = grid ? '生成辅助区域 · '+eyeBoxes.length+' 个眼睛框 · '+editMask.filter(Boolean).length+' 格（原图保持到接受候选）' : '先从工作台带入完整格图'
   $('generate').disabled = busy || !prepared
   $('accept').disabled = busy || !candidate || candidate.changedCells.length === 0
   $('reject').disabled = busy || !candidate
@@ -34,6 +39,14 @@ function paint(canvas, g, overlay = false, hole = false) {
     if (overlay && (lockedMask[i] || editMask[i])) { ctx.fillStyle = lockedMask[i] ? '#f2923377' : '#16b6b577'; ctx.fillRect(px, py, scale, scale) }
     ctx.strokeStyle = '#53647422'; ctx.strokeRect(px, py, scale, scale)
   })
+  if (overlay) {
+    const boxes = [...eyeBoxes, ...(eyeDrag ? [eyeRectangle(eyeDrag.start, eyeDrag.end, g)] : [])]
+    for (const [index, box] of boxes.entries()) {
+      ctx.strokeStyle = '#086c64'; ctx.lineWidth = 2
+      ctx.strokeRect(x+box.x*scale+1,y+box.y*scale+1,box.width*scale-2,box.height*scale-2)
+      ctx.fillStyle='#086c64';ctx.font='12px sans-serif';ctx.fillText(String(index+1),x+box.x*scale+3,y+box.y*scale+13)
+    }
+  }
 }
 function draw() {
   paint($('before'), grid, true); paint($('after'), candidate?.grid ?? null)
@@ -41,12 +54,13 @@ function draw() {
   $('candidateTitle').textContent = candidate ? '完整填充候选 · 待人工接受' : '填充候选 · 尚无合格候选'
 }
 function setGrid(value, request = null) {
-  grid = importGrid(value); original = value.schema === 'bead-pattern-document-v1' ? clone(value) : null
-  editMask = request?.editMask ?? Array(grid.cells.length).fill(false)
+  grid = importProductGrid(value); original = value.schema === 'bead-pattern-document-v1' ? clone(value) : null
+  paintedMask = [...(request?.editMask ?? Array(grid.cells.length).fill(false))]
+  eyeBoxes = []; eyeDrag = null; editMask = [...paintedMask]
   lockedMask = request?.lockedMask ?? Array(grid.cells.length).fill(false)
   $('colors').value = Math.max(24, new Set(grid.cells.filter(v => v >= 0)).size)
   $('skin').replaceChildren(new Option('自动建议周边主要色（请核对）', ''), ...grid.colors.map(c => new Option(`${c.id} · RGB ${c.rgb.join(',')}`, c.id)))
-  history = []; accepted = []; events = []
+  history = []; accepted = []; events = []; showPreview('before')
   invalidate(); status(`已载入 ${grid.width}×${grid.height} 格。涂选后先确认周边，再填充蒙版区。`)
 }
 async function api(path, body) {
@@ -62,22 +76,62 @@ function download(name, data) {
 $('example').onclick = async () => { try { const r = await api('example'); setGrid(r.currentGrid, r); $('prompt').value = r.prompt; status('自有程序绘制样例：缺少左眼。它不是人工真值或真实照片评测。') } catch (e) { status(e.message, true) } }
 $('import').onchange = async (e) => { try { if (e.target.files[0]) setGrid(JSON.parse(await e.target.files[0].text())) } catch (err) { status(err.message, true) } }
 let drawing = false
-function brush(event) {
-  if (!drawing || busy || !grid) return
-  const rect = $('before').getBoundingClientRect(), { x, y, scale } = geometry(grid)
-  const gx = Math.floor(((event.clientX - rect.left) * 640 / rect.width - x) / scale)
-  const gy = Math.floor(((event.clientY - rect.top) * 640 / rect.height - y) / scale)
-  if (gx < 0 || gy < 0 || gx >= grid.width || gy >= grid.height) return
-  const i = gy * grid.width + gx, tool = $('brush').value
-  if (tool === 'edit' || tool === 'erase') editMask[i] = tool === 'edit'
-  else lockedMask[i] = tool === 'lock'
-  invalidate()
+function pointerCell(event, clamp = false) {
+  const rect=$('before').getBoundingClientRect(),{x,y,scale}=geometry(grid)
+  let gx=Math.floor(((event.clientX-rect.left)*640/rect.width-x)/scale)
+  let gy=Math.floor(((event.clientY-rect.top)*640/rect.height-y)/scale)
+  if(clamp){gx=Math.max(0,Math.min(grid.width-1,gx));gy=Math.max(0,Math.min(grid.height-1,gy))}
+  return gx<0||gy<0||gx>=grid.width||gy>=grid.height?null:{x:gx,y:gy}
 }
-$('before').onpointerdown = (e) => { drawing = true; $('before').setPointerCapture(e.pointerId); brush(e) }
-$('before').onpointermove = brush
-$('before').onpointerup = () => { drawing = false }
-$('before').onpointercancel = () => { drawing = false }
-$('clear').onclick = () => { editMask.fill(false); invalidate() }
+function rebuildGuidance(){editMask=mergeEyeGuidance(grid,paintedMask,eyeBoxes);invalidate()}
+function brush(event) {
+  if(!drawing||busy||!grid)return
+  const p=pointerCell(event);if(!p)return
+  const i=p.y*grid.width+p.x,tool=$('brush').value
+  if(tool==='eye-box'||tool==='skin-pick')return
+  if(tool==='edit'||tool==='erase'){
+    if(tool==='erase'){
+      // Erasing a cell detaches rectangle geometry while preserving the remaining mask.
+      paintedMask=[...editMask];eyeBoxes=[]
+    }
+    paintedMask[i]=tool==='edit'
+  }else lockedMask[i]=tool==='lock'
+  rebuildGuidance()
+}
+$('before').onpointerdown=e=>{
+  if(!grid||busy)return
+  const p=pointerCell(e);if(!p)return
+  const tool=$('brush').value
+  if(tool==='skin-pick'){
+    const color=grid.colors[grid.cells[p.y*grid.width+p.x]]
+    if(!color){status('请选择有颜色的肤色格。',true);return}
+    $('skin').value=color.id;$('brush').value='eye-box';invalidate();status('已从当前拼豆图选取肤色 '+color.id);return
+  }
+  drawing=true;$('before').setPointerCapture(e.pointerId)
+  if(tool==='eye-box'){eyeDrag={start:p,end:p};draw()}else brush(e)
+}
+$('before').onpointermove=e=>{
+  if(eyeDrag){eyeDrag.end=pointerCell(e,true);draw()}else brush(e)
+}
+$('before').onpointerup=e=>{
+  if(eyeDrag){
+    const box=eyeRectangle(eyeDrag.start,pointerCell(e,true),grid);eyeDrag=null
+    if(!eyeBoxes.some(b=>JSON.stringify(b)===JSON.stringify(box)))eyeBoxes.push(box)
+    rebuildGuidance()
+  }
+  drawing=false
+}
+$('before').onpointercancel=()=>{drawing=false;eyeDrag=null;draw()}
+$('removeEyeBox').onclick=()=>{if(grid&&!busy){eyeBoxes.pop();rebuildGuidance()}}
+$('clear').onclick=()=>{paintedMask.fill(false);eyeBoxes=[];rebuildGuidance()}
+function showPreview(view){
+  for(const [name,id] of [['before','showBefore'],['input','showInput'],['candidate','showCandidate']]){
+    $(name+'View').hidden=name!==view;$(id).setAttribute('aria-selected',String(name===view))
+  }
+}
+$('showBefore').onclick=()=>showPreview('before')
+$('showInput').onclick=()=>showPreview('input')
+$('showCandidate').onclick=()=>showPreview('candidate')
 for (const id of ['skin', 'task', 'prompt', 'negative', 'size', 'steps', 'strength', 'guidance', 'seed', 'colors', 'adapter', 'harmony', 'attempts']) $(id).addEventListener('change', invalidate)
 function makeRequest() {
   return { schemaVersion: 'region-generation-v3', currentGrid: clone(grid), editMask: [...editMask], lockedMask: [...lockedMask], inputMode: 'grid-context', fillPolicy: 'all-editable',
@@ -119,7 +173,7 @@ $('generate').onclick = async () => {
     for (const [id, key] of [['inputPreview', 'input'], ['maskPreview', 'mask'], ['rawPreview', 'generated']]) $(id).src = result.preview[key]
     $('metrics').textContent = JSON.stringify({ decision: result.decision, changedCells: result.changedCells.length, validation: result.validation, diagnostics: result.diagnostics, harmony: result.harmony, attempts: result.attempts.map(a => ({ seed: a.seed, decision: a.decision, validation: a.validation })), metrics: result.metrics, provenance: result.provenance }, null, 2)
     status(candidate ? `已完整填充 ${result.diagnostics.filledCells} 格，未填充 0 格；修改 ${result.changedCells.length} 格。请确认结构与色调后接受。` : `已尝试 ${result.attempts.length} 次，未产生合格候选：${result.validation.reasons.join('；')}。请调整区域或指令后重新确认周边。`, !candidate)
-    $('details').open = true; draw()
+    $('details').open = true; if(candidate)showPreview('candidate'); draw()
   } catch (err) { events.push({ event: 'failed', started, request, error: err.message }); status(err.message, true) }
   finally { busy = false; controls.forEach((c, i) => { c.disabled = disabled[i] }); updateButtons() }
 }
@@ -130,7 +184,7 @@ $('accept').onclick = () => {
     const next = verifyCandidate(pendingRequest, candidate, grid)
     history.push({ grid: clone(grid), accepted: clone(accepted) })
     const record = { event: 'accepted', time: new Date().toISOString(), requestSha256: candidate.requestSha256, beforeSha256: candidate.beforeSha256, reason, provenance: candidate.provenance, changedCells: candidate.changedCells }
-    accepted.push(record); events.push(record); grid = next; invalidate(); status('已接受；可撤销，也可导出当前格图与完整回放记录。')
+    accepted.push(record); events.push(record); grid = next; invalidate(); showPreview('before'); status('已接受；可撤销，也可导出当前格图与完整回放记录。')
   } catch (err) { status(err.message, true) }
 }
 $('reject').onclick = () => {
@@ -143,7 +197,7 @@ $('undo').onclick = () => {
   grid = previous.grid; accepted = previous.accepted; invalidate(); status('已撤销上次接受。')
 }
 $('export').onclick = () => download('region-pattern.json', exportDocument(grid, original, accepted))
-$('audit').onclick = () => download('region-replay.json', { schemaVersion: 'region-generation-review-v3', currentGrid: grid, editMask, lockedMask, accepted, events, humanGold: false, trainingEligible: false })
+$('audit').onclick = () => download('region-replay.json', { schemaVersion: 'region-generation-review-v3', maskPurpose: PRODUCT_MASK_PURPOSE, eyeBoxes: clone(eyeBoxes), currentGrid: grid, editMask, lockedMask, accepted, events, humanGold: false, trainingEligible: false })
 try {
   const key = new URLSearchParams(location.search).get('input')
   if (key?.startsWith('sdxl-region-')) {
@@ -158,12 +212,13 @@ try {
 } catch (error) { $('health').textContent = 'SDXL 服务未启动'; status(error.message, true) }
 draw(); updateButtons()
 
+$('annotatePair').hidden = new URLSearchParams(location.search).get('internal') !== '1'
 $('annotatePair').onclick = () => {
   try {
-    if (!grid) { window.open('/apps/demo/annotation.html', '_blank', 'noopener'); return }
+    if (!grid) { window.open('/apps/training-annotation/', '_blank', 'noopener'); return }
     const record = { currentGrid: structuredClone(grid), source: { kind: 'region' } }
     const key = 'annotation-input-' + crypto.randomUUID()
     localStorage.setItem(key, JSON.stringify(record))
-    window.open('/apps/demo/annotation.html?input=' + encodeURIComponent(key), '_blank', 'noopener')
+    window.open('/apps/training-annotation/?input=' + encodeURIComponent(key), '_blank', 'noopener')
   } catch (error) { status(error.message, true) }
 }
