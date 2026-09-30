@@ -80,6 +80,9 @@ if [[ ! -x .tools/pnpm/node_modules/.bin/pnpm ]] || [[ "$(.tools/pnpm/node_modul
 fi
 pnpm --version
 uv python install 3.11
+managed_python="$(uv python find 3.11 --managed-python)"
+ln -sfn "$managed_python" .tools/bootstrap/bin/python3
+ln -sfn "$managed_python" .tools/bootstrap/bin/python
 pnpm install --frozen-lockfile
 services=(sdxl-region-sidecar sam2-sidecar)
 if [[ "$scope" == all ]]; then

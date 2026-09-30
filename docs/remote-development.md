@@ -18,9 +18,11 @@ pnpm exec playwright install chromium
 
 安装固定 Node 24.13.0、pnpm 11.19.0、uv 0.12.19 和 Python 3.11。Node／uv 下载验证官方发布的 SHA-256；JavaScript 按 pnpm lockfile，六个 sidecar 按各自 uv.lock 安装，互相隔离。`core` 参数仅安装当前主线 SDXL 与 SAM2 两个 Python 环境。不会替换系统 Python、pip、CUDA 或其他用户环境。
 
+加载环境后的 python／python3 指向项目管理的 Python 3.11；具体依赖仍使用对应服务的虚拟环境。不要调用系统 pip3 安装项目依赖。
+
 每次进入工作目录后执行 `source scripts/dev/remote-env.sh`。工具与缓存位于该副本的 `.tools`，虚拟环境位于各服务 `.venv`；默认 CPU 线程数为 4，可显式覆盖。GPU 编号必须按当前分配选择，脚本不预占 GPU。
 
-家目录可能存在 `df`／`quota` 未显示的服务端配额。若安装报 `Disk quota exceeded`，可将 `.tools` 和各服务 `.venv` 放到个人临时盘目录，再用符号链接连接回仓库。根 `node_modules` 保留真实目录；环境脚本将 pnpm store 与 virtual store 放到 `.tools`，以免 pnpm 重建目录时留下断链。先确认目标目录归自己所有，已有目录不能直接覆盖。临时缓存被清理后需要重新建立链接和运行安装脚本；它不能作为标注、代码或训练成果的唯一存储。
+家目录可能存在 `df`／`quota` 未显示的服务端配额。若安装报 `Disk quota exceeded`，可将 `.tools` 和各服务 `.venv` 放到个人临时盘目录，再用符号链接连接回仓库。浏览器 trace 等可重建产物也应放在临时缓存（例如把 output/tests 链接到 .tools/generated-tests），避免测试再次占满家目录。根 `node_modules` 保留真实目录；环境脚本将 pnpm store 与 virtual store 放到 `.tools`，以免 pnpm 重建目录时留下断链。先确认目标目录归自己所有，已有目录不能直接覆盖。临时缓存被清理后需要重新建立链接和运行安装脚本；它不能作为标注、代码或训练成果的唯一存储。
 
 ## 本机 SSH 入口
 

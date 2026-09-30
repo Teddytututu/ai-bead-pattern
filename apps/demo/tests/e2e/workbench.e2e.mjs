@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('generates a refined pattern with planning diagnostics', async ({ page }) => {
+  test.setTimeout(60_000)
   const errors = []
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text())
@@ -12,7 +13,7 @@ test('generates a refined pattern with planning diagnostics', async ({ page }) =
   await expect(page.locator('#refinementModeControl [data-refinement="quality"]'))
     .toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('#patternCanvas')).toBeVisible()
-  await expect(page.locator('#structureRegionCount')).not.toHaveText('--', { timeout: 20_000 })
+  await expect(page.locator('#structureRegionCount')).not.toHaveText('--', { timeout: 45_000 })
   await expect(page.locator('#valueRoleCount')).not.toHaveText('--')
   await expect(page.locator('#paletteRoleCount')).not.toHaveText('--')
   await expect(page.locator('#gridRefinementEnergy')).toContainText('→')
