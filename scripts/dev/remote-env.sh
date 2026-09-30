@@ -10,6 +10,8 @@ export HF_HOME="$IMAGE_PINDOU_ROOT/.tools/huggingface"
 export HF_HUB_DISABLE_XET=1
 export TOKENIZERS_PARALLELISM=false
 export PLAYWRIGHT_BROWSERS_PATH="$IMAGE_PINDOU_ROOT/.tools/playwright"
+export npm_config_store_dir="$IMAGE_PINDOU_ROOT/.tools/pnpm-store"
+export npm_config_virtual_store_dir="$IMAGE_PINDOU_ROOT/.tools/pnpm-virtual-store"
 # Shared machines: keep ordinary CPU work bounded. Select a GPU explicitly when
 # launching GPU services; this file does not reserve or choose a shared GPU.
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-4}"
