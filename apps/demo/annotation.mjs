@@ -1,13 +1,19 @@
+import { createBatchController, draftKey } from './annotation-batch.mjs'
 import { importGrid } from './region-state.mjs'
-import { createAnnotation, validateAnnotation, effectiveMask, invalidate, setMaskCell, paintTargetCell, contextIssues, completionIssues, confirmContext, confirmTarget, modelInput, exportPair } from './annotation-state.mjs'
+import { createAnnotation, validateAnnotation, effectiveMask, invalidate, setMaskCell, paintTargetCell, contextIssues, completionIssues, confirmContext, confirmTarget, modelInput, exportPair, setInputOccupancy, confirmInput } from './annotation-state.mjs'
 const $ = id => document.getElementById(id)
 const KEY = 'region-annotation-workspace-v1'
+let batchController = null, saving = false
 let annotation = null, version = 0, dirty = false, undo = [], redo = [], brushColor = 0, drawing = false, strokeStarted = false, lastCell = -1
 const copy = value => structuredClone(value)
 function message(text, error = false) { $('message').textContent = text; $('message').dataset.error = String(error) }
 function stash() {
   if (!annotation) return
-  try { localStorage.setItem(KEY, JSON.stringify({ annotation, version, dirty })) }
+  try {
+    const value = JSON.stringify({ annotation, version, dirty })
+    localStorage.setItem(KEY, value)
+    localStorage.setItem(draftKey(annotation.id), value)
+  }
   catch { message('浏览器暂存失败，请保存到远端或导出文件。', true) }
 }
 function changed(context = true) {
@@ -17,12 +23,19 @@ function checkpoint() { undo.push(copy(annotation)); if (undo.length > 60) undo.
 function canReplace() { return !annotation || !dirty || window.confirm('当前有未保存到远端的修改。先导出或保存可保留进度；确定切换吗？') }
 function update() {
   const a = annotation
-  for (const id of ['saveRemote','exportDraft','confirmContext','importTarget']) $(id).disabled = !a
+  for (const id of ['saveRemote','exportDraft','confirmContext','importTarget']) $(id).disabled = !a || (id === 'saveRemote' && saving)
   $('undo').disabled = !undo.length; $('redo').disabled = !redo.length
   $('fillSkin').disabled = !a?.review.contextConfirmed
   $('confirmTarget').disabled = !a?.review.contextConfirmed
   $('exportPair').disabled = !a?.review.targetConfirmed
   $('saveState').textContent = !a ? '尚未载入图纸' : dirty ? '浏览器已暂存 · 远端待保存' : version ? '远端已保存 · v' + version : '尚未保存到远端'
+  batchController?.refresh()
+  $('inputReviewPanel').hidden = !a?.inputReview
+  if (a?.inputReview) {
+    const unknown = a.inputReview.occupancy.filter(v => v === null).length
+    $('inputReviewInfo').textContent = a.inputReview.confirmed ? '输入已确认并固定，可开始区域标注。' : '还有 ' + unknown + ' 格占用未知。先填写标注者，在左侧格图上复核。'
+    for (const id of ['markOccupied','pickEmpty','confirmInput']) $(id).disabled = a.inputReview.confirmed
+  }
   if (!a) return
   const mask = effectiveMask(a)
   const missing = a.targetGrid.cells.filter((c,i) => mask[i] && c < 0).length
@@ -51,6 +64,9 @@ function draw(canvas, grid, overlays = false) {
       ctx.fillStyle=annotation.lockedMask[i]?'#e48a3070':'#27b9b34a';ctx.fillRect(xx,yy,scale,scale)
     }
     ctx.strokeStyle='#354f3526';ctx.strokeRect(xx,yy,scale,scale)
+    if (overlays && annotation.inputReview && !annotation.inputReview.confirmed && annotation.inputReview.occupancy[i] === null) {
+      ctx.fillStyle='#e18b20';ctx.beginPath();ctx.arc(xx+scale-3,yy+3,Math.max(1,Math.min(2,scale/6)),0,Math.PI*2);ctx.fill()
+    }
   })
 }
 function renderBoards() {
@@ -77,11 +93,11 @@ function render() {
     $('groupConfirmed').checked=a.grouping.confirmed
     $('skin').replaceChildren(new Option('自动建议周边主要色（请核对）',''),...a.currentGrid.colors.map(c=>new Option(c.id+' · RGB '+c.rgb.join(','),c.id)))
     $('skin').value=a.skinColorId
-    $('sourceInfo').textContent='来源：'+(a.source.name||a.source.kind)+' · 输入创建后保持不变'
+    $('sourceInfo').textContent='来源：'+(a.source.name||a.source.kind)+(a.inputReview&&!a.inputReview.confirmed?' · 先复核占用，确认后输入固定':' · 输入已固定')
   }
   renderPalette();renderBoards();update()
 }
-function adopt(a, v=0, isDirty=true) { annotation=validateAnnotation(a,{allowIncompleteMetadata:true});version=v;dirty=isDirty;undo=[];redo=[];brushColor=0;stash();render() }
+function adopt(a, v=0, isDirty=true) { annotation=validateAnnotation(a,{allowIncompleteMetadata:true});version=v;dirty=isDirty;undo=[];redo=[];brushColor=0;if(annotation.inputReview&&!annotation.inputReview.confirmed)$('tool').value='input-empty-color';stash();render() }
 async function api(path='', body) {
   const response=await fetch('/api/annotations'+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{})
   let value
@@ -122,11 +138,12 @@ $('import').onchange=async event=>{
   }catch(error){message(error.message,true)}
   finally{event.target.value=''}
 }
-$('saveRemote').onclick=async()=>{
+async function saveCurrent() {
   if(!annotation)return
+  if(saving)throw new Error('正在保存，请稍后再切换')
+  saving=true;update()
   try{
     const sent=validateAnnotation(annotation), sentVersion=version
-    $('saveRemote').disabled=true
     const record=await api('',{annotation:sent,expectedVersion:sentVersion})
     if(annotation.id===sent.id){
       version=record.version
@@ -134,9 +151,10 @@ $('saveRemote').onclick=async()=>{
       stash();update()
     }
     await refreshRecords();message('已保存到 SSH 远端 · v'+record.version)
-  }catch(error){message(error.message,true)}
-  finally{update()}
+    return record
+  } finally { saving=false;update() }
 }
+$('saveRemote').onclick=async()=>{try{await saveCurrent()}catch(error){message(error.message,true)}}
 $('refresh').onclick=refreshRecords
 $('loadRemote').onclick=async()=>{
   try{
@@ -151,6 +169,7 @@ for(const id of ['title','reviewer','prompt','skin','notes','groupId','rightsDec
   $(id).addEventListener(id==='skin'||id.startsWith('rights')&&id!=='rightsEvidence'?'change':'input',()=>{
     if(!annotation)return
     if(['title','reviewer','prompt'].includes(id))annotation[id]=$(id).value
+    if(id==='reviewer')localStorage.setItem('region-annotation-reviewer',annotation.reviewer)
     if(id==='skin')annotation.skinColorId=$(id).value
     if(id==='notes')annotation.review.notes=$(id).value
     if(id==='groupId'){annotation.grouping.groupId=$(id).value;annotation.grouping.confirmed=false;$('groupConfirmed').checked=false}
@@ -188,6 +207,19 @@ function stroke(event) {
       const color=(event.currentTarget.id==='before'?annotation.currentGrid:annotation.targetGrid).cells[i]
       if(color>=0){brushColor=color;renderPalette();update()}return
     }
+    if(tool.startsWith('input-')){
+      if(event.currentTarget.id!=='before')throw new Error('请在左侧输入格图复核占用')
+      if(!annotation.inputReview||annotation.inputReview.confirmed)throw new Error('输入已固定，不能修改占用')
+      if(!strokeStarted){checkpoint();strokeStarted=true}
+      if(tool==='input-empty-color'){
+        const color=annotation.inputReview.sampledGrid.cells[i]
+        setInputOccupancy(annotation,annotation.currentGrid.cells.map((_,j)=>j),1)
+        setInputOccupancy(annotation,annotation.inputReview.sampledGrid.cells.map((c,j)=>c===color?j:-1).filter(j=>j>=0),0)
+        $('tool').value='input-blank'
+        message('已按所点空板颜色初填；请继续核对同色白珠、边缘和格点。')
+      }else setInputOccupancy(annotation,[i],tool==='input-occupied'?1:tool==='input-blank'?0:null)
+      dirty=true;renderBoards();update();return
+    }
     if(['paint','empty'].includes(tool)&&event.currentTarget.id!=='target')throw new Error('左侧输入保持原样，请在右侧目标图绘制')
     if(!strokeStarted){checkpoint();strokeStarted=true}
     if(['paint','empty'].includes(tool))paintTargetCell(annotation,i,tool==='empty'?-1:brushColor)
@@ -218,6 +250,9 @@ for(const id of ['undo','redo'])$(id).onclick=()=>{
   to.push(copy(annotation));annotation=from.pop()
   invalidate(annotation);dirty=true;stash();render()
 }
+$('markOccupied').onclick=()=>{try{checkpoint();setInputOccupancy(annotation,annotation.currentGrid.cells.map((_,i)=>i),1);dirty=true;stash();render();message('已初填为有珠，仍需人工检查空板与白珠。')}catch(error){message(error.message,true)}}
+$('pickEmpty').onclick=()=>{$('tool').value='input-empty-color';message('在左侧格图点一个确认的空板格；初填后仍需检查白珠。')}
+$('confirmInput').onclick=()=>{try{confirmInput(annotation);undo=[];redo=[];dirty=true;$('tool').value='edit';stash();render();message('输入格图已确认。现在可以选择区域、确认周边并修改目标。')}catch(error){message(error.message,true)}}
 $('zoom').onchange=()=>{for(const id of ['before','target'])$(id).style.width=Number($('zoom').value)*100+'%'}
 $('overlay').onchange=renderBoards
 window.addEventListener('beforeunload',()=>stash())
@@ -241,3 +276,5 @@ try{
   }
 }catch(error){message('草稿恢复失败：'+error.message+'。原始暂存保留，可导入备份。',true)}
 render();await refreshRecords()
+batchController=createBatchController({getCurrent:()=>({annotation,version,dirty}),adopt,saveCurrent,message})
+await batchController.initialize()

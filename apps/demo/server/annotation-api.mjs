@@ -2,25 +2,41 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, readdir, writeFile, rename, unlink } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { validateAnnotation } from '../annotation-state.mjs'
+import { createAnnotationDataset } from './annotation-dataset.mjs'
 
 const LIMIT = 3 * 1024 * 1024
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const sha = value => createHash('sha256').update(JSON.stringify(value)).digest('hex')
-export function createAnnotationApiHandler({ directory = process.env.REGION_ANNOTATION_DIR ?? resolve('output/region-annotations') } = {}) {
+export function createAnnotationApiHandler({ directory = process.env.REGION_ANNOTATION_DIR ?? resolve('output/region-annotations'), packetPath } = {}) {
+  const dataset = createAnnotationDataset({ packetPath })
   const locks = new Set()
   const read = async id => {
     try { return JSON.parse(await readFile(join(directory, id + '.json'), 'utf8')) }
     catch (error) { if (error.code === 'ENOENT') return null; throw error }
   }
   return async (request, response) => {
-    const path = new URL(request.url, 'http://localhost').pathname
-    if (path !== '/api/annotations' && !path.startsWith('/api/annotations/')) return false
+    const url = new URL(request.url, 'http://localhost'), path = url.pathname
+    if (path !== '/api/annotation-dataset' && path !== '/api/annotations' && !path.startsWith('/api/annotations/')) return false
     const send = (code, value) => {
       response.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
       response.end(JSON.stringify(value))
     }
     if (request.headers.origin && request.headers.origin !== 'http://' + request.headers.host) {
       send(403, { detail: '禁止跨站访问标注记录' }); return true
+    }
+    if (path === '/api/annotation-dataset') {
+      if (request.method !== 'GET') { send(405, { detail: '图库仅支持读取' }); return true }
+      try {
+        const offset = url.searchParams.get('offset') ?? '0'
+        if (!/^(0|[1-9][0-9]{0,8})$/.test(offset)) throw new Error('批次偏移无效')
+        const batch = await dataset(Number(offset), url.searchParams.get('snapshot') ?? '')
+        for (const item of batch.items) if (item.id) {
+          const existing = await read(item.id)
+          if (existing) item.record = existing
+        }
+        send(200, batch)
+      } catch (error) { send(error.status ?? 400, { detail: error.message }) }
+      return true
     }
     const id = path === '/api/annotations' ? null : path.slice('/api/annotations/'.length)
     if (id !== null && !uuid.test(id)) { send(400, { detail: '标注 ID 无效' }); return true }
@@ -68,7 +84,14 @@ export function createAnnotationApiHandler({ directory = process.env.REGION_ANNO
           send(409, { detail: '远端已有更新；请先导出当前草稿，再载入远端记录', currentVersion: prior?.version ?? 0 }); return true
         }
         const sourceSha256 = sha(annotation.currentGrid)
-        if (prior && prior.sourceSha256 !== sourceSha256) {
+        const priorInput = prior?.annotation.inputReview, nextInput = annotation.inputReview
+        if (prior && (Boolean(priorInput) !== Boolean(nextInput) || (priorInput &&
+          (sha({ ...priorInput, occupancy: [], confirmed: false }) !== sha({ ...nextInput, occupancy: [], confirmed: false }) ||
+           (priorInput.confirmed && !nextInput.confirmed))))) {
+          send(422, { detail: '不能替换输入来源或撤销已保存的输入确认' }); return true
+        }
+        const preparingInput = priorInput && nextInput && !priorInput.confirmed && !prior.annotation.review.contextConfirmed
+        if (prior && prior.sourceSha256 !== sourceSha256 && !preparingInput) {
           send(422, { detail: '同一标注不能替换原始输入，请创建新标注' }); return true
         }
         const record = { version: body.expectedVersion + 1, updatedAt: new Date().toISOString(),
