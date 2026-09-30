@@ -7,9 +7,11 @@
 - 已接入通用 24、MARD 291、Perler 123；Perler 登记 123 个 SKU，其中 118 色参与自动配色。单张图纸最多 48 色，通用色卡最多 24 色。
 - 已实现主体轮廓、35 个五官规则模板、姿态保持、手动点选校正、蒙版补擦与撤销重做，以及保色和细节保护。
 - 自动主体／部件分析固定使用 GroundingDINO Tiny + SAM 2.1 Small。产品 API、微信 SDK 和原生小程序示例可本地运行；真实微信环境与 HTTPS 部署仍待接入。
-- 已下载 2,435 张拼豆参考图纸。完整逐格编辑、画布编辑、模板模型训练及多场景质量验收仍按[当前计划](docs/plans/README.md)推进；全图 ≤64×64 格、自主学习模板宽高的新方案尚未实施。
+- 已下载 2,435 张拼豆参考图纸，[数据清点、读格与预标注审核工具](tools/template-learning/README.md)已有实现。五官新路线采用现成网络，仅训练 adapter；[SDXL Inpainting＋LoRA 实验服务](services/sdxl-region-sidecar/README.md)已本地装配，支持全图条件下的区域生成、接受／撤销和导出，并通过 512/1024 推理及 LoRA 单步／重载验证。真实效果、配对目标、独立分组及正式训练仍待完成，详见[当前计划](docs/plans/README.md)。
 
 ## 本地运行
+
+全职 SSH 开发的安装、更新、测试与端口转发见 [远程开发说明](docs/remote-development.md)。Linux 环境可以通过 `bash scripts/dev/bootstrap-linux.sh all` 从锁文件重建。
 
 要求 Node 24.13+、pnpm 11.19。在仓库根目录执行：
 
@@ -29,6 +31,15 @@ pnpm demo:net
 ```
 
 模型配置、权重版本及故障处理见 [SAM2 服务说明](services/sam2-sidecar/README.md)。侧栏的“五官定位与模板”支持原图点选、模板选择、隐藏与锁定；应用校正后重新生成。外／内轮廓独立开关，两眼保留原图高差与大小关系。`node scripts/diagnostics/render-contours-features-demo.mjs` 可生成模板总览和合成对照。
+
+启用 SDXL 局部生成实验（独立 Python 环境，首次安装下载约 6.94 GB 模型及依赖）：
+
+```powershell
+pnpm sdxl:setup
+pnpm demo:sdxl
+```
+
+在工作台顶栏点击“局部生成实验”，或访问 `/apps/demo/region.html`。现有构建需保持最新。当前流程为**先确认周边与配色 → 蒙版铺肤色 → 局部生成**，要求可编辑区域全部填色。操作与 prompt 见 [SDXL 说明](services/sdxl-region-sidecar/README.md)，最新状态见[填充计划与实测](docs/plans/masked-grid-fill-plan.md)，历史资源记录见[首轮报告](docs/plans/sdxl-region-implementation-2026-09-30.md)。该入口尚未接入微信 SDK，未通过正式五官质量验收。
 
 另开终端启动产品 API：
 
@@ -58,7 +69,7 @@ pnpm api:dev
 | `scripts/benchmarks`、`scripts/diagnostics` | 性能测量、颜色／模板诊断 |
 | `scripts/maintenance` | 色卡导入和 OpenAPI 生成 |
 | `assets/palettes` | 色卡、来源和许可 |
-| `docs/plans` | 当前产品计划及五官模板专项 |
+| `docs/plans` | 产品计划、五官区域生成专项及开源模型调研 |
 | `output` | 本地产物按 `benchmarks`、`diagnostics`、`previews`、`tests`、`scratch` 分类；下载图纸仍在 `datasets` |
 | `work` | 已冻结的评测会话与人工记录；不提交 Git |
 

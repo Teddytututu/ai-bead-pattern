@@ -4,6 +4,7 @@ import { extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { createDemoAiApiHandler } from './ai-api.mjs'
+import { createRegionApiHandler } from './region-api.mjs'
 
 const root = fileURLToPath(new URL('../../../', import.meta.url)).replace(/[\\/]$/, '')
 const hasExplicitPort = process.env.PORT !== undefined
@@ -27,6 +28,7 @@ const aiApiHandler = process.env.AI_BEAD_E2E_FIXTURE === '1'
       service: (await import('../tests/fixtures/ai-service.mjs')).createDemoAiE2EService(),
     })
   : createDemoAiApiHandler()
+const regionApiHandler = createRegionApiHandler()
 
 function sendText(response, statusCode, body) {
   response.writeHead(statusCode, { 'Content-Type': 'text/plain; charset=utf-8' })
@@ -34,6 +36,7 @@ function sendText(response, statusCode, body) {
 }
 
 const server = createServer(async (request, response) => {
+  if (await regionApiHandler(request, response)) return
   if (await aiApiHandler(request, response)) return
   const requestUrl = new URL(request.url ?? '/', 'http://127.0.0.1')
   if (requestUrl.pathname === '/') {

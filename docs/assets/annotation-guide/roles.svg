@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780" role="img" aria-labelledby="title">
+<title id="title">眼、鼻、嘴角色以及空白、白珠、保留底色的区别</title>
+<style>text{font-family:"Microsoft YaHei","Noto Sans CJK SC",sans-serif} .mono{font-family:Consolas,monospace}</style>
+<rect x="0" y="0" width="1200" height="780" fill="#edf3f7" />
+<text x="36" y="47" font-size="29" fill="#193447" >角色参考：看功能，不只看颜色</text>
+<text x="36" y="80" font-size="17" fill="#526b7b" >下列形状是教学示例；真实图纸可以更小、更大、不对称、闭眼或缺失。</text>
+<rect x="24" y="106" width="274" height="352" fill="#fff" rx="14"/>
+<text x="42" y="142" font-size="20" fill="#193447" >睁眼：4 × 4</text>
+<rect x="77" y="166" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="98" y="192.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<rect x="119" y="166" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="140" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="161" y="166" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="182" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="203" y="166" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="224" y="192.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<rect x="77" y="208" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="98" y="234.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="119" y="208" width="42" height="42" fill="#fff29b" stroke="#8ca0ac" stroke-width="1"/>
+<text x="140" y="234.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">H</text>
+<rect x="161" y="208" width="42" height="42" fill="#409da6" stroke="#8ca0ac" stroke-width="1"/>
+<text x="182" y="234.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">I</text>
+<rect x="203" y="208" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="224" y="234.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="77" y="250" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="98" y="276.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="119" y="250" width="42" height="42" fill="#fff" stroke="#8ca0ac" stroke-width="1"/>
+<text x="140" y="276.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">W</text>
+<rect x="161" y="250" width="42" height="42" fill="#409da6" stroke="#8ca0ac" stroke-width="1"/>
+<text x="182" y="276.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">I</text>
+<rect x="203" y="250" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="224" y="276.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="77" y="292" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="98" y="318.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<rect x="119" y="292" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="140" y="318.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="161" y="292" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="182" y="318.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="203" y="292" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="224" y="318.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<text x="40" y="376" font-size="15" fill="#526b7b" >D 深色；H 高光；I 虹膜</text>
+<text x="40" y="404" font-size="15" fill="#526b7b" >W 眼白；. 保留脸部底色</text>
+<text x="40" y="432" font-size="15" fill="#526b7b" >同样白色也可能有不同角色</text>
+<rect x="316" y="106" width="274" height="352" fill="#fff" rx="14"/>
+<text x="334" y="142" font-size="20" fill="#193447" >闭眼：3 × 2</text>
+<rect x="390" y="166" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="411" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="432" y="166" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="453" y="192.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<rect x="474" y="166" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="495" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="390" y="208" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="411" y="234.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<rect x="432" y="208" width="42" height="42" fill="#273449" stroke="#8ca0ac" stroke-width="1"/>
+<text x="453" y="234.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">D</text>
+<rect x="474" y="208" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="495" y="234.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<text x="332" y="376" font-size="15" fill="#526b7b" >闭眼线条仍用 eye-dark</text>
+<text x="332" y="404" font-size="15" fill="#526b7b" >没有画高光，就不添加高光</text>
+<text x="332" y="432" font-size="15" fill="#526b7b" >两角的皮肤用 preserve-base</text>
+<rect x="608" y="106" width="274" height="352" fill="#fff" rx="14"/>
+<text x="626" y="142" font-size="20" fill="#193447" >张嘴：3 × 3</text>
+<rect x="682" y="166" width="42" height="42" fill="#743247" stroke="#8ca0ac" stroke-width="1"/>
+<text x="703" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">M</text>
+<rect x="724" y="166" width="42" height="42" fill="#743247" stroke="#8ca0ac" stroke-width="1"/>
+<text x="745" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">M</text>
+<rect x="766" y="166" width="42" height="42" fill="#743247" stroke="#8ca0ac" stroke-width="1"/>
+<text x="787" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">M</text>
+<rect x="682" y="208" width="42" height="42" fill="#743247" stroke="#8ca0ac" stroke-width="1"/>
+<text x="703" y="234.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">M</text>
+<rect x="724" y="208" width="42" height="42" fill="#df8a94" stroke="#8ca0ac" stroke-width="1"/>
+<text x="745" y="234.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">O</text>
+<rect x="766" y="208" width="42" height="42" fill="#743247" stroke="#8ca0ac" stroke-width="1"/>
+<text x="787" y="234.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">M</text>
+<rect x="682" y="250" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="703" y="276.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<rect x="724" y="250" width="42" height="42" fill="#743247" stroke="#8ca0ac" stroke-width="1"/>
+<text x="745" y="276.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">M</text>
+<rect x="766" y="250" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="787" y="276.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<text x="624" y="376" font-size="15" fill="#526b7b" >M mouth-dark：边缘／深线</text>
+<text x="624" y="404" font-size="15" fill="#526b7b" >O mouth-inner：可见内侧</text>
+<text x="624" y="432" font-size="15" fill="#526b7b" >. 保留底色，不扩大嘴部</text>
+<rect x="900" y="106" width="274" height="352" fill="#fff" rx="14"/>
+<text x="918" y="142" font-size="20" fill="#193447" >鼻子：3 × 2</text>
+<rect x="974" y="166" width="42" height="42" fill="#986270" stroke="#8ca0ac" stroke-width="1"/>
+<text x="995" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">N</text>
+<rect x="1016" y="166" width="42" height="42" fill="#986270" stroke="#8ca0ac" stroke-width="1"/>
+<text x="1037" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">N</text>
+<rect x="1058" y="166" width="42" height="42" fill="#986270" stroke="#8ca0ac" stroke-width="1"/>
+<text x="1079" y="192.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">N</text>
+<rect x="974" y="208" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="995" y="234.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<rect x="1016" y="208" width="42" height="42" fill="#986270" stroke="#8ca0ac" stroke-width="1"/>
+<text x="1037" y="234.88" font-size="17.64" fill="#fff" text-anchor="middle" class="mono">N</text>
+<rect x="1058" y="208" width="42" height="42" fill="#edc3a8" stroke="#8ca0ac" stroke-width="1"/>
+<text x="1079" y="234.88" font-size="17.64" fill="#263747" text-anchor="middle" class="mono">.</text>
+<text x="916" y="376" font-size="15" fill="#526b7b" >N nose-base：鼻部功能格</text>
+<text x="916" y="404" font-size="15" fill="#526b7b" >未画鼻子时不补造一个鼻子</text>
+<text x="916" y="432" font-size="15" fill="#526b7b" >未知格用 ?，不要强行填 N</text>
+<rect x="24" y="482" width="1150" height="271" fill="#fff" rx="14"/>
+<text x="44" y="523" font-size="22" fill="#193447" >同为浅色，要区分三件事</text>
+<rect x="80" y="550" width="70" height="70" fill="#edc3a8" stroke="#8399a8"/>
+<rect x="80" y="550" width="70" height="70" fill="#f7f9fa" stroke="#8399a8"/>
+<circle cx="115" cy="585" r="7" fill="none" stroke="#89949c" stroke-width="2"/>
+<rect x="380" y="550" width="70" height="70" fill="#edc3a8" stroke="#8399a8"/>
+<circle cx="415" cy="585" r="27" fill="white" stroke="#c5ced6"/>
+<circle cx="415" cy="585" r="7" fill="#d8e0e6"/>
+<rect x="730" y="550" width="70" height="70" fill="#edc3a8" stroke="#8399a8"/>
+<text x="765" y="596" font-size="34" fill="#334b5a" text-anchor="middle" class="mono">.</text>
+<text x="165" y="578" font-size="19" fill="#193447" >空白底板</text>
+<text x="165" y="608" font-size="16" fill="#526b7b" >occupancy = 0</text>
+<text x="465" y="578" font-size="19" fill="#193447" >白珠（孔不是空格）</text>
+<text x="465" y="608" font-size="16" fill="#526b7b" >occupancy = 1</text>
+<text x="815" y="578" font-size="19" fill="#193447" >保留底色</text>
+<text x="815" y="608" font-size="16" fill="#526b7b" >保留原格；可以有珠</text>
+<text x="44" y="670" font-size="18" fill="#193447" >? unknown：证据不足，先留空待核对。    . preserve-base：已确定这个位置应保持原样。</text>
+<text x="44" y="711" font-size="16" fill="#526b7b" >白色角色按形状与上下文区分：虹膜内的小亮点多为高光；明确的眼白区域用 eye-white。</text>
+</svg>

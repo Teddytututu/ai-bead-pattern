@@ -7,6 +7,7 @@ services/openclip-sidecar/.venv/
 services/sam2-sidecar/.venv/
 services/mmpose-sidecar/.venv/
 services/dinov2-sidecar/.venv/
+services/sdxl-region-sidecar/.venv/
 **/__pycache__/
 .pytest_cache/
 

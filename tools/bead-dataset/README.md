@@ -60,6 +60,8 @@ py tools/bead-dataset/finalize_notes.py
 
 本批次是本地参考候选，尚未具备确认的训练和公开再分发许可。所有条目保留 `authorizationStatus: pending`、`trainingEligible: false`、`publicRedistribution: false`。它没有脸框、关键点、逐格色号真值或配对训练输入；`evaluation-manifest.json` 仅与项目清单格式兼容，尚未接入应用评估或训练。来源条款链接为 [Kandi Pad Terms of Use](https://kandipad.com/terms-of-use)，本地已有快照保存在数据目录的 `sources/terms-of-use.html`。
 
+[读格与预标注准备工具](../template-learning/README.md)已从有效manifest复查2,435张原图，并分别记录来源声明格数（79张≤64格、13张超出、2,343张未知）与尚未知的审定格数；已导出240候选和24例方格校准诊断。派生预览没有自动获得训练资格，也没有修改这里的原图或主清单。2026-09-30 起[专项](../../docs/plans/bead-facial-template-learning-plan.md)改为全图条件下的区域生成与 adapter 训练；本数据集没有逐张配对原插画或人工接受的修正前后目标，不能直接视为新路线的完整训练集。
+
 查询确认的脸部与眼部参考：
 
 ```sql

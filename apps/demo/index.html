@@ -684,6 +684,7 @@
       </div>
       <h1>拼豆工作台</h1>
     </div>
+    <button class="secondary" id="regionExperiment" type="button">局部生成实验</button>
     <div class="status" id="status" data-state="busy" role="status" aria-live="polite">
       <span class="status-dot" aria-hidden="true"></span>
       <span id="statusText">正在准备</span>
@@ -1158,6 +1159,7 @@
       createMaskCorrectionDraftFromSession,
       createMaskEditSession,
       createPatternAlgorithm,
+      createPatternDocument,
       comparePreferenceModels,
       composeCandidateEvaluationV2,
       createFrozenPreferenceSplit,
@@ -2821,6 +2823,19 @@
       if (selectedCandidate !== null) renderPattern(selectedCandidate)
     })
     elements.downloadButton.addEventListener('click', downloadPattern)
+    document.querySelector('#regionExperiment').addEventListener('click', () => {
+      try {
+        let url = '/apps/demo/region.html'
+        if (selectedCandidate?.pattern) {
+          const pattern = selectedCandidate.pattern
+          if (pattern.width > 64 || pattern.height > 64) throw new Error('局部生成实验目前支持不超过 64×64 格的图纸。')
+          const key = `sdxl-region-${crypto.randomUUID()}`
+          localStorage.setItem(key, JSON.stringify(createPatternDocument(pattern)))
+          url += `?input=${encodeURIComponent(key)}`
+        }
+        window.open(url, '_blank', 'noopener')
+      } catch (error) { setStatus(error.message, 'error') }
+    })
 
     try {
       const bundledSample = await loadBundledSample()

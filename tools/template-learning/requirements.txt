@@ -1,0 +1,5 @@
+# Already installed in services/sam2-sidecar/.venv; no new model environment needed.
+pydantic>=2.12,<3
+numpy==2.2.6
+pillow==12.3.0
+opencv-python-headless==4.12.0.88
