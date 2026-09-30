@@ -2,6 +2,8 @@
 
 2026-09-30。按用户最终要求保留肤色底图逻辑，固定先周边、再蒙版区。此版本用于本地实验服务与 Demo，与旧 v2／模板 v1 隔离；完整定义见 [contracts.py](../services/sdxl-region-sidecar/src/sdxl_region_sidecar/contracts.py)。
 
+2026-10-01：蒙版与训练／推理条件仅基于完整拼豆格图；原照片／插画不是输入，也不作为缺失数据要求。
+
 ## 两步请求
 
 先将当前完整请求提交 POST /v1/regions/prepare，得到 contextSha256、周边材料、建议／指定肤色、完整模型输入与 mask。再携带该指纹提交 POST /v1/regions/generate。所有参数都参与指纹，任意变化都需重新 prepare。指纹用于顺序与过期输入检查，不是权限凭证，也不代表人工审核资格。

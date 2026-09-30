@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import { createDemoAiApiHandler } from './ai-api.mjs'
 import { createRegionApiHandler } from './region-api.mjs'
+import { createAnnotationApiHandler } from './annotation-api.mjs'
 
 const root = fileURLToPath(new URL('../../../', import.meta.url)).replace(/[\\/]$/, '')
 const hasExplicitPort = process.env.PORT !== undefined
@@ -29,6 +30,7 @@ const aiApiHandler = process.env.AI_BEAD_E2E_FIXTURE === '1'
     })
   : createDemoAiApiHandler()
 const regionApiHandler = createRegionApiHandler()
+const annotationApiHandler = createAnnotationApiHandler()
 
 function sendText(response, statusCode, body) {
   response.writeHead(statusCode, { 'Content-Type': 'text/plain; charset=utf-8' })
@@ -36,6 +38,7 @@ function sendText(response, statusCode, body) {
 }
 
 const server = createServer(async (request, response) => {
+  if (await annotationApiHandler(request, response)) return
   if (await regionApiHandler(request, response)) return
   if (await aiApiHandler(request, response)) return
   const requestUrl = new URL(request.url ?? '/', 'http://127.0.0.1')

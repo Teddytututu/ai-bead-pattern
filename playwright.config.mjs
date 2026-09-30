@@ -14,7 +14,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'node apps/demo/server/serve.mjs',
-    env: { PORT: '4174', AI_BEAD_E2E_FIXTURE: '1' },
+    env: { PORT: '4174', AI_BEAD_E2E_FIXTURE: '1', REGION_ANNOTATION_DIR: './output/tests/annotation-api' },
     url: 'http://127.0.0.1:4174/apps/demo/',
     reuseExistingServer: false,
     timeout: 10_000,

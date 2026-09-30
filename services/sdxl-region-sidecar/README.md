@@ -18,6 +18,10 @@ pnpm demo:sdxl
 
 本服务 .venv 与 SAM2 等环境隔离，依赖由 pyproject.toml 和 uv.lock 固定：Torch 2.8.0+cu128、Diffusers 0.35.2、PEFT 0.17.1、Transformers 4.56.2、Accelerate 1.10.1。默认 model CPU offload、SDPA、VAE tiling/slicing；SDXL_REGION_OFFLOAD=sequential 是更慢的低显存选项。
 
+## 人工配对标注
+
+工作台现有独立的“人工配对标注”入口：完整格图 → 格级蒙版 → 人工修改后的完整目标。只依赖拼豆图，不接收原照片或插画；支持画笔、锁定、撤销、远端保存和配对导出。见[操作说明](../../docs/region-annotation-guide.md)。用户已要求停止本轮训练，当前未启动多步训练。
+
 ## 操作
 
 1. **完成周边图纸**：从工作台带入或导入完整的 ≤64×64 格图 JSON。实验页不会自动修改原工作台。

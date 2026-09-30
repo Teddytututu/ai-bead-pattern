@@ -1,0 +1,107 @@
+import { test, expect } from '@playwright/test'
+const grid = { width: 4, height: 3, paletteId: 'test', paletteVersion: '1',
+  colors: [{ id: 'skin', rgb: [235,190,151] }, { id: 'dark', rgb: [30,40,50] }],
+  cells: [0,0,0,0,0,-1,1,0,0,0,0,0] }
+const request = { currentGrid: grid, editMask: grid.cells.map((_,i) => i === 5 || i === 6),
+  lockedMask: grid.cells.map((_,i) => i === 6), skinColorId: 'skin', prompt: 'Repair the missing eye.' }
+async function clickCell(page, id, x, y) {
+  await page.locator('#' + id).scrollIntoViewIfNeeded()
+  const box = await page.locator('#' + id).boundingBox()
+  // 4x3 grid is padded vertically by 80 in the 640 square canvas.
+  await page.mouse.click(box.x + ((x + .5) * 160) / 640 * box.width,
+    box.y + (80 + (y + .5) * 160) / 640 * box.height)
+}
+test('grid-only annotation edits, restores, saves remotely, exports and protects locks', async ({ page }, testInfo) => {
+  const errors = []
+  page.on('pageerror', e => errors.push(e.message))
+  await page.goto('/apps/demo/annotation.html')
+  await expect(page.locator('#reference')).toHaveCount(0)
+  await page.locator('#import').setInputFiles({ name: 'grid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(request)) })
+  await page.locator('#confirmContext').click()
+  await expect(page.locator('#message')).toContainText('标注者')
+  await page.locator('#reviewer').fill('automated-browser-not-human-gold')
+  await page.locator('#confirmContext').click()
+  await page.locator('#fillSkin').click()
+  await page.getByRole('button', { name: 'dark', exact: true }).click()
+  await clickCell(page, 'target', 1, 1)
+  await clickCell(page, 'target', 2, 1)
+  await expect(page.locator('#message')).toContainText('锁定')
+  await page.locator('#notes').fill('Automated fixture; not a human target.')
+  await page.locator('#confirmTarget').click()
+  await expect(page.locator('#exportPair')).toBeEnabled()
+  await page.locator('#saveRemote').click()
+  await expect(page.locator('#saveState')).toContainText('远端已保存')
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('region-annotation-workspace-v1')))
+  expect(stored.annotation.targetGrid.cells[5]).toBe(1)
+  expect(stored.annotation.targetGrid.cells[6]).toBe(1)
+  expect(stored.annotation.currentGrid.cells[5]).toBe(-1)
+  const download = page.waitForEvent('download')
+  await page.locator('#exportPair').click()
+  await (await download).saveAs(testInfo.outputPath('pair.json'))
+  await page.reload()
+  await expect(page.locator('#reviewStatus')).toContainText('目标图已由')
+  await expect(page.locator('#reviewer')).toHaveValue('automated-browser-not-human-gold')
+  await page.locator('#notes').fill('Updated test note')
+  await expect(page.locator('#exportPair')).toBeDisabled()
+  await expect(page.locator('#undo')).toBeDisabled()
+  await page.locator('#saveRemote').click()
+  await expect(page.locator('#saveState')).toContainText('v2')
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page.locator('#records').selectOption(stored.annotation.id)
+  await page.locator('#loadRemote').click()
+  await expect(page.locator('#notes')).toHaveValue('Updated test note')
+  await page.locator('#tool').selectOption('unedit')
+  await clickCell(page, 'before', 1, 1)
+  await page.locator('#undo').click()
+  await expect(page.locator('#contextStatus')).toContainText('周边待确认')
+  await page.screenshot({ path: testInfo.outputPath('desktop.png'), fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('mobile.png'), fullPage: true })
+  expect(errors).toEqual([])
+})
+test('malformed imported target and original-photo condition cannot enter annotation', async ({ page }) => {
+  await page.goto('/apps/demo/annotation.html')
+  await page.locator('#import').setInputFiles({ name: 'bad.json', mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ ...request, sourceImage: { data: 'not-used' } })) })
+  await expect(page.locator('#message')).toContainText('不接收原图')
+  await page.locator('#import').setInputFiles({ name: 'valid.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(request)) })
+  await page.locator('#reviewer').fill('automated-only')
+  await page.locator('#confirmContext').click()
+  const changed = { ...grid, cells: [...grid.cells] }; changed.cells[0] = 1; changed.cells[5] = 1
+  await page.locator('#importTarget').setInputFiles({ name: 'target.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(changed)) })
+  await expect(page.locator('#message')).toContainText('越过')
+})
+
+test('regional masks transfer to annotation without a source image', async ({ page, context }) => {
+  await page.route('**/api/ai/region/health', route => route.fulfill({ json: { status: 'cached', adapterConfigured: false } }))
+  await page.route('**/api/ai/region/example', route => route.fulfill({ json: request }))
+  await page.goto('/apps/demo/region.html')
+  await page.locator('#example').click()
+  await expect(page.locator('#status')).toContainText('自有程序')
+  const opened = context.waitForEvent('page')
+  await page.locator('#annotatePair').click()
+  const annotationPage = await opened
+  await annotationPage.waitForLoadState()
+  await expect(annotationPage.locator('#gridInfo')).toContainText('4 × 3')
+  const saved = await annotationPage.evaluate(() => JSON.parse(localStorage.getItem('region-annotation-workspace-v1')))
+  expect(saved.annotation.editMask).toEqual(request.editMask)
+  expect(saved.annotation.lockedMask).toEqual(request.lockedMask)
+  expect(saved.annotation.conditioning).toBe('bead-grid-only')
+  expect(saved.annotation).not.toHaveProperty('sourceImage')
+})
+test('main workbench transfers the full selected bead grid', async ({ page, context }) => {
+  test.setTimeout(60_000)
+  await page.goto('/apps/demo/')
+  await expect(page.locator('#candidateList .candidate[aria-pressed="true"]')).toBeVisible({ timeout: 45000 })
+  const opened = context.waitForEvent('page')
+  await page.locator('#annotationWorkspace').click()
+  const annotationPage = await opened
+  await annotationPage.waitForLoadState()
+  await expect(annotationPage.locator('#gridInfo')).toContainText('格')
+  const saved = await annotationPage.evaluate(() => JSON.parse(localStorage.getItem('region-annotation-workspace-v1')))
+  expect(saved.annotation.currentGrid.cells.length).toBe(saved.annotation.currentGrid.width * saved.annotation.currentGrid.height)
+  expect(saved.annotation.currentGrid.width).toBeLessThanOrEqual(64)
+  expect(saved.annotation.source.kind).toBe('workbench')
+})

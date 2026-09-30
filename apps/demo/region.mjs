@@ -1,3 +1,4 @@
+import { createAnnotation, validateAnnotation } from './annotation-state.mjs'
 import { importGrid, verifyCandidate, exportDocument, resolveSkinIndex } from './region-state.mjs'
 const $ = (id) => document.getElementById(id)
 let grid = null, original = null, editMask = [], lockedMask = [], prepared = null
@@ -157,3 +158,17 @@ try {
   $('adapter').options[1].disabled = !health.adapterConfigured
 } catch (error) { $('health').textContent = 'SDXL 服务未启动'; status(error.message, true) }
 draw(); updateButtons()
+
+$('annotatePair').onclick = () => {
+  try {
+    if (!grid) { window.open('/apps/demo/annotation.html', '_blank', 'noopener'); return }
+    const record = createAnnotation({ currentGrid: grid, editMask, lockedMask,
+      skinColorId: $('skin').value, prompt: $('prompt').value },
+      { title: '局部修正配对标注', sourceKind: 'region', sourceName: '区域生成页完整格图' })
+    if (candidate?.grid) record.targetGrid = structuredClone(candidate.grid)
+    validateAnnotation(record)
+    const key = 'annotation-input-' + crypto.randomUUID()
+    localStorage.setItem(key, JSON.stringify(record))
+    window.open('/apps/demo/annotation.html?input=' + encodeURIComponent(key), '_blank', 'noopener')
+  } catch (error) { status(error.message, true) }
+}
