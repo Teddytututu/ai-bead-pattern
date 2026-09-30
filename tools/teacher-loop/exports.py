@@ -1,4 +1,4 @@
-"""Idempotent JSONL exports after each 25 distinct reviewed inputs, scoped per round."""
+"""Range-named immutable JSONL exports; each version retains the same download name."""
 import fcntl,hashlib,json,pathlib,re,uuid
 import store
 def rows(rid):
@@ -10,42 +10,60 @@ def rows(rid):
     pool=store.items(); output=[]
     for r in reviews:
         item=pool[r['item_id']]; result=store.candidate_result(rid,item['id'])
-        output.append(dict(schema_version=1,round_id=rid,item_id=item['id'],split=item['split'],
+        payload=json.loads(r['payload']);payload.setdefault('rejection_reasons',[])
+        output.append(dict(schema_version=1,round_id=rid,item_id=item['id'],photo_id=item['photo_id'],image_number=item['image_number'],split=item['split'],
             category=item['category'],group_id=item['group_id'],review_version=r['version'],
-            reviewed_at=r['updated'],**json.loads(r['payload']),
-            source=dict(path='dataset-v1/'+item['path'],sha256=item['sha256'],license=item['license'] if 'license' in item else 'fixture',
-                        source_url=item.get('source_url')),
-            candidates={v:result[v] for v in ('a','b')},
-            dataset_sha256=store.digest(store.DATA/'dataset-v1/manifest.json')))
-    return output
-def write(rid,label,records):
+            reviewed_at=r['updated'],**payload,
+            source=dict(path=item['photo_path'],sha256=item['sha256'],license=item.get('license','fixture'),source_url=item.get('source_url')),
+            candidates={v:result[v] for v in ('a','b')},dataset_sha256=store.digest(store.DATA/'dataset-v1/manifest.json')))
+    return sorted(output,key=lambda r:r['image_number'])
+def validate_range(start,end):
+    if start<0 or end>=500 or end-start!=24:raise ValueError('每组需要连续 25 张，序号范围为 0–499')
+def write(rid,start,end,records):
     content=''.join(store.dump(r)+'\n' for r in records)
-    sha=hashlib.sha256(content.encode()).hexdigest()
-    name=f'labels-{rid}-{label}-{sha[:12]}.jsonl'
-    directory=store.DATA/'exports';directory.mkdir(exist_ok=True)
-    path=directory/name; created=not path.exists()
+    sha=hashlib.sha256(content.encode()).hexdigest();name=f'{start:03d}_{end:03d}.jsonl'
+    directory=store.DATA/'exports'/store.safe_id(rid)/sha;directory.mkdir(parents=True,exist_ok=True)
+    path=directory/name;created=not path.exists()
     if created:
         temp=directory/(name+'.'+uuid.uuid4().hex+'.tmp');temp.write_text(content);temp.replace(path)
-    return dict(name=name,count=len(records),sha256=sha,created=created,url='/api/exports/'+name)
-def export_batches(rid):
+    key=path.relative_to(store.DATA/'exports').as_posix()
+    return dict(name=name,key=key,count=len(records),sha256=sha,created=created,url='/api/exports/'+key)
+def export_batches(rid,start=None,end=None):
     directory=store.DATA/'exports';directory.mkdir(exist_ok=True)
     with (directory/'.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
-        records=rows(rid); made=[]
-        for start in range(0,len(records)-24,25):
-            result=write(rid,f'{start+1:04d}-{start+25:04d}',records[start:start+25])
-            if result['created']: made.append(result)
+        records=rows(rid);made=[]
+        ranges_path=directory/store.safe_id(rid)/'ranges.json'
+        ranges={tuple(x) for x in json.loads(ranges_path.read_text())} if ranges_path.exists() else set()
+        if start is not None and end is not None:
+            validate_range(start,end)
+            if (start,end) not in ranges:
+                ranges.add((start,end));store.atomic(ranges_path,sorted(ranges))
+        ranges.update((i,i+24) for i in range(0,500,25))
+        for start,end in sorted(ranges):
+            batch=[r for r in records if start<=r['image_number']<=end]
+            if {r['image_number'] for r in batch}!=set(range(start,end+1)):continue
+            result=write(rid,start,end,batch)
+            if result['created']:made.append(result)
         return made
-def export_all(rid):
+def export_all(rid,start=None,end=None):
     records=rows(rid)
-    if not records: raise ValueError('当前轮次还没有标注')
-    return write(rid,'all',records)
+    if (start is None)!=(end is None):raise ValueError('Provide both range bounds')
+    if start is not None:
+        validate_range(start,end);records=[r for r in records if start<=r['image_number']<=end]
+    if not records:raise ValueError('当前范围还没有标注')
+    if start is None:start,end=min(r['image_number'] for r in records),max(r['image_number'] for r in records)
+    return write(rid,start,end,records)
 def listing():
-    directory=store.DATA/'exports';directory.mkdir(exist_ok=True)
-    return [dict(name=p.name,count=sum(1 for _ in p.open()),sha256=store.digest(p),url='/api/exports/'+p.name)
-            for p in sorted(directory.glob('*.jsonl'),key=lambda p:p.stat().st_mtime,reverse=True)]
-def get_path(name):
-    if not re.fullmatch(r'labels-[a-zA-Z0-9_-]+\.jsonl',name): raise ValueError('Invalid export filename')
-    path=store.DATA/'exports'/name
-    if not path.is_file(): raise ValueError('Export not found')
+    directory=store.DATA/'exports';directory.mkdir(exist_ok=True);result=[]
+    for path in sorted(directory.rglob('*.jsonl'),key=lambda p:p.stat().st_mtime,reverse=True):
+        key=path.relative_to(directory).as_posix()
+        result.append(dict(name=path.name,key=key,count=sum(1 for _ in path.open()),sha256=store.digest(path),url='/api/exports/'+key))
+    return result
+def get_path(key):
+    current=r'round-[a-zA-Z0-9-]+/[0-9a-f]{64}/\d{3}_\d{3}\.jsonl'
+    legacy=r'labels-[a-zA-Z0-9_-]+\.jsonl'
+    if not re.fullmatch(current,key) and not re.fullmatch(legacy,key):raise ValueError('Invalid export path')
+    path=store.DATA/'exports'/key
+    if not path.is_file():raise ValueError('Export not found')
     return path

@@ -5,7 +5,9 @@ p=argparse.ArgumentParser();p.add_argument('--scope',choices=['dataset','review'
 ident=uid('backup');directory=ROOT/'.tools/cache/teacher-loop-backups'/ident;directory.mkdir(parents=True)
 archive=directory/(ident+'.tar')
 with tarfile.open(archive,'w',dereference=True) as tar:
- if args.scope in ('dataset','all'):tar.add(DATA/'dataset-v1',arcname='dataset-v1')
+ if args.scope in ('dataset','all'):
+  tar.add(DATA/'dataset-v1',arcname='dataset-v1')
+  if (DATA/'dataset-numbered').exists():tar.add(DATA/'dataset-numbered',arcname='dataset-numbered')
  if args.scope in ('review','all'):
   sqlite_path=directory/'reviews.sqlite3'
   with db() as conn:

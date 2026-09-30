@@ -23,7 +23,7 @@ class WorkflowTests(unittest.TestCase):
             store.atomic(directory/'result.json',result)
     def tearDown(self): store.DATA=self.old; self.tmp.cleanup()
     def review(self,i=0,choice='a',version=0):
-        return store.save_review(self.rid,f'input{i}',dict(accepted=choice,preferred=choice if choice!='both' else 'b',caption='a flat cartoon cat',notes='test fixture'),version)
+        return store.save_review(self.rid,f'input{i}',dict(accepted=choice,preferred=choice if choice!='both' else 'b',caption='a flat cartoon cat',notes='test fixture',rejection_reasons=['color'] if choice=='neither' else []),version)
     def test_no_labels_no_training_export(self):
         with self.assertRaisesRegex(ValueError,'No approved'): store.freeze()
     def test_holdouts_excluded(self):
@@ -58,6 +58,17 @@ class WorkflowTests(unittest.TestCase):
     def test_preference_is_not_acceptance(self):
         with self.assertRaisesRegex(ValueError,'agree'):
             store.save_review(self.rid,'input0',dict(accepted='neither',preferred='a',caption='cat'),0)
+    def test_rejection_reason_required_and_roundtripped(self):
+        body=dict(accepted='neither',preferred='neither',caption='',rejection_reasons=[])
+        with self.assertRaisesRegex(ValueError,'至少一个'): store.save_review(self.rid,'input0',body,0)
+        body['rejection_reasons']=['color','pose']
+        saved=store.save_review(self.rid,'input0',body,0)
+        self.assertEqual(saved['rejection_reasons'],['color','pose'])
+        import exports
+        exported=exports.export_all(self.rid,0,24)
+        row=json.loads(exports.get_path(exported['key']).read_text().splitlines()[0])
+        self.assertEqual(row['rejection_reasons'],['color','pose'])
+        with self.assertRaisesRegex(ValueError,'No approved'): store.freeze()
     def test_path_traversal_rejected(self):
         with self.assertRaisesRegex(ValueError,'identifier'): store.round_config('../outside')
     def test_api_cross_origin_and_backup(self):

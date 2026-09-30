@@ -40,7 +40,10 @@ def manifest():
     expected=(path.parent/'manifest.sha256').read_text().split()[0]
     if digest(path)!=expected: raise ValueError('Dataset manifest hash mismatch')
     return value
-def items(): return {item['id']:item for item in manifest()['items']}
+def items():
+    numbered=(DATA/'dataset-numbered/manifest.json').exists()
+    return {item['id']:dict(**item,image_number=index,photo_id=f'{index:03d}',photo_path=(f'dataset-numbered/images/{index:03d}.jpg' if numbered else 'dataset-v1/'+item['path']))
+            for index,item in enumerate(manifest()['items'])}
 def round_config(rid):
     with db() as c: row=c.execute('SELECT config FROM rounds WHERE id=?',(safe_id(rid),)).fetchone()
     if row is None: raise ValueError('Round not found')
@@ -96,10 +99,14 @@ def save_review(rid,iid,payload,version):
     if preferred not in ('a','b','tie','neither'): raise ValueError('Invalid preference')
     if (accepted in ('a','b') and preferred!=accepted) or (accepted=='neither' and preferred!='neither') or (accepted=='both' and preferred=='neither'):
         raise ValueError('Preference must agree with accepted candidates')
+    reasons=payload.get('rejection_reasons',[])
+    if not isinstance(reasons,list) or any(x not in ('color','pose') for x in reasons) or len(reasons)!=len(set(reasons)):raise ValueError('不合格原因只能选择颜色、姿态，不能重复')
+    if accepted=='neither' and not reasons:raise ValueError('请选择至少一个不合格原因：颜色或姿态')
+    if accepted!='neither' and reasons:raise ValueError('只有两张都不合格时才能填写不合格原因')
     caption=payload.get('caption','').strip()
     if accepted!='neither' and len(caption)<5: raise ValueError('Describe the accepted target')
     if len(caption)>2000 or len(payload.get('notes',''))>2000: raise ValueError('Text too long')
-    body=dict(accepted=accepted,preferred=preferred,caption=caption,notes=payload.get('notes',''),
+    body=dict(accepted=accepted,preferred=preferred,rejection_reasons=sorted(reasons),caption=caption,notes=payload.get('notes',''),
               candidate_hashes={v:result[v]['sha256'] for v in ('a','b')},master_hashes={v:result[v].get('master_sha256') for v in ('a','b')},source_sha256=result['source_sha256'])
     updated=now()
     with db() as c:
@@ -125,7 +132,7 @@ def freeze():
         variant=r['preferred'] if r['preferred'] in ('a','b') else 'a'
         if result[variant]['sha256']!=r['candidate_hashes'][variant]: raise ValueError('Reviewed candidate changed')
         if result[variant].get('master_sha256')!=r.get('master_hashes',{}).get(variant): raise ValueError('Reviewed training master changed')
-        selected.append(dict(item_id=iid,group_id=pool[iid]['group_id'],source_path='dataset-v1/'+pool[iid]['path'],
+        selected.append(dict(item_id=iid,photo_id=pool[iid]['photo_id'],image_number=pool[iid]['image_number'],group_id=pool[iid]['group_id'],source_path=pool[iid]['photo_path'],
              source_sha256=pool[iid]['sha256'],target_path=result[variant].get('master_path',result[variant]['path']),target_sha256=result[variant].get('master_sha256',result[variant]['sha256']),
              output_path=result[variant]['path'],output_sha256=result[variant]['sha256'],
              caption=r['caption'],review_round=row['round_id'],review_version=row['version'],

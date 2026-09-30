@@ -1,6 +1,6 @@
 # SDXL 教师迭代
 
-网页经 SSH 转发访问 http://127.0.0.1:4190 。这是独立主体卡通化实验，不替换原有 SAM2 或眼睛补全服务。
+操作人员请先阅读 [简要操作说明](../../apps/teacher-review/README.md)。图片按 000–499 编号，前端按可编辑的 25 张范围审核。\n\n网页经 SSH 转发访问 http://127.0.0.1:4190 。这是独立主体卡通化实验，不替换原有 SAM2 或眼睛补全服务。
 
 ## 标注与输出
 
@@ -8,7 +8,7 @@
 
 新轮次内部生成 1024×1024 底稿，标注/导出结果为 256×256，等比缩放、白色补边，不拉伸不裁切。网页可查看高分辨率底稿。LoRA 使用对应已通过预览的底稿，两者均记录哈希。旧校准轮次保持原状。
 
-每轮每完成 25 个不同输入的标注，导出一批 JSONL 到持久目录 output/teacher-loop/exports，并触发浏览器下载。页面保留下载链接；不足 25 张可手动导出。修改不重复计数，已导出批次修改后生成新哈希版本，不覆盖历史。导出包含拒绝项、split、路径/哈希、标注版本；合并时按 round_id + item_id 取最大 review_version。JSONL 不含图片字节，迁移需同时保存图像。
+每轮本组连续 25 张标注全部完成后，导出范围命名的 JSONL（如 000_024.jsonl） 到持久目录 output/teacher-loop/exports，并触发浏览器下载。页面保留下载链接；不足 25 张可手动导出。已导出批次修改后生成新哈希目录版本，文件名仍为 xxx_xxx.jsonl，不覆盖历史。导出包含拒绝项、split、路径/哈希、标注版本；合并时按 round_id + item_id 取最大 review_version。JSONL 不含图片字节，迁移需同时保存图像。
 
 ## 训练流程
 
@@ -31,7 +31,7 @@
 
 ## 存储与备份
 
-远端代码、SQLite 标注历史、冻结快照、JSONL 在持久项目目录。当前家目录配额不足，dataset-v1、rounds、adapters 链接到 .tools 运行盘，可能被清理。Windows 已保存输入集，结果和 adapter 在轮次完成后应执行备份，不能仅存运行盘。
+远端代码、SQLite 标注历史、冻结快照、JSONL 在持久项目目录。当前家目录配额不足，dataset-v1、rounds、adapters 链接到 .tools 运行盘，可能被清理。Windows 已保存输入集（新的编号图片在 dataset-numbered，dataset-v1 作为旧轮次兼容副本），结果和 adapter 在轮次完成后应执行备份，不能仅存运行盘。
 
 Windows：
 
@@ -45,7 +45,7 @@ Windows：
 先运行 SSH status，再通过 remote.ps1 执行 Bash：
 
     source scripts/dev/remote-env.sh
-    services/sam2-sidecar/.venv/bin/python tools/teacher-loop/prepare.py
+    services/sam2-sidecar/.venv/bin/python tools/teacher-loop/prepare.py\n    services/sdxl-region-sidecar/.venv/bin/python tools/teacher-loop/number_dataset.py
     services/sdxl-region-sidecar/.venv/bin/python tools/teacher-loop/prefetch.py
     services/sdxl-region-sidecar/.venv/bin/python tools/teacher-loop/prefetch-control.py
     services/sam2-sidecar/.venv/bin/python tools/teacher-loop/controls.py
