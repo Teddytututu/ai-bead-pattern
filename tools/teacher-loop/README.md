@@ -27,7 +27,7 @@ services/sdxl-region-sidecar/.venv/bin/python tools/teacher-loop/prefetch-contro
 services/sam2-sidecar/.venv/bin/python tools/teacher-loop/controls.py
 ~~~
 
-prepare 拒绝覆盖已有 manifest；已有数据时不要重复初始化。使用 server.py --gpu 指定当前获分配的单个 GPU，--port 默认 7119。服务只监听本机，按 GPU 锁协调任务。源码中的分片扩展若尚未提交，不视作稳定接口。
+prepare 拒绝覆盖已有 manifest；已有数据时不要重复初始化。使用 server.py --gpu 指定当前获分配的单个 GPU，--port 默认 7119。服务只监听本机，按 GPU 锁协调任务。命令行 worker 的多卡生成分片见下文。
 
 ## 保存与恢复
 
@@ -50,7 +50,6 @@ node tools/teacher-loop/tests/browser.mjs
 ~~~
 
 单元测试使用临时库，浏览器测试使用 mock。tests/gpu_smoke.py 会实际占用 GPU，只做合成诊断，需单独选择设备。训练任务日志、失败清单和审核证据不作为过期普通日志清理。
-
 
 ## 多卡补全同一轮候选
 

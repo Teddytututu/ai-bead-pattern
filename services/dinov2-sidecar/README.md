@@ -1,26 +1,18 @@
-# DINOv2 ViT-S/14 Pair Sidecar
+# DINOv2 图像对评分
 
-This local FastAPI provider compares a source image with one candidate by using the
-pinned `facebook/dinov2-small` encoder. It emits CLS identity similarity and patch-token
-correspondence for four views: global, subject, head, and critical local detail.
+服务使用固定 facebook/dinov2-small，比较原图与候选的全图、主体、头部和关键局部视图，返回 CLS 相似度和 patch 对应指标。原始嵌入不作为 HTTP 结果输出。
 
-Model source: `facebookresearch/dinov2` at
-`7764ea0f912e53c92e82eb78a2a1631e92725fc8` (Apache-2.0). Weights:
-`facebook/dinov2-small` at `ed25f3a31f01632728cabb09d1542f84ab7b0056`
-(Apache-2.0).
+模型 revision、输入合同及来源记录见 [contracts.py](src/dinov2_sidecar/contracts.py)。视图等比放入 224×224 白底画布；相似度用于辅助排序，不直接判断图纸是否可制作。
 
-```powershell
-uv sync --project services/dinov2-sidecar --python 3.11
+## 启动
+
+~~~bash
+pnpm dinov2:setup
 uv run --project services/dinov2-sidecar --python 3.11 python -m dinov2_sidecar.prefetch
-uv run --project services/dinov2-sidecar --python 3.11 python -m unittest discover -s services/dinov2-sidecar/tests -v
-uv run --project services/dinov2-sidecar --python 3.11 python -m dinov2_sidecar
-```
+pnpm dinov2:test
+DINOV2_PORT=7106 pnpm dinov2:start
+~~~
 
-The server listens on `127.0.0.1:7105`. `DINOV2_DEVICE=cpu` forces the CPU route.
-`DINOV2_ALLOW_DOWNLOAD=1` permits a request to fetch absent pinned weights; the normal
-setup path uses the explicit prefetch command. `/health` reports `unavailable` while the
-pinned checkpoint is absent, `degraded` while cached and cold, and `ready` after loading.
+代码默认端口为 7105，与 Pattern API 冲突，因此以上示例使用 7106。Demo 同时设置 DINOV2_ENDPOINT=http://127.0.0.1:7106。DINOV2_DEVICE=cpu 可选 CPU；使用 CUDA 时明确选择 GPU。
 
-Every view preserves aspect ratio and uses white padding on a 224 x 224 canvas. The
-canvas is a 14-pixel patch multiple, so regional geometry reaches the ViT without image
-stretching. Raw embeddings remain inside the sidecar; only compact pair metrics leave it.
+/health 区分缺少权重、已缓存但未加载、已加载。默认提前 prefetch，DINOV2_ALLOW_DOWNLOAD=1 才允许请求时下载缺失权重。固定环境与权重不代表已经完成真实质量评测。

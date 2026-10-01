@@ -1,88 +1,72 @@
 # Pattern API v1
 
-将 MARD 291 色匹配、图纸生成和导出提供给微信小程序。API 使用 Node HTTP、计算 Worker 和 SQLite，默认只监听本机。确定性生成不依赖模型或 GPU；AI 分析复用现有 ai-gateway。
+Node HTTP、Worker 和 SQLite 组成的异步图纸服务。确定性生成不需要 GPU；neural-analysis 可接入主体分析模型。它与浏览器 Demo 的模型代理是独立入口。
 
-## 本地启动
+## 启动
 
-要求 Node 24.13+、pnpm 11.19。`node:sqlite` 在 Node 24 中为实验功能，部署时应固定经过验证的 Node 小版本。
+在远端仓库根目录：
 
-在仓库根目录执行：
-
-```powershell
-pnpm install
-Copy-Item services/pattern-api/.env.example services/pattern-api/.env
+~~~bash
+source scripts/dev/remote-env.sh
+cp services/pattern-api/.env.example services/pattern-api/.env
 pnpm api:dev
-```
+~~~
 
-`.env` 默认启用本地模拟身份，监听 `http://127.0.0.1:7105`。规范化图片、任务和结果保存在 `services/pattern-api/data/`，默认保留 24 小时，均已加入 Git 忽略规则。不要将此目录作为 Web 静态目录公开。
+只在尚无个人 .env 时复制示例。默认端口 7105，默认数据目录 services/pattern-api/data。生产部署关闭 PATTERN_DEV_AUTH，配置 NODE_ENV=production、WECHAT_APP_ID 和 WECHAT_APP_SECRET，并使用 HTTPS 与持久数据卷。
 
-规范见 [openapi.json](openapi.json)。时间戳均为 Unix 毫秒；JSON 响应为 `{ data, requestId }` 或 `{ error: { code, message, retryable }, requestId }`。
+[OpenAPI](openapi.json)和[共享契约](../../packages/pattern-api-contracts/src/index.ts)定义请求。响应使用 data/requestId 或 error/requestId 信封。
 
 ## 调用流程
 
-1. 本地使用 `POST /v1/auth/dev` 和 `{ "userId": "local-demo" }` 取得 token。真实小程序通过 `wx.login` 获得 code，再调用 `POST /v1/auth/wechat`。
-2. `GET /v1/palettes/mard-291` 读取版本，`GET /v1/capabilities` 查询限制及已配置路线。
-3. `POST /v1/images` 使用 multipart 字段 `file` 上传，带 `Authorization: Bearer <token>`。支持 JPEG/PNG/WebP，最多 5 MiB、2000 万像素；拒绝动画和伪装类型，校正方向和 sRGB、最长边缩至 1024，保留透明度。
-4. `POST /v1/pattern-jobs`，带授权头及唯一 `Idempotency-Key`。重试同一业务操作时保持该键不变。
-5. 查询 `/v1/pattern-jobs/{jobId}`，`succeeded` 后读取 `/result`，选择候选后访问 `/exports/{candidateId}?format=png|csv|json`。
+1. /v1/auth/dev 提供开发身份；真实客户端经 wx.login 后调用 /v1/auth/wechat。
+2. /v1/capabilities 查询能力，/v1/palettes 选择色卡及版本。
+3. POST /v1/images，以 multipart 的 file 上传，使用 Bearer token。
+4. POST /v1/pattern-jobs，使用唯一 Idempotency-Key；相同操作重试复用该键。
+5. 轮询 /v1/pattern-jobs/{jobId}；成功后读取其 /result。
+6. 选择候选，访问 /exports/{candidateId}?format=png|csv|json。
 
-```json
+~~~json
 {
-  "imageId": "img_从上传返回",
+  "imageId": "上传返回的 imageId",
   "paletteId": "mard-291",
   "route": "deterministic",
   "options": {
-    "canvas": { "mode": "fixed", "size": { "width": 48, "height": 48 } },
-    "maxColors": 20,
+    "canvas": { "mode": "fixed", "size": { "width": 64, "height": 64 } },
+    "styles": ["faithful"],
+    "maxColors": 24,
     "maxCandidates": 3,
-    "styles": ["faithful", "simple", "high-contrast"]
+    "structure": {
+      "valueMode": "preserve",
+      "valueStrength": 0,
+      "contours": { "external": true, "internal": false }
+    }
   }
 }
-```
+~~~
 
-省略 `paletteVersion` 会冻结当前版本；显式指定未知版本返回 404。作品最多 48 色，完整材料库参与搜索；自动网格为 32/48/64，固定网格还支持 96。
+固定格数支持 32／48／64／96，单图最多 48 色、3 个候选。省略色卡版本时冻结当前版本，未知版本会被拒绝。
 
-颜色策略通过 `options.structure` 传入，微信 SDK 的 `createPatternJob` 使用相同字段：
+## 结果与参数
 
-```json
-{ "valueMode": "preserve", "valueStrength": 0, "valueLevels": 3, "outlineMode": "off" }
-```
+- task state 表示执行状态；generationStatus 表示图纸质量，两者不能混为一谈。
+- best-effort 必须经用户检查并使用 acceptBestEffort=true 才能导出不合格候选；无候选时没有图纸。
+- 网格 -1 是空板，其他索引引用 colors，材料统计只计算占用格。
+- valueMode 支持 preserve／adaptive／stylized；valueStrength 为 0–1。零强度不改变明暗，不代表材料量化零色差。
+- contours 的 external／internal 分别控制外／内轮廓，可指定合规 colorId。MARD 的 H7 填色排除和统一深色描边不套用到 Perler。
+- 不接受 featureOverrides，不返回 featurePlacements，也没有模板修正能力。
 
-`valueMode` 支持 `preserve / adaptive / stylized`；省略时还原风格为 preserve、简洁为 adaptive、其余为 stylized。`valueStrength` 范围 0–1，默认 1；preserve 实际强度固定为 0。零强度不改变明暗，描边独立；适度增强/风格化的非描边格在量化前最多分别改变 6/12 个 L* 单位和 ΔE00，按强度缩放。色卡、几何映射、五官与精修造成的最终误差另行评估，不能把量化前上限解释为成品色差保证。返回图纸 `metadata` 记录生效策略、强度和算法版本。
+## 模型与手机
 
-任务执行状态与 `result.generationStatus` 分开。`best-effort` 需要用户检查并接受后加 `acceptBestEffort=true` 才能导出不合格候选；`no-valid-candidate` 没有图纸。网格索引 `-1` 表示空白，其余值引用候选的 `colors`；材料数量只统计占用格。
+设置 SAM2_ENDPOINT 可启用 Grounded-SAM-2；只设置 REMBG_ENDPOINT 时只有主体抠图证据。严格模式在分析失败时报错，best-effort 降级会返回警告和实际路线。
 
-## 轮廓参数
+远程分析端点需配置 REMOTE_ANALYSIS_LABEL，客户端取得同意后传 consentToRemoteAnalysis。客户端不能自行指定模型 URL。手机接入见 [小程序说明](../../apps/wechat-miniapp/README.md)。
 
-`options.structure.contours: { external, internal, colorId? }` 控制外／内轮廓；微信 SDK 使用相同字段：
+## 持久化和限制
 
-```json
-{ "structure": { "contours": { "external": true, "internal": false } } }
-```
+上传支持 JPEG／PNG／WebP，最多 5 MiB、2000 万像素，拒绝动画并规范化至最长边 1024，保留透明度。默认保存 24 小时；运行任务引用的图片不会提前清理。
 
-候选返回 `contourPlan`，包含轮廓格、材料色及质量诊断。五官规则模板及其手动校正入口已删除；请求不再接受 `featureOverrides`，结果不再生成 `featurePlacements`。模型关键点只用于原图细节保护和评估。
+默认单实例、一个计算 Worker、20 个排队槽位；每用户最多 3 个活动任务、100 个有效任务和 10 张图片。断网不取消任务，可凭 jobId 恢复。显式取消终止任务，重启后原运行任务标记 SERVICE_RESTARTED；旧算法排队任务不能伪装成新版本完成。
 
-MARD 291 默认使用单色深描边，候选为 B22、B23、C12、C18、D4、D10、D15、D22、F7、F11、G8、R22；内外轮廓共用一色，显式指定不合规色号返回 `422 INVALID_CONTOUR_COLOR`。自动填色排除 H7；此限制不应用于 Perler 黑色或通用 24 色，详见[当前配色行为](../../docs/architecture.md#配色与五官的当前行为)。
+精确配额、超时和错误以 [server.ts](src/server.ts)为准。当前不支持多个实例同时调度同一个数据库。真实微信登录、域名与真机权限仍需部署验收。
 
-## 恢复与限额
-
-- 图片、色卡快照、任务、算法版本、幂等键、会话持久化。断网/退后台不取消任务；恢复后查询原 jobId。升级后无法按原算法执行的排队任务返回 `ALGORITHM_VERSION_CHANGED`，由用户重新生成。
-- 显式取消可停止排队/运行任务，迟到结果不能覆盖取消状态。重启恢复排队任务，原运行任务返回 `SERVICE_RESTARTED`；成功结果继续可读。
-- 单实例、默认一个 Worker、20 个排队槽位；每用户最多 3 个活动任务、100 个有效任务、10 张图片。上传最多同时两个用户、每用户一个；规范化图片按用户去重。
-- 确定性执行超时 60 秒，仅 REMBG 的 AI 路线 180 秒，配置 SAM2 后 AI 路线 300 秒；排队超时 5 分钟。每个来源 IP 每分钟最多 120 请求；超过限额返回 429，转发头不作为认证依据。
-- 每 30 秒清理过期文件，运行任务引用的图片受保护。过期元数据短期保留用于 410，然后清除。会话有效期 24 小时。
-- 用户只能操作自己的图片/任务/结果；不可见资源返回 404。生产模式禁止模拟身份，AppSecret/session_key 只留在服务端。
-
-## 可选分析与部署
-
-启动 `pnpm sam2:start`，在 API 环境设置 `SAM2_ENDPOINT=http://127.0.0.1:7103`，请求 `route: neural-analysis`，即可使用 Grounded-SAM-2 主体及部件蒙版、独立部件定位与原图细节保护。首次安装执行 `pnpm sam2:setup`，模型来源与验证边界见 [SAM2 服务说明](../sam2-sidecar/README.md)。
-
-仅设置 `REMBG_ENDPOINT=http://127.0.0.1:7000` 时提供主体蒙版，返回部件识别未启用的提示；同时配置时优先 SAM2。strict 模式在分析失败时报错；best-effort 降级时明确返回警告与 `actualRoute: deterministic`。
-
-非本机模型地址必须配置 `REMOTE_ANALYSIS_LABEL`。客户端先展示能力接口返回的处理位置、取得单独同意，再发送 `consentToRemoteAnalysis: true`。能力接口报告配置，不代替模型健康保证。客户端不能传入模型 URL。
-
-正式环境设置 `NODE_ENV=production`、`PATTERN_DEV_AUTH=0`、`WECHAT_APP_ID`、`WECHAT_APP_SECRET`，以单实例运行并挂载持久数据卷。用 HTTPS 反向代理提供服务，代理上传上限至少容纳 5 MiB 文件及 multipart 开销；微信后台配置 request/uploadFile/downloadFile 域名。不要将凭据写入客户端、响应或日志。
-
-当前不支持多实例同时调度同一个数据库。域名、微信账号绑定、体验版和真机验收需部署方配置，本地自动化不代表这些步骤已完成。
-
-验证：`pnpm test:api`、`pnpm typecheck`、`pnpm test:e2e`。OpenAPI 在根目录运行 `node scripts/maintenance/generate-pattern-openapi.mjs` 生成。SQLite 参考 [Node v24.13 官方文档](https://github.com/nodejs/node/blob/v24.13.0/doc/api/sqlite.md)。
+验证使用 pnpm test:api 和 pnpm typecheck。修改接口后运行 node scripts/maintenance/generate-pattern-openapi.mjs 更新规范。

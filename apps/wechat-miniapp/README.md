@@ -1,28 +1,22 @@
-# 微信小程序联调示例
+# 微信小程序示例
 
-原生 TypeScript 单页提供选图、291/24 色卡、用色/尺寸设置、上传、异步生成、Canvas 候选预览、材料清单及 PNG/CSV/JSON 下载。退后台暂停轮询，回到前台使用保存的 jobId 恢复，任务继续在服务端执行。
+客户端负责选图、上传、创建异步任务、候选预览、材料清单和 PNG／CSV／JSON 下载。生成在 Pattern API 服务端执行，手机端不加载 SDXL 或网格神经网络。
 
-新增颜色策略与明暗强度：支持随风格、保色、适度增强、风格化；零强度保留原始明暗。字段经微信 SDK 的 `options.structure` 传递，语义与 [API](../../services/pattern-api/README.md) 一致。保色模式下滑块禁用，切换参数会清除待重试请求，避免复用旧参数。
+## 接入
 
-## 使用
+1. 在远端启动 [Pattern API](../../services/pattern-api/README.md)。
+2. 修改 config.ts 的 apiBaseUrl。开发配置的 127.0.0.1 只适用于当前设备，不能让手机访问电脑。
+3. 在远端运行 pnpm wechat:build，得到 SDK 和页面 JavaScript；按远程开发流程同步构建产物后，在微信开发者工具导入本目录。
+4. 真实登录清空 devUserId，配置自己的 AppID 和 HTTPS API；AppSecret 只放服务端。
+5. 配置 request／uploadFile／downloadFile 域名，在 Android／iOS 验证登录、后台恢复、下载和相册权限。
 
-外/内轮廓提供独立开关，默认开启；候选下方显示实际轮廓格数、对比不足和证据缺失提示。五官规则模板及手动模板校正参数已移除，轮廓配置见 [API 说明](../../services/pattern-api/README.md#轮廓参数)。
+页面从 API 加载 MARD、Perler、通用色卡，支持尺寸、用色、明暗强度以及内外轮廓。模板五官参数已删除。
 
-1. 按 [Pattern API 说明](../../services/pattern-api/README.md)启动服务。
-2. `config.ts` 已使用本机调试配置 `apiBaseUrl: http://127.0.0.1:7105` 和 `devUserId: local-demo`；真实微信登录时清空 `devUserId` 并改为 HTTPS API 地址。
-3. 仓库根目录运行 `pnpm wechat:build`，生成 SDK 和页面 JS，构建产物已被忽略。
-4. 微信开发者工具导入本目录。游客 AppID 只用于本地示例，请替换自己的 AppID 后测试真实登录。
-5. 本机 HTTP 调试可按开发者工具设置临时关闭域名校验；上线恢复校验，配置 HTTPS API 和 request/uploadFile/downloadFile 合法域名。手机不能用 `127.0.0.1` 访问电脑服务。
+## SDK
 
-上传前页面显示处理及保留说明。PNG 由用户点击后保存到相册；CSV/JSON 下载后打开微信文件分享菜单，不会自动发送给任何人。AppSecret 只配置在服务端环境变量中。
+[wechat-client](../../packages/wechat-client/)通过可注入 wx 适配器运行，提供 ESM／CommonJS 构建。
 
-已提供 TypeScript 编译和 SDK/HTTP 自动化测试；开发者工具、Android/iOS、真实微信登录及相册权限需在对应环境验证。
-
-## SDK 单独接入
-
-SDK 源码及 ESM/CommonJS 输出位于 [packages/wechat-client](../../packages/wechat-client/)。通过可注入的 wx 适配器工作，不依赖 Node、DOM 或 fetch。
-
-```ts
+~~~ts
 const client = new WechatPatternClient({ baseUrl: 'https://你的API域名', wx })
 await client.login()
 const image = await client.uploadImage(tempFilePath)
@@ -32,7 +26,8 @@ const terminal = await waiting.promise
 if (terminal.state === 'succeeded') {
   const result = await client.getResult(job.jobId)
 }
-// 退后台：waiting.stop()；取消服务端计算：client.cancelJob(job.jobId)
-```
+~~~
 
-同一次创建操作重试时复用 requestKey。SDK 同时检查 HTTP 状态和业务响应，并解析上传回调的字符串 JSON。会话失效通过 `onSessionExpired` 通知调用者。
+同一次请求重试复用 requestKey。退后台停止轮询，回前台用 jobId 恢复；停止轮询不等于取消服务端任务。SDK 的 cancelJob 才提交取消。
+
+图片上传前展示处理及保留说明。PNG 经用户操作保存到相册，CSV／JSON 可由用户选择分享。编译和 HTTP 测试不代替真实微信环境验收。

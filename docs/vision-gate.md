@@ -1,38 +1,27 @@
-# Portrait Vision Gate
+# 人像分析评测
 
-Portrait Vision Gate measures whether the portrait providers locate the eyes and mouth at the resolution used by a 48 x 48 bead pattern, and whether face, hair, and clothes regions occupy plausible grid areas.
+Vision Gate 评测原图人像分析证据在固定 48×48 参考网格上的位置和区域质量。它不评测 SDXL 卡通风格，也不表示第二阶段网格网络已实现。
 
-## Protocol
+## 数据和指标
 
-- Dataset: 30 licensed or owned portrait images.
-- Coverage: front face, light profile, three-quarter view, glasses, bangs, occlusion, low light, complex background, and small full-body portraits.
-- Landmark annotations: normalized source coordinates for `left-eye-center`, `right-eye-center`, and `mouth-center`.
-- Region annotations: occupied cell indices on a fixed 48 x 48 reference grid for `face-skin`, `hair`, and `clothes`.
-- Predictions: one JSONL record per manifest sample, with stable dataset, protocol, model, and image identity.
+协议需要 30 张来源明确的人像及人工标签，覆盖正脸、侧转、遮挡、眼镜、弱光、背景和小主体。关键点用归一化源图坐标，区域使用参考格图的占用索引。
 
-The protocol fixture generator produces synthetic annotations and perfect predictions for checking the evaluator itself:
-
-```powershell
-pnpm vision-gate:fixtures --output work/vision-gate/protocol
-pnpm vision-gate:report `
-  --manifest work/vision-gate/protocol/manifest.json `
-  --predictions work/vision-gate/protocol/predictions.jsonl `
-  --output work/vision-gate/protocol/report.md `
-  --json work/vision-gate/protocol/summary.json `
-  --diagnostics work/vision-gate/protocol/diagnostics
-```
-
-Protocol fixtures verify schema, statistics, CLI output, and diagnostic exports. Real model results use a separate dataset ID and real human annotations.
-
-## Gate Criteria
-
-| Metric | Target |
+| 指标 | 门槛 |
 | --- | ---: |
-| Eye centers within 1 grid cell | at least 90% |
-| Mouth center within 1.5 grid cells | at least 90% |
-| Face containment above 0.85 | at least 90% of samples |
-| Hair Dice above 0.50 | at least 80% of samples |
-| Clothes Dice above 0.50 | at least 80% of samples |
-| High-confidence hard landmark mismatch | at most 2% |
+| 眼中心误差 ≤1 格 | ≥90% |
+| 嘴中心误差 ≤1.5 格 | ≥90% |
+| 面部包含率 >0.85 | ≥90% 样本 |
+| 头发 Dice >0.50 | ≥80% 样本 |
+| 衣物 Dice >0.50 | ≥80% 样本 |
+| 高置信硬关键点失配 | ≤2% |
 
-The summary also reports expected calibration error and Brier score. Diagnostics include per-sample outcomes, per-landmark errors, per-region overlap, and calibration bins.
+报告另含校准误差、Brier 分数和逐样本诊断。真实结果固定数据、协议、模型和图像身份。
+
+## 验证评测器
+
+~~~bash
+pnpm vision-gate:fixtures --output work/vision-gate/protocol
+pnpm vision-gate:report --manifest work/vision-gate/protocol/manifest.json --predictions work/vision-gate/protocol/predictions.jsonl --output work/vision-gate/protocol/report.md --json work/vision-gate/protocol/summary.json --diagnostics work/vision-gate/protocol/diagnostics
+~~~
+
+fixtures 生成合成标签和完美预测，只检查 schema、统计、CLI 及导出。真实人工数据必须使用独立数据集身份，不能把夹具报告当作模型准确率。

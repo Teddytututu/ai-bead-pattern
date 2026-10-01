@@ -1,91 +1,61 @@
-# 当前实现架构
+# 当前架构
 
-算法版本为 `0.11.0-source-features`，以 [pipeline.ts](../packages/pattern-core/src/pipeline.ts) 为准。本文维护当前运行行为；后续交付与验收状态统一见[产品计划](plans/contours-features-editing-perler-123-plan.md)。
+主生成器版本为 0.11.0-source-features，定义见 [pipeline.ts](../packages/pattern-core/src/pipeline.ts)。两阶段神经网络路线的状态见 [训练路线](training.md)。
 
-## 两条运行入口
+## 执行入口
 
-```mermaid
-flowchart TD
-  Demo[浏览器工作台] --> Core[Pattern Core]
-  Demo --> DemoAPI[Demo AI HTTP 接口]
-  Mini[微信小程序] --> SDK[WeChat SDK 与 API Contracts]
+~~~mermaid
+flowchart LR
+  Web[网页工作台] --> Core[Pattern Core]
+  Web --> Gateway[Demo API / AI Gateway]
+  Mini[微信小程序] --> SDK[WeChat SDK]
   SDK --> API[Pattern API]
-  API --> Store[SQLite 与私有文件]
-  API --> Worker[任务 Worker]
+  API --> Store[SQLite / 私有文件]
+  API --> Worker[计算 Worker]
   Worker --> Core
-  DemoAPI --> Gateway[AI Gateway]
   Worker --> Gateway
-  Gateway --> Models[外部模型与本地 sidecar]
-  Palettes[Material Palettes] --> Core
-```
+  Gateway --> Models[可选模型服务]
+  Palettes[实体色卡] --> Core
+~~~
 
-- **浏览器工作台**：`apps/demo/index.html` 在浏览器执行核心算法；`apps/demo/server/serve.mjs` 提供静态资源和 `/api/ai/*`，由 `apps/demo/server/ai-api.mjs` 接入 Gateway。它不经过产品任务 API。
-- **小程序产品链路**：`apps/wechat-miniapp` → `packages/wechat-client` → `services/pattern-api` → `src/worker.ts`。服务负责会话、上传校正、资源归属、幂等任务、取消/恢复、持久化和导出，Worker 执行分析与生成。默认一个计算 Worker，具体契约见 [API 说明](../services/pattern-api/README.md)。
-- **离线评测**：`tools/auto-eval` 生成候选、取得视觉评分并应用偏好判断；`mask-gate`、`vision-gate` 分别维护蒙版和视觉证据的评测协议与报告。评测入口不等同于产品入口。
+网页在浏览器执行核心算法，Demo 服务提供静态文件及模型代理。小程序通过产品 API 上传和创建任务，计算在服务端完成。两者不是同一个 HTTP 入口。
 
-## 依赖与构建边界
+教师审核工具及训练标注前端独立保存数据。教师输出尚未自动流入产品生成器。
 
-- `apps/demo` 是独立 pnpm 工作区，`src` 保存浏览器模块，`server` 保存 Node 服务，`tests` 区分单元测试、浏览器测试和服务替身。服务按文件位置定位仓库根目录，从工作区启动时仍使用相同资源 URL。
-- 运行包在自己的 `package.json` 声明直接依赖；工作区依赖使用 `workspace:*`。Demo 服务通过声明的 Gateway 包导入，浏览器模块仍使用静态构建路径，不额外引入打包器。
-- 根目录管理编译／测试工具和维护脚本所需的 `sharp`；Demo 的 `sharp` 用于浏览器测试并登记为开发依赖。脚本直接导入自己的依赖，不从其他服务的 `node_modules` 借用。已有 `sharp` 统一锁定在 0.35.3，本次只调整引用归属。
-- 各 Python sidecar 保留独立 `pyproject.toml`、`uv.lock` 与虚拟环境。SAM2、姿态、生成提案和视觉评分的 Torch／CUDA 组合不因目录整理而合并或升级。
-- 根 `pnpm build` 保持现有构建顺序。`pnpm install --frozen-lockfile` 校验 Node 锁文件；更改依赖时只更新相应引用并检查锁文件差异，不顺带升级全部包。
+## 主体图纸生成
 
-开发启动脚本集中在 `scripts/dev`；维护生成器在 `scripts/maintenance`；性能和质量诊断分别在 `scripts/benchmarks`、`scripts/diagnostics`。测试截图与 trace 进入 `output/tests/playwright`，性能 JSON 进入 `output/benchmarks`，临时诊断进入 `output/diagnostics`。数据集与评测记录保持各自原路径，避免破坏来源及会话关联。
+1. 校验 RGBA、材料色卡、选项和分析证据，固定生成身份。
+2. 根据主体形状、裁剪和占位要求选择画布，建立源图到格图的映射。
+3. 采样源图，规划结构区域并保护有证据支持的细节。
+4. 分别处理明暗和外／内轮廓，映射真实材料颜色。
+5. 执行配色优化和网格精修，检查拓扑、色差、主体保真与可制作性。
+6. 排序并返回推荐、best-effort 或无有效候选；导出材料统计及图纸。
 
-## 图纸核心
+A0/A1 是采样对照，MVP 是结构处理路线。没有训练好的全图网格预测器，也没有规则五官模板。关键点与部件掩码帮助取样、保护和评估，不生成缺失的眼睛、高光或嘴巴。
 
-公共入口为 `createPatternAlgorithm().generate()`，实现由 `algorithm.ts` 委托给 `pipeline.ts`。核心只处理内存中的 RGBA、色卡、选项和 `ImageAnalysis`；解码、方向修正和网络推理在调用侧完成。
+## 颜色与结构约束
 
-当前 `mvp` 结构路线按以下职责组织；A0/A1 保留为最近邻和面积采样对照：
+- preserve、adaptive、stylized 控制明暗；强度 0 旁路明暗调整，量化与精修仍可能产生色差。
+- MARD 自动填色排除 H7；内外轮廓共用一个合规深色。Perler 黑色正常参与匹配，特殊材质不自动分配。
+- 精修保护原图细节和部件边界，不根据双眼推导镜像轴。
+- 缺少轮廓证据时给出诊断，不把画布边缘当作主体边界。
+- PatternAlgorithm.adapt 处理已固定珠格及材料变化，不等于通用作品编辑和保存系统。
 
-1. 校验请求、校验分析证据，建立生成身份。
-2. 生成源图引导、主体形状候选、占位方案和 `CanvasPlan`。
-3. 根据原图采样建立 `StructurePlan` 和源图映射，保护有证据支持的关键细节格。
-4. 分别规划蒙版轮廓和 `ValuePlan`；结构路线的明暗规划关闭旧内置描边，避免与独立轮廓叠加。
-5. 建立 `PalettePlan`，映射真实材料颜色并应用轮廓。MARD 291 的填色/统一描边规则在此生效。色卡注册表支持 291/123/24；Perler 保留完整 123 SKU，生成候选只使用 118 个可自动匹配颜色，详见[数据来源与边界](perler-123.md)。
-6. 保护五官与轮廓，执行配色优化及 Fast/Quality 网格精修。
-7. 计算原图保真、结构、拓扑与制作指标，执行质量门禁并排序，返回推荐、备选或 best-effort。
+## 目录职责
 
-明暗处理只有一个 Lab 阶段；结构路线不再串行叠加旧的 RGB 明暗分档。
+| 目录 | 职责 |
+| --- | --- |
+| packages/pattern-core | 内存图像、网格、配色、质量评分、导出 |
+| packages/material-palettes | 色卡注册、内容版本及材质限制 |
+| packages/pattern-api-contracts、wechat-client | 请求校验、共享类型和微信适配 |
+| services/pattern-api | 身份、上传、任务调度、持久化与导出 |
+| services/ai-gateway | 模型目录、Provider、超时、证据融合及贡献记录 |
+| services/*-sidecar | 独立 Python 模型服务和锁定环境 |
+| apps/demo | 产品工作台、模型代理及实验页面 |
+| apps/training-annotation | 人工眼睛目标封存 |
+| apps/teacher-review、tools/teacher-loop | 原图到卡通图的教师闭环 |
+| tools/*-gate、tools/auto-eval | 离线质量与偏好评测 |
 
-`PatternAlgorithm.adapt()` 负责锁定已制作格并调整剩余区域。它与 P6 规划中的通用逐格编辑、作品保存不是同一个接口。
+GroundingDINO + SAM2 是当前自动主体／部件分析组合。MMPose、OpenCLIP、DINOv2 和像素提案为可选服务；模型目录存在条目不表示对应推理已经部署。人像关键点映射代码也不代表默认接入真实 MediaPipe 服务。
 
-## 配色与五官的当前行为
-
-- `structure.valueMode` 支持 `preserve / adaptive / stylized`；还原风格默认保色，`valueStrength: 0` 旁路明暗调整。配色量化、几何映射和精修造成的误差通过阶段诊断分别报告，保色不表示最终零色差。
-- MARD 291 自动填色排除 H7，内外轮廓使用同一个合规深色号。Perler 黑色正常参与匹配；5 个特殊材质色不自动使用。色卡参考 RGB 不等于实物测色。
-- MVP 精修对清理产生的逐格额外 ΔE00 设上限：MARD 为 6，Perler 为 4；超过上限恢复清理前的匹配色。Perler 在保色／零强度时不移动结构取色位置。这些约束不保证最终总色差低于该数值。
-- 五官规则模板、选型／联合落格搜索和模板补色已删除。分析提供的五官位置与蒙版仅用于保护、采样和质量评估，不补画眼白、高光或缺失部件。
-- 精修保护原图关键点所在格与模型部件边界，不根据双眼推导镜像轴。`symmetryQuality` 评估原图相对位置保持；模板占格、碰撞和位移指标已移除。
-- 外／内轮廓独立开关，缺少主体证据时不制造画框；A0/A1 保留为采样对照。轮廓配置见 [API 说明](../services/pattern-api/README.md#轮廓参数)。
-
-Demo 的蒙版编辑区分草稿与确认，补画／擦除支持撤销重做；网络圈选失败时保留当前蒙版。确认后再触发完整生成。偏好工具位于内部入口 `?internal=1`，记录保存在浏览器本地，支持 Bradley–Terry 聚合。
-
-## 分析证据与模型边界
-
-Gateway 统一 Provider 注册、请求校验、超时/取消、证据融合和贡献记录。`subjectMaskEvidence` 保存模型置信度、来源、revision、人工确认和 provenance；关键点、语义区、裁剪各有独立证据。人工确认增加 trust，不覆盖原始模型 confidence。
-
-| 能力 | 当前接入方式与范围 |
-|---|---|
-| 主体与部件自动蒙版 | GroundingDINO Tiny + SAM 2.1 Small：`sam2-sidecar`，Demo 与产品 Worker 均可接入 |
-| 提示分割 | 同一 sidecar 的 SAM2 路线接收粗圈、框和正负点 |
-| 主体抠图 | rembg/BiRefNet 适配器；仅有主体证据时不自动补画几何五官 |
-| 宠物骨架 | 可选 MMPose sidecar，经配置后供 Demo/评测使用 |
-| 学习像素化、生成式提案 | 可选 pixel-proposal sidecar，接入 Demo 的候选路线 |
-| 视觉相似度与偏好特征 | 可选 OpenCLIP、DINOv2 sidecar，供 Demo/离线候选评分 |
-| 人像专用映射 | MediaPipe 关键点、语义映射和可注入 Provider 已有实现；默认 Demo/Worker 未接入真实 MediaPipe 推理 |
-
-标准生成不依赖所有 sidecar 同时启动；`MODEL_CATALOG` 中登记了模型也不代表本机已提供推理服务。模型版本、启动和验证范围见 [SAM2 服务说明](../services/sam2-sidecar/README.md)。
-
-`pet-analysis.ts` 的旧几何推断仍被离线评测使用，`enrichPetGeometryAnalysis` 也仍作为公开函数保留，但正式 Gateway 不再自动调用它。后续须先迁移评测证据和公开调用方，再删除这条兼容路径。
-
-独立明暗规划器的轮廓接口及偏好记录兼容层仍有使用与测试。`pipeline.ts` 与 Demo 页面职责较集中，后续拆分应保持输出、生成身份与缓存行为不变。
-
-## 评测与复现入口
-
-常规检查使用根目录的 `pnpm test`、`pnpm typecheck`、`pnpm test:e2e`。真实质量标准分别由[蒙版](mask-failure-gate.md)、[人像视觉](vision-gate.md)协议维护。
-
-构建后可运行 `node scripts/diagnostics/triage-color-fidelity.mjs` 做分阶段色差对照，或运行 `node scripts/diagnostics/compare-color-harmony.mjs --palette perler-123 --reference mard-291 --baseline <旧版 dist/index.js> --label perler-before-after` 比较版本。输入、配置、算法与色卡版本须一起固定；旧版本从 Git 取回，不保留多套说明文档。
-
-`pnpm benchmark:palette` 和 `node scripts/benchmarks/benchmark-palette-memory.mjs` 用于性能回归。[24/291 耗时数据](../tests/fixtures/benchmarks/palette-2026-09-26.json)与[内存数据](../tests/fixtures/benchmarks/palette-memory-2026-09-26.json)保留为历史机器可读样本，不代表当前版本或三套色卡完整质量验收。
+各包声明直接依赖，各 Python 服务保留独立锁文件。构建产物、日志、缓存和数据不进入 Git；部署与存储要求见 [远程开发](remote-development.md)。
