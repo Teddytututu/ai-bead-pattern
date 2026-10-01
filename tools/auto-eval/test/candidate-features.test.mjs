@@ -25,7 +25,7 @@ function candidate(poseStructure, petStructure = {}) {
       featureConnectivity: 0.5,
       shapeApplied: true,
       silhouetteBoundaryIoU: 0.5,
-      hardFeatureCompleteness: 0.6,
+      featureCoverage: 0.6,
       paletteRoleConsistency: 0.7,
       artDirectionBudgetViolations: 0,
       petSkeletonContinuity: poseStructure,

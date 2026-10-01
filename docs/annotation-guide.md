@@ -1,4 +1,4 @@
-# 五官模板标注指南
+# 历史部件角色标注指南
 
 > 2026-10-01：当前 SDXL 配对标注请使用[区域配对标注指南](region-annotation-guide.md)。蒙版只基于拼豆格图，无需原照片／插画。本页仍为旧 v1 部件角色审核的历史说明。
 
@@ -280,4 +280,4 @@ $ftPython = 'services/sam2-sidecar/.venv/Scripts/python.exe'
 
 导入工具检查原图／格图版本、矩阵和人工确认信息，分别保存审核目标与原始预测。未确认草稿不会算作人工真值。实际训练还需要独立设计切分和质量验证，标完一张不自动启动训练。
 
-模型、批量处理、生成新审核包及复现命令见[模板学习工具说明](../tools/template-learning/README.md)。本文示意角色与当前[规则模板库](../packages/pattern-core/src/planning/feature-template-library.ts)、[离线契约](../tools/template-learning/task-contract.md)保持一致；遇到界面与指南不符时保留导出记录，再核对版本。
+模型、批量处理、生成新审核包及复现命令见[模板学习工具说明](../tools/template-learning/README.md)。规则模板库已删除；历史部件标注及其[离线契约](../tools/template-learning/task-contract.md)保留用于人工记录和数据追溯；遇到界面与指南不符时保留导出记录，再核对版本。

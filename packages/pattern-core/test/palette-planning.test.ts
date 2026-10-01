@@ -4,7 +4,6 @@ import { describe, it } from 'node:test'
 import {
   buildPalettePlan,
   validatePalettePlan,
-  type ResolvedFeaturePlacement,
   type StructurePlan,
   type ValuePlan,
 } from '../src/experimental.js'
@@ -35,7 +34,7 @@ function structurePlan(): StructurePlan {
     regionIds: new Int32Array([0, 0, 0]),
     boundaryStrength: new Float32Array([0, 0, 0]),
     regions: [{ id: 0, importance: 1, cellIndices: [0, 1, 2], adjacentRegionIds: [] }],
-    featureConstraints: [],
+
     confidence: 1,
   }
 }
@@ -53,7 +52,7 @@ function valuePlan(): ValuePlan {
 describe('PalettePlan', () => {
   it('retains different colors within a single tonal role when assigning per cell', () => {
     const colorsWithChroma = colors.map((color, index) => ({ ...color, lab: [50, index === 0 ? 50 : index === 1 ? -20 : 0, index === 0 ? 30 : index === 1 ? -30 : 0] as const }))
-    const result = buildPalettePlan({ preserveCellColors: true, valuePlan: valuePlan(), structurePlan: structurePlan(), roleIdsByCell: ['region-0:base', 'region-0:base', 'region-0:base'], plannedLabs: colorsWithChroma.map(color => color.lab), colors: colorsWithChroma, maximumColors: 3, distanceMethod: 'delta-e-2000', featurePlacements: [] })
+    const result = buildPalettePlan({ preserveCellColors: true, valuePlan: valuePlan(), structurePlan: structurePlan(), roleIdsByCell: ['region-0:base', 'region-0:base', 'region-0:base'], plannedLabs: colorsWithChroma.map(color => color.lab), colors: colorsWithChroma, maximumColors: 3, distanceMethod: 'delta-e-2000' })
     assert.deepEqual(result.colorIds, colors.map(color => color.id))
     assert.equal(result.plan.totalCost, 0)
     assert.deepEqual(result.plan.cellColorIds, result.colorIds)
@@ -61,7 +60,7 @@ describe('PalettePlan', () => {
   })
 
   it('splits per-cell stock demand without exceeding finite inventory', () => {
-    const result = buildPalettePlan({ preserveCellColors: true, valuePlan: valuePlan(), structurePlan: structurePlan(), roleIdsByCell: ['region-0:base', 'region-0:base', 'region-0:base'], plannedLabs: [[50, 0, 0], [50, 0, 0], [50, 0, 0]], colors, maximumColors: 3, distanceMethod: 'delta-e-2000', featurePlacements: [], inventory: { 'gray-20': 1, 'gray-50': 1, 'gray-80': 1 } })
+    const result = buildPalettePlan({ preserveCellColors: true, valuePlan: valuePlan(), structurePlan: structurePlan(), roleIdsByCell: ['region-0:base', 'region-0:base', 'region-0:base'], plannedLabs: [[50, 0, 0], [50, 0, 0], [50, 0, 0]], colors, maximumColors: 3, distanceMethod: 'delta-e-2000', inventory: { 'gray-20': 1, 'gray-50': 1, 'gray-80': 1 } })
     assert.deepEqual(result.diagnostics.inventoryUse, { 'gray-50': 1, 'gray-80': 1, 'gray-20': 1 })
     assert.equal(new Set(result.colorIds).size, 3)
   })
@@ -70,7 +69,7 @@ describe('PalettePlan', () => {
       valuePlan: valuePlan(), structurePlan: structurePlan(),
       roleIdsByCell: ['region-0:shadow', 'region-0:base', 'region-0:light'],
       plannedLabs: [[20, 0, 0], [50, 0, 0], [80, 0, 0]],
-      colors, maximumColors: 3, distanceMethod: 'delta-e-2000', featurePlacements: [],
+      colors, maximumColors: 3, distanceMethod: 'delta-e-2000',
     }
     const original = buildPalettePlan(input)
     const changedColors = colors.map(color => ({ ...color, lab: [color.lab![0] + 5, 0, 0] as const }))
@@ -91,7 +90,7 @@ describe('PalettePlan', () => {
       colors,
       maximumColors: 3,
       distanceMethod: 'delta-e-2000',
-      featurePlacements: [],
+
     })
 
     assert.doesNotThrow(() => validatePalettePlan(result.plan))
@@ -123,7 +122,7 @@ describe('PalettePlan', () => {
       colors: materialColors,
       maximumColors: materialColors.length,
       distanceMethod: 'delta-e-2000',
-      featurePlacements: [],
+
     })
 
     assert.deepEqual(result.colorIds, ['charcoal', 'gray', 'silver'])
@@ -132,16 +131,6 @@ describe('PalettePlan', () => {
   })
 
   it('uses a shared subset when the material color budget is smaller than the role count', () => {
-    const placement: ResolvedFeaturePlacement = {
-      featureId: 'left-eye-center',
-      kind: 'eye',
-      templateId: 'eye-e1',
-      center: [1, 0],
-      occupiedCells: [1],
-      roles: [{ cell: 1, role: 'eye-dark' }],
-      shift: [0, 0],
-      score: 1,
-    }
     const result = buildPalettePlan({
       valuePlan: valuePlan(),
       roleIdsByCell: ['region-0:shadow', 'region-0:base', 'region-0:light'],
@@ -150,7 +139,6 @@ describe('PalettePlan', () => {
       colors,
       maximumColors: 2,
       distanceMethod: 'delta-e-2000',
-      featurePlacements: [placement],
     })
 
     assert.equal(result.plan.selectedColorIds.length, 2)
@@ -173,7 +161,7 @@ describe('PalettePlan', () => {
         { id: 0, importance: 1, cellIndices: [0, 1, 2], adjacentRegionIds: [1] },
         { id: 1, importance: 0.5, cellIndices: [3], adjacentRegionIds: [0] },
       ],
-      featureConstraints: [],
+
       confidence: 1,
     }
     const weightedValues: ValuePlan = {
@@ -193,7 +181,7 @@ describe('PalettePlan', () => {
       ],
       maximumColors: 1,
       distanceMethod: 'delta-e-2000',
-      featurePlacements: [],
+
     })
 
     assert.deepEqual(result.plan.selectedColorIds, ['z-red'])
@@ -208,7 +196,7 @@ describe('PalettePlan', () => {
       colors,
       maximumColors: 1,
       distanceMethod: 'delta-e-2000',
-      featurePlacements: [],
+
       requiredColorIds: ['gray-80'],
     })
 
@@ -233,7 +221,7 @@ describe('PalettePlan', () => {
       regionIds: new Int32Array([0, 0, 0, 0, 0]),
       boundaryStrength: new Float32Array(5),
       regions: [{ id: 0, importance: 1, cellIndices: [0, 1, 2, 3, 4], adjacentRegionIds: [] }],
-      featureConstraints: [],
+
       confidence: 1,
     }
     const roleIds = orderedValues.roles.map((role) => role.id)
@@ -245,7 +233,7 @@ describe('PalettePlan', () => {
       colors: orderedColors,
       maximumColors: 5,
       distanceMethod: 'delta-e-2000',
-      featurePlacements: [],
+
     })
     const lightness = roleIds.map((roleId) =>
       orderedColors.find((color) => color.id === result.plan.assignments[roleId]!)!.lab![0])
@@ -275,7 +263,7 @@ describe('PalettePlan', () => {
       regionIds: new Int32Array([0, 0, 0]),
       boundaryStrength: new Float32Array(3),
       regions: [{ id: 0, importance: 1, cellIndices: [0, 1, 2], adjacentRegionIds: [] }],
-      featureConstraints: [],
+
       confidence: 1,
     }
     const result = buildPalettePlan({
@@ -286,7 +274,7 @@ describe('PalettePlan', () => {
       colors: stockColors,
       maximumColors: 2,
       distanceMethod: 'delta-e-2000',
-      featurePlacements: [],
+
       inventory: { 'shadow-ideal': 1, 'shadow-substitute': 2, base: 1 },
       substituteColorIds: { 'shadow-ideal': ['shadow-substitute'] },
     })
@@ -328,7 +316,7 @@ describe('PalettePlan', () => {
       colors: stockColors,
       maximumColors: 1,
       distanceMethod: 'delta-e-2000',
-      featurePlacements: [],
+
       inventory: { ideal: 3, substitute: 3 },
       substituteColorIds: { ideal: ['substitute'] },
     })
@@ -346,7 +334,7 @@ describe('PalettePlan', () => {
       colors,
       maximumColors: 3,
       distanceMethod: 'delta-e-2000',
-      featurePlacements: [],
+
       inventory: { 'gray-20': 0, 'gray-50': 1, 'gray-80': 1 },
     }), /inventory/i)
   })

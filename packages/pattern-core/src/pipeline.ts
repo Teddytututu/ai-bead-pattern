@@ -1,3 +1,4 @@
+import { validateFeatureShape } from './landmarks.js'
 import {
   colorDistance,
   prepareColors,
@@ -27,7 +28,6 @@ import {
 import { identityAppearanceSimilarity } from './identity-similarity.js'
 import {
   applyStyle,
-  fitCropToCanvas,
   gridCellForSourcePoint,
   normalizeCrop,
   resizePixels,
@@ -52,14 +52,6 @@ import {
   planCanvases,
   planCanvasesWithShapeVariants,
 } from './planning/canvas-planner.js'
-import {
-  createFeatureConstraint,
-  searchFeaturePlacements,
-  type ResolvedFeaturePlacement,
-} from './planning/feature-placement.js'
-import { searchFaceFeatureGroup, type FaceFeatureCandidates } from './planning/face-feature-search.js'
-import { featureFaceGroup, prepareFeatureEvidence, validateFeatureShape, validateFeatureOverrides } from './planning/feature-evidence.js'
-import { resolveFeatureColors } from './planning/feature-color-resolver.js'
 import { buildStructurePlan } from './planning/structure-planner.js'
 import {
   buildValuePlan,
@@ -320,7 +312,6 @@ function validateMask(
 }
 
 function validateRequest(request: PatternGenerationRequest): void {
-  validateFeatureOverrides(request.options.featureOverrides, request.image.width, request.image.height)
   validateEnum(request.options.baseline, new Set(['a0', 'a1', 'mvp']), 'baseline')
   validateEnum(request.options.resizeMethod, new Set(['area', 'bilinear', 'nearest', 'cell-aware']), 'resizeMethod')
   validateEnum(
@@ -490,9 +481,6 @@ function validateRequest(request: PatternGenerationRequest): void {
   const landmarkIds = new Set<string>()
   for (const landmark of analysis?.landmarks ?? []) {
     validateFeatureShape(landmark.featureShape)
-    if (landmark.placementLocked !== undefined && typeof landmark.placementLocked !== 'boolean') {
-      throw new RangeError('Landmark placementLocked must be boolean')
-    }
     if (landmark.id.trim().length === 0 || landmarkIds.has(landmark.id)) {
       throw new RangeError('Landmark ids must be unique and non-empty')
     }
@@ -856,9 +844,7 @@ function gridRegionIds(
 
 function hasDetailedColorEvidence(
   analysis: ImageAnalysis | undefined,
-  featurePlacements: readonly ResolvedFeaturePlacement[],
 ): boolean {
-  if (featurePlacements.length > 0) return true
   return (analysis?.semanticRegions ?? []).some((region) => {
     const id = region.id.trim().toLowerCase()
     const label = region.label.trim().toLowerCase()
@@ -954,130 +940,6 @@ function shouldPreserveThinAlphaStructures(
   const foregroundRatio = foregroundMass / Math.max(1, total)
   const boundaryRatio = boundaryPixels / foregroundPixels
   return foregroundRatio <= 0.08 || (foregroundRatio <= 0.18 && boundaryRatio >= 0.45)
-}
-
-function maskFromActiveCells(width: number, height: number, activeMask: Uint8Array) {
-  return { width, height, values: Float32Array.from(activeMask) }
-}
-
-function carrierMask(
-  carrierRegionId: string,
-  width: number,
-  height: number,
-  regionIds: readonly (string | undefined)[],
-  analysis: ImageAnalysis | undefined,
-  canvasPlan: CanvasPlan,
-) {
-  // A network head/eye mask may overlap its subject carrier. The exclusive
-  // display region IDs must not erase that underlying carrier evidence.
-  const source = analysis?.semanticRegions?.find(region => region.id === carrierRegionId)?.mask
-  if (source !== undefined) {
-    const fit = fitCropToCanvas(canvasPlan.crop, width, height)
-    return { width, height, values: Float32Array.from({ length: width * height }, (_, cell) => {
-      const point = sourcePointForGridCell(canvasPlan.crop, fit, cell % width, Math.floor(cell / width))
-      if (point === undefined) return 0
-      const x = Math.round(point[0]), y = Math.round(point[1])
-      return x < 0 || y < 0 || x >= source.width || y >= source.height ? 0 : source.values[y * source.width + x] ?? 0
-    }) }
-  }
-  return {
-    width,
-    height,
-    values: Float32Array.from(regionIds, (regionId) => Number(regionId === carrierRegionId)),
-  }
-}
-
-function planFeaturePlacements(
-  analysis: ImageAnalysis | undefined,
-  canvasPlan: CanvasPlan,
-  activeMask: Uint8Array,
-  regionIds: readonly (string | undefined)[],
-  pixelLabs: readonly Lab[],
-): readonly ResolvedFeaturePlacement[] {
-  const eligible = (analysis?.landmarks ?? []).filter((landmark) =>
-    landmarkObservationState(landmark) === 'observed' && landmarkEffectiveConfidence(landmark) >= 0.2
-      && (landmark.kind === 'eye' || landmark.kind === 'mouth' || landmark.kind === 'nose'
-      || landmark.kind === 'ear' || landmark.kind === 'identity-mark' || landmark.kind === 'custom'))
-  if (eligible.length === 0) return []
-  const budgets = new Map(canvasPlan.featureBudgets.map((budget) => [budget.featureId, budget]))
-  const occupancyMask = maskFromActiveCells(canvasPlan.size.width, canvasPlan.size.height, activeMask)
-  const blockedCells = new Set<number>()
-  const selected: ResolvedFeaturePlacement[] = []
-  const handled = new Set<string>()
-  const faceGroups = new Map<string, ImageLandmark[]>()
-  for (const landmark of eligible) {
-    if (landmark.kind !== 'eye' && landmark.kind !== 'nose' && landmark.kind !== 'mouth') continue
-    const key = featureFaceGroup(landmark)
-    const group = faceGroups.get(key) ?? []
-    group.push(landmark)
-    faceGroups.set(key, group)
-  }
-  for (const group of faceGroups.values()) {
-    // Groups without instance evidence can contain many components; bound each beam.
-    for (let offset = 0; offset < group.length; offset += 16) {
-      const features: FaceFeatureCandidates[] = group.slice(offset, offset + 16).flatMap(landmark => {
-        handled.add(landmark.id)
-        const budget = budgets.get(landmark.id)
-        if (budget === undefined) return []
-        return [{ featureId: landmark.id, hard: budget.hard,
-          expectedCenter: createFeatureConstraint(budget, landmark, canvasPlan).targetCenter,
-          candidates: searchFeaturePlacements({ canvasPlan, budget, landmark, occupancyMask, blockedCells, pixelLabs,
-            ...(landmark.carrierRegionId === undefined ? {} : { carrierMask: carrierMask(landmark.carrierRegionId, canvasPlan.size.width, canvasPlan.size.height, regionIds, analysis, canvasPlan) }),
-          }),
-        }]
-      })
-      const placements = searchFaceFeatureGroup(features, blockedCells)
-      selected.push(...placements)
-      for (const placement of placements) for (const cell of [...placement.occupiedCells, ...(placement.reservedCells ?? [])]) blockedCells.add(cell)
-    }
-  }
-  const remaining = eligible.filter((landmark) => handled.has(landmark.id) === false)
-    .sort((first, second) => Number(second.priority === 'hard') - Number(first.priority === 'hard')
-      || second.confidence - first.confidence
-      || first.id.localeCompare(second.id))
-  for (const landmark of remaining) {
-    const budget = budgets.get(landmark.id)
-    if (budget === undefined) continue
-    const placement = searchFeaturePlacements({
-      canvasPlan,
-      budget,
-      landmark,
-      occupancyMask,
-      blockedCells,
-      pixelLabs,
-      ...(landmark.carrierRegionId === undefined ? {} : {
-        carrierMask: carrierMask(
-          landmark.carrierRegionId,
-          canvasPlan.size.width,
-          canvasPlan.size.height,
-          regionIds,
-          analysis,
-          canvasPlan,
-        ),
-      }),
-      maximumCandidates: 1,
-    })[0]
-    if (placement === undefined) continue
-    selected.push(placement)
-    for (const cell of [...placement.occupiedCells, ...(placement.reservedCells ?? [])]) blockedCells.add(cell)
-  }
-  return selected.sort((first, second) => first.featureId.localeCompare(second.featureId))
-}
-
-function plannedFeatureConstraints(
-  analysis: ImageAnalysis | undefined,
-  canvasPlan: CanvasPlan,
-  placements: readonly ResolvedFeaturePlacement[],
-) {
-  const landmarks = new Map((analysis?.landmarks ?? []).map((landmark) => [landmark.id, landmark]))
-  const budgets = new Map(canvasPlan.featureBudgets.map((budget) => [budget.featureId, budget]))
-  return placements.flatMap((placement) => {
-    const landmark = landmarks.get(placement.featureId)
-    const budget = budgets.get(placement.featureId)
-    return landmark === undefined || budget === undefined
-      ? []
-      : [createFeatureConstraint(budget, landmark, canvasPlan)]
-  })
 }
 
 function protectedCells(
@@ -1389,7 +1251,7 @@ interface FeatureVisibilityResult {
 }
 
 interface FeatureEvaluationProfile {
-  metric: 'blob' | 'template' | 'contour' | 'geometry'
+  metric: 'blob' | 'contour' | 'geometry'
   kindWeight: number
   minimumCoverage: number
   minimumPurity: number
@@ -1416,7 +1278,7 @@ const featureProfiles: Readonly<Record<LandmarkKind, FeatureEvaluationProfile>> 
     minimumConnectivity: 0.5, minimumContrast: 0.1, minimumBoundary: 0,
   },
   mouth: {
-    metric: 'template', kindWeight: 1.2, minimumCoverage: 0.45, minimumPurity: 0,
+    metric: 'blob', kindWeight: 1.2, minimumCoverage: 0.45, minimumPurity: 0,
     minimumConnectivity: 0.45, minimumContrast: 0.08, minimumBoundary: 0,
   },
   ear: {
@@ -1510,7 +1372,6 @@ function featureVisibility(
   palette: readonly PreparedColor[],
   activeMask: Uint8Array,
   regionIds: readonly (string | undefined)[],
-  featurePlacements: readonly ResolvedFeaturePlacement[],
 ): FeatureVisibilityResult {
   const landmarks = (analysis?.landmarks ?? []).filter((landmark) =>
     landmarkEffectiveConfidence(landmark) > 0
@@ -1532,18 +1393,10 @@ function featureVisibility(
     }
   }
   const colorsById = new Map(palette.map((color) => [color.id, color]))
-  const placementByFeatureId = new Map(featurePlacements.map((placement) => [
-    placement.featureId,
-    placement,
-  ]))
   const evaluated = landmarks.map((landmark) => {
     const profile = featureProfiles[landmark.kind]
     const effectiveConfidence = landmarkEffectiveConfidence(landmark)
-    const placement = placementByFeatureId.get(landmark.id)
-    const templateAware = placement !== undefined && (landmark.carrierRegionId !== undefined
-      || landmark.provenance?.some(source => source.origin === 'manual') === true)
-    const [centerX, centerY] = (templateAware ? placement?.center : undefined)
-      ?? gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
+    const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
     const center = centerY * width + centerX
     const colorId = colorIds[center]
     const color = colorId === undefined ? undefined : colorsById.get(colorId)
@@ -1570,32 +1423,18 @@ function featureVisibility(
     const regionCells: number[] = []
     const matchingCells = new Set<number>()
     const ringCellSet = new Set<number>()
-    if (templateAware && placement !== undefined) {
-      for (const index of placement.occupiedCells) {
+    for (let offsetY = -radius - 1; offsetY <= radius + 1; offsetY += 1) {
+      for (let offsetX = -radius - 1; offsetX <= radius + 1; offsetX += 1) {
+        const x = centerX + offsetX
+        const y = centerY + offsetY
+        if (x < 0 || y < 0 || x >= width || y >= height) continue
+        const index = y * width + x
         if (activeMask[index] !== 1) continue
-        regionCells.push(index)
-        matchingCells.add(index)
-        const x = index % width
-        for (const neighbor of [index - width, index + width, x > 0 ? index - 1 : -1, x + 1 < width ? index + 1 : -1]) {
-          if (neighbor >= 0 && neighbor < activeMask.length
-            && activeMask[neighbor] === 1
-            && placement.occupiedCells.includes(neighbor) === false) ringCellSet.add(neighbor)
-        }
-      }
-    } else {
-      for (let offsetY = -radius - 1; offsetY <= radius + 1; offsetY += 1) {
-        for (let offsetX = -radius - 1; offsetX <= radius + 1; offsetX += 1) {
-          const x = centerX + offsetX
-          const y = centerY + offsetY
-          if (x < 0 || y < 0 || x >= width || y >= height) continue
-          const index = y * width + x
-          if (activeMask[index] !== 1) continue
-          const insideFeature = Math.abs(offsetX) <= radius && Math.abs(offsetY) <= radius
-          if (insideFeature) {
-            regionCells.push(index)
-            if (colorIds[index] === colorId) matchingCells.add(index)
-          } else ringCellSet.add(index)
-        }
+        const insideFeature = Math.abs(offsetX) <= radius && Math.abs(offsetY) <= radius
+        if (insideFeature) {
+          regionCells.push(index)
+          if (colorIds[index] === colorId) matchingCells.add(index)
+        } else ringCellSet.add(index)
       }
     }
     const ringCells = [...ringCellSet]
@@ -1611,17 +1450,12 @@ function featureVisibility(
     const neighborCells = carrierRegionId === undefined
       ? ringCells
       : ringCells.filter((index) => regionIds[index] === carrierRegionId)
-    const minimumCells = templateAware === false
-      ? radius === 0 ? 1 : Math.max(2, Math.ceil(regionCells.length * 0.4))
-      : Math.max(1, placement.occupiedCells.length)
+    const minimumCells = radius === 0 ? 1 : Math.max(2, Math.ceil(regionCells.length * 0.4))
     const coverage = clamp(matchingCells.size / minimumCells, 0, 1)
     const purity = matchingCells.size / Math.max(1, regionCells.length)
     const connectionSeed = matchingCells.has(center) ? center : matchingCells.values().next().value ?? center
     const connectivity = connectedFeatureRatio(matchingCells, connectionSeed, width)
-    const featureColors = templateAware
-      ? [...new Set(regionCells.map((index) => colorIds[index]!))]
-        .flatMap((id) => colorsById.get(id) ?? [])
-      : [color]
+    const featureColors = [color]
     const contrast = neighborCells.length === 0 ? 0 : neighborCells.reduce((sum, index) => {
       const neighbor = colorsById.get(colorIds[index]!)
       return sum + (neighbor === undefined ? 0 : Math.max(
@@ -1640,10 +1474,7 @@ function featureVisibility(
       0,
     ) / ringCells.length
     const sourceLab = rgbToLab(sourceRgbAt(request, landmark.x, landmark.y))
-    const sourceMatch = templateAware
-      ? Math.max(0, ...featureColors.map((featureColor) =>
-        1 / (1 + colorDistance(sourceLab, featureColor.lab, 'delta-e-2000') / 15)))
-      : 1 / (1 + colorDistance(sourceLab, color.lab, 'delta-e-2000') / 15)
+    const sourceMatch = 1 / (1 + colorDistance(sourceLab, color.lab, 'delta-e-2000') / 15)
     const rejectionReasons: string[] = []
     if (landmark.priority === 'hard' && effectiveConfidence >= 0.5) {
       if (coverage < profile.minimumCoverage || purity < profile.minimumPurity) {
@@ -1660,9 +1491,7 @@ function featureVisibility(
       ? 1
       : profile.metric === 'contour'
         ? sourceMatch * (boundaryScore * 0.75 + contrastScore * 0.25)
-        : profile.metric === 'template'
-          ? sourceMatch * (coverage * 0.2 + connectivity * 0.3 + contrastScore * 0.25 + boundaryScore * 0.25)
-          : sourceMatch * (coverage * 0.25 + purity * 0.2 + connectivity * 0.2 + contrastScore * 0.35)
+        : sourceMatch * (coverage * 0.25 + purity * 0.2 + connectivity * 0.2 + contrastScore * 0.35)
     return {
       landmark,
       profile,
@@ -1752,7 +1581,6 @@ function scoreCandidate(
   canvasPlanScore: number,
   identityAppearance: number,
   petPose: PetPoseEvaluation,
-  hardFeatureCompleteness: number,
   valueOrderAccuracy: number,
   fragmentedArcSegments: number,
   smallComponents: number,
@@ -1788,16 +1616,14 @@ function scoreCandidate(
   const identity = feature.confidence > 0
     ? petPose.available
       ? clamp(
-        featureProtection * 0.3
-          + hardFeatureCompleteness * 0.2
+        featureProtection * 0.5
           + identityAppearance * 0.25
           + petPose.score * 0.25,
         0,
         1,
       )
       : clamp(
-        featureProtection * 0.45
-          + hardFeatureCompleteness * 0.25
+        featureProtection * 0.7
           + identityAppearance * 0.3,
         0,
         1,
@@ -2013,44 +1839,6 @@ function generateCandidate(
   const sourceLabs = rawResized.pixels.map(rgbToLab)
   const valueLevels = structureOptions.valueLevels
     ?? artDirection.generation.valueLevels
-  const featurePlacements = baseline === 'mvp'
-    ? planFeaturePlacements(request.analysis, context.canvasPlan, activeMask, regionIds, sourceLabs)
-    : []
-  const hardFeatureIds = new Set((request.analysis?.landmarks ?? [])
-    .filter((landmark) => landmark.priority === 'hard'
-      && landmarkObservationState(landmark) === 'observed' && landmarkEffectiveConfidence(landmark) >= 0.5
-      && (landmark.kind === 'eye' || landmark.kind === 'mouth' || landmark.kind === 'nose'
-        || landmark.kind === 'ear' || landmark.kind === 'identity-mark' || landmark.kind === 'custom'))
-    .map((landmark) => landmark.id))
-  const placedFeatureIds = new Set(featurePlacements.map((placement) => placement.featureId))
-  const hardFeatureCompleteness = hardFeatureIds.size === 0
-    ? 1
-    : [...hardFeatureIds].filter((featureId) => placedFeatureIds.has(featureId)).length / hardFeatureIds.size
-  const featureCellOwners = new Map<number, number>()
-  for (const placement of featurePlacements) {
-    for (const cell of placement.occupiedCells) {
-      featureCellOwners.set(cell, (featureCellOwners.get(cell) ?? 0) + 1)
-    }
-  }
-  const featureCollisionCount = [...featureCellOwners.values()].filter((owners) => owners > 1).length
-  const landmarkById = new Map((request.analysis?.landmarks ?? []).map((landmark) => [landmark.id, landmark]))
-  const symmetryGroups = new Map<string, ResolvedFeaturePlacement[]>()
-  for (const placement of featurePlacements) {
-    const groupId = landmarkById.get(placement.featureId)?.symmetryGroup
-    if (groupId === undefined) continue
-    const group = symmetryGroups.get(groupId) ?? []
-    group.push(placement)
-    symmetryGroups.set(groupId, group)
-  }
-  const symmetryErrors = [...symmetryGroups.values()].flatMap((group) => {
-    if (group.length !== 2) return []
-    const ordered = [...group].sort((first, second) => first.center[0] - second.center[0])
-    return [clamp(Math.hypot(ordered[0]!.shift[0] - ordered[1]!.shift[0],
-      ordered[0]!.shift[1] - ordered[1]!.shift[1]) / (2 * Math.SQRT2), 0, 1)]
-  })
-  const featureSymmetryError = symmetryErrors.length === 0
-    ? 0
-    : symmetryErrors.reduce((sum, value) => sum + value, 0) / symmetryErrors.length
   const structurePlan = baseline === 'mvp'
     ? buildStructurePlan({
       width: size.width,
@@ -2062,8 +1850,7 @@ function generateCandidate(
       semanticRegionIds: regionIds,
       importance: weights,
       sourceGuidance: context.sourceGuidance,
-      featurePlacements,
-      featureConstraints: plannedFeatureConstraints(request.analysis, context.canvasPlan, featurePlacements),
+      protectedCells: protectedCells(request.analysis, crop, size.width, size.height, resized.fit, activeMask),
       maximumSourceShiftCells: mardFillPolicy || (sourceFillPolicy && valuePolicy.strength === 0) ? 0 : 0.35,
     })
     : undefined
@@ -2072,7 +1859,7 @@ function generateCandidate(
     && context.preserveThinStructures === false
     && regionIds.some((regionId) => regionId !== undefined)
   const colorPlanningActive = structurePlanningActive
-    && hasDetailedColorEvidence(request.analysis, featurePlacements)
+    && hasDetailedColorEvidence(request.analysis)
   const structureMappingActive = structurePlanningActive && !mardFillPolicy
   const structuredPixels = structureMappingActive === false
     ? resized.pixels
@@ -2102,8 +1889,7 @@ function generateCandidate(
     ...(contourSubjectMask === undefined ? {} : { subjectMask: contourSubjectMask }),
     externalSource: sourceSubjectMask !== undefined || shapeRasterization !== undefined ? 'subject-mask' : hasAlpha ? 'alpha' : 'unavailable',
     regionIds, regionLabels: semanticLabels, pixelLabs: structuredPixels.map(rgbToLab),
-    featureCells: new Set(featurePlacements.flatMap(placement => placement.occupiedCells)),
-    reservedFeatureCells: new Set(featurePlacements.flatMap(placement => placement.reservedCells ?? [])),
+    featureCells: protectedCells(request.analysis, crop, size.width, size.height, resized.fit, activeMask),
     protectedEndpoints: shapeRasterization?.protectedCells ?? new Set<number>(),
     options: resolveContourOptions(structureOptions),
   }) : undefined
@@ -2160,18 +1946,12 @@ function generateCandidate(
       * artDirection.generation.maxColorFactor),
   ))
   const preferredFeatureColors = preferredFeaturePaletteColorIds(request, availablePalette)
-  const featureRoles = new Set(featurePlacements.flatMap(placement => placement.roles.map(entry => entry.role)))
-  const orderedTones = [...availablePalette].sort((a, b) => a.lab[0] - b.lab[0] || a.id.localeCompare(b.id))
-  const templateRoleColors = [
-    ...([...featureRoles].some(role => role.endsWith('-dark')) ? [orderedTones[0]!.id] : []),
-    ...(featureRoles.has('eye-highlight') || featureRoles.has('eye-white') ? [orderedTones.at(-1)!.id] : []),
-  ]
   const contourPreferredColors = contourGeometry === undefined ? [] : preferredContourColors({ plan: contourGeometry,
     pixelLabs: structuredPixels.map(rgbToLab), activeMask, colors: availablePalette,
     ...(request.palette.inventory === undefined ? {} : { inventory: request.palette.inventory }) })
   const requiredFeatureColors = [...new Set(mardFillPolicy
-    ? [...contourPreferredColors, ...preferredFeatureColors.values(), ...templateRoleColors]
-    : [...preferredFeatureColors.values(), ...templateRoleColors, ...contourPreferredColors])].slice(0, maximumColors)
+    ? [...contourPreferredColors, ...preferredFeatureColors.values()]
+    : [...preferredFeatureColors.values(), ...contourPreferredColors])].slice(0, maximumColors)
   const palettePlanning = colorPlanningActive && structurePlan !== undefined
     && valuePlanning !== undefined
     ? buildPalettePlan({
@@ -2183,7 +1963,6 @@ function generateCandidate(
       colors: context.preparedPalette,
       maximumColors,
       distanceMethod,
-      featurePlacements,
       requiredColorIds: requiredFeatureColors,
       excludedColorIds: excludedFillColors,
       ...(request.palette.inventory === undefined
@@ -2205,7 +1984,6 @@ function generateCandidate(
       requiredFeatureColors,
     )
     : context.preparedPalette.filter((color) => selectedPaletteIds.has(color.id))
-  const selectedFeatureColorIds = new Set(selectedPalette.map((color) => color.id))
   const assigned = palettePlanning === undefined
     ? assignGrid(pixels, pixelLabs, selectedPalette, baseline, distanceMethod)
     : { colorIds: palettePlanning.colorIds }
@@ -2240,39 +2018,13 @@ function generateCandidate(
     ...(shapeRasterization?.protectedCells ?? []),
     ...thinDetailCells,
     ...plannedOutlineCells,
-    ...featurePlacements.flatMap((placement) => placement.occupiedCells),
-    ...featurePlacements.flatMap((placement) => placement.reservedCells ?? []),
     ...(contourGeometry?.externalCells ?? []), ...(contourGeometry?.internalCells ?? []),
     ...semanticBoundaryCells,
   ])
-  const semanticFeatureIds = new Set((request.analysis?.landmarks ?? [])
-    .filter((landmark) => landmark.carrierRegionId !== undefined || landmark.provenance?.some(source => source.origin === 'manual'))
-    .map((landmark) => landmark.id))
-  const colorPlacements = featurePlacements.filter((placement) =>
-    semanticFeatureIds.has(placement.featureId))
-  const colorPlacementIds = new Set(colorPlacements.map((placement) => placement.featureId))
-  const selectedFeaturePreferences = new Map([...preferredFeatureColors].filter(([featureId, colorId]) =>
-    colorPlacementIds.has(featureId) && selectedFeatureColorIds.has(colorId)))
-  const featureColors = baseline === 'mvp'
-    ? resolveFeatureColors({
-      placements: colorPlacements,
-      initialColorIds: assigned.colorIds,
-      colors: selectedPalette,
-      width: size.width,
-      height: size.height,
-      activeMask,
-      minimumContrastByFeature: new Map(context.canvasPlan.featureBudgets.map((budget) => [
-        budget.featureId,
-        budget.minimumContrast,
-      ])),
-      preferredColorIdsByFeature: selectedFeaturePreferences,
-      distanceMethod,
-    })
-    : { colorIds: assigned.colorIds, edits: [] }
   const contourColors = contourGeometry === undefined ? undefined : resolveContourColors({ plan: contourGeometry,
-    pixelLabs: structuredPixels.map(rgbToLab), activeMask, colors: selectedPalette, initialColorIds: featureColors.colorIds,
+    pixelLabs: structuredPixels.map(rgbToLab), activeMask, colors: selectedPalette, initialColorIds: assigned.colorIds,
     ...(request.palette.inventory === undefined ? {} : { inventory: request.palette.inventory }) })
-  const plannedColorIds = contourColors?.colorIds ?? featureColors.colorIds
+  const plannedColorIds = contourColors?.colorIds ?? assigned.colorIds
   const paletteOptimization = baseline === 'mvp'
     ? optimizePaletteAssignments({
       pixelLabs,
@@ -2347,7 +2099,6 @@ function generateCandidate(
       colors: selectedPalette,
       boundaryStrength: structurePlan.boundaryStrength,
       importance: weights,
-      featurePlacements,
       distanceMethod,
       mode: request.options.optimization?.refinementMode ?? 'fast',
       ...(refinementBudgets === undefined ? {} : { budgets: refinementBudgets }),
@@ -2495,7 +2246,6 @@ function generateCandidate(
     selectedPalette,
     activeMask,
     regionIds,
-    featurePlacements,
   )
   const colorsByIdForIdentity = new Map(selectedPalette.map((color) => [color.id, color.rgb]))
   const identityAppearance = identityAppearanceSimilarity(
@@ -2533,7 +2283,6 @@ function generateCandidate(
       : 1 / (1 + totalBeads / 1024),
     identityAppearance,
     petPose,
-    hardFeatureCompleteness,
     finalValueOrderAccuracy,
     gridRefinement?.diagnosticsAfter.fragmentedArcSegments ?? 0,
     gridRefinement?.diagnosticsAfter.smallComponents ?? 0,
@@ -2565,7 +2314,6 @@ function generateCandidate(
   const semanticIdentityValid = (
     identityCritical === false
       || (score.identity >= 0.38
-        && hardFeatureCompleteness >= 0.6
         && poseValid
         && earValid
         && muzzleValid
@@ -2628,7 +2376,6 @@ function generateCandidate(
       featureRegionId: landmark.featureRegionId,
       carrierRegionId: landmark.carrierRegionId,
     })) ?? [],
-    featurePlacements,
     structureRegions: structurePlan?.regions.map((region) => ({
       id: region.id,
       sourceRegionId: region.sourceRegionId,
@@ -2674,9 +2421,6 @@ function generateCandidate(
       featurePurity: visibility.purity,
       featureConnectivity: visibility.connectivity,
       featureLocalContrast: visibility.localContrast,
-      hardFeatureCompleteness,
-      featureCollisionCount,
-      featureSymmetryError,
       petPoseAvailable: petPose.available,
       petPoseScore: petPose.score,
       petPoseConfidence: petPose.confidence,
@@ -2750,7 +2494,6 @@ function generateCandidate(
     canvasPlan: context.canvasPlan,
     artDirection,
     artDirectionExecution,
-    ...(featurePlacements.length === 0 ? {} : { featurePlacements }),
     ...(structurePlan === undefined ? {} : { structurePlan }),
     ...(valuePlanning === undefined ? {} : { valuePlan: valuePlanning.plan, valueDiagnostics: valuePlanning.diagnostics }),
     ...(palettePlanning === undefined ? {} : { palettePlan: palettePlanning.plan }),
@@ -2771,8 +2514,7 @@ function generateCandidate(
         },
       }),
     edits: [
-      ...featureColors.edits,
-      ...(contourColors?.colorIds.flatMap((id, cell) => id === featureColors.colorIds[cell] ? [] : [{ x: cell % size.width, y: Math.floor(cell / size.width), fromColorId: featureColors.colorIds[cell]!, toColorId: id, reason: 'contour' as const }]) ?? []),
+      ...(contourColors?.colorIds.flatMap((id, cell) => id === assigned.colorIds[cell] ? [] : [{ x: cell % size.width, y: Math.floor(cell / size.width), fromColorId: assigned.colorIds[cell]!, toColorId: id, reason: 'contour' as const }]) ?? []),
       ...paletteEdits,
       ...optimization.edits,
       ...(gridRefinement?.edits ?? []),
@@ -2797,7 +2539,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number; yieldControl?: () => Promise<void> }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.10.2-perler-color-fidelity'
+    this.version = config.version ?? '0.11.0-source-features'
     this.#clock = config.clock ?? Date.now
     this.#yieldControl = config.yieldControl
   }
@@ -2808,8 +2550,6 @@ export class DeterministicPatternAlgorithm {
     let shapePlanningMs = 0
     let canvasPlanningMs = 0
     let candidateGenerationMs = 0
-    validateRequest(request)
-    request = prepareFeatureEvidence(request)
     validateRequest(request)
     request = { ...request, palette: { ...request.palette,
       version: request.palette.version ?? await createPaletteVersion(request.palette) } }

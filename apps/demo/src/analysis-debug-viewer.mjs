@@ -14,7 +14,6 @@ export const analysisDebugLayers = Object.freeze([
   { id: 'depth', label: '深度' },
   { id: 'embedding', label: '嵌入' },
   { id: 'landmarks', label: '关键点' },
-  { id: 'features', label: '五官落格' },
 ])
 
 const colors = Object.freeze({
@@ -32,14 +31,6 @@ const colors = Object.freeze({
   depth: [74, 118, 167],
 })
 
-const featureColors = Object.freeze({
-  'eye-dark': '#176f9c',
-  'eye-highlight': '#f7f3e9',
-  'mouth-dark': '#8f3f50',
-  'mouth-inner': '#d6534d',
-  'nose-base': '#b47a42',
-})
-
 function region(analysis, id) {
   return analysis?.semanticRegions?.find((entry) => entry.id === id)
 }
@@ -52,7 +43,6 @@ function unavailable(id) {
     modelVersion: undefined,
     provenance: [],
     landmarks: [],
-    placements: [],
   }
 }
 
@@ -67,7 +57,6 @@ function evidenceLayer(id, evidence, modelVersion) {
     modelVersion,
     provenance: evidence.provenance ?? [],
     landmarks: [],
-    placements: [],
   }
 }
 
@@ -81,7 +70,6 @@ function semanticLayer(id, semanticRegion, modelVersion) {
     modelVersion,
     provenance: semanticRegion.provenance ?? [],
     landmarks: [],
-    placements: [],
   }
 }
 
@@ -96,7 +84,6 @@ function importanceLayer(analysis) {
     modelVersion: analysis.modelVersions?.segmentation,
     provenance: analysis.provenance ?? [],
     landmarks: [],
-    placements: [],
   }
 }
 
@@ -133,7 +120,6 @@ function embeddingLayer(preferenceFeatures) {
     modelVersion: preferenceFeatures.map((entry) => entry.modelId).join(' · '),
     provenance: [],
     landmarks: [],
-    placements: [],
     detail: preferenceFeatures.flatMap((entry) => entry.names.map((name, index) =>
       `${name} ${Number(entry.values[index] ?? 0).toFixed(3)}`)).join(' · '),
   }
@@ -164,29 +150,12 @@ function combinedSkinLayer(analysis) {
     modelVersion: analysis.modelVersions?.portraitSemantics,
     provenance: available.flatMap((entry) => entry.provenance ?? []),
     landmarks: [],
-    placements: [],
-  }
-}
-
-function featureLayer(candidate) {
-  const placements = candidate?.featurePlacements ?? []
-  if (placements.length === 0 || candidate?.canvasPlan === undefined) return unavailable('features')
-  return {
-    id: 'features',
-    available: true,
-    confidence: placements.reduce((sum, placement) => sum + placement.score, 0) / placements.length,
-    modelVersion: candidate.pattern?.metadata?.algorithmVersion,
-    provenance: [],
-    landmarks: [],
-    placements,
-    candidate,
   }
 }
 
 export function resolveAnalysisDebugLayer(id, {
   analysis,
   originalSubjectEvidence,
-  candidate,
   preferenceFeatures = [],
 }) {
   if (analysisDebugLayers.some((layer) => layer.id === id) === false) {
@@ -200,7 +169,6 @@ export function resolveAnalysisDebugLayer(id, {
       modelVersion: undefined,
       provenance: [],
       landmarks: [],
-      placements: [],
     }
   }
   if (id === 'ai-subject') {
@@ -245,7 +213,6 @@ export function resolveAnalysisDebugLayer(id, {
       entry.id === 'depth' || entry.label === 'depth'), analysis?.modelVersions?.depth)
   }
   if (id === 'embedding') return embeddingLayer(preferenceFeatures)
-  if (id === 'features') return featureLayer(candidate)
   const landmarks = analysis?.landmarks ?? []
   return {
     id,
@@ -256,27 +223,6 @@ export function resolveAnalysisDebugLayer(id, {
     modelVersion: analysis?.modelVersions?.faceLandmarks,
     provenance: landmarks.flatMap((landmark) => landmark.provenance ?? []),
     landmarks,
-    placements: [],
-  }
-}
-
-export function featureCellSourceRect(candidate, cell) {
-  const size = candidate?.canvasPlan?.size
-  const crop = candidate?.canvasPlan?.crop
-  if (size === undefined || crop === undefined) throw new TypeError('Feature projection requires a canvas plan')
-  if (Number.isInteger(cell) === false || cell < 0 || cell >= size.width * size.height) {
-    throw new RangeError('Feature projection cell falls outside the target grid')
-  }
-  const scale = Math.min(size.width / crop.width, size.height / crop.height)
-  const offsetX = (size.width - crop.width * scale) / 2
-  const offsetY = (size.height - crop.height * scale) / 2
-  const gridX = cell % size.width
-  const gridY = Math.floor(cell / size.width)
-  return {
-    x: crop.x + (gridX - offsetX) / scale,
-    y: crop.y + (gridY - offsetY) / scale,
-    width: 1 / scale,
-    height: 1 / scale,
   }
 }
 
@@ -341,7 +287,6 @@ export function createAnalysisDebugViewer({ elements }) {
   let image
   let analysis = {}
   let originalSubjectEvidence
-  let candidate
   let route = 'deterministic'
   let providers = []
   let contributions = []
@@ -355,7 +300,6 @@ export function createAnalysisDebugViewer({ elements }) {
     return resolveAnalysisDebugLayer(id, {
       analysis,
       originalSubjectEvidence,
-      candidate,
       preferenceFeatures,
     })
   }
@@ -415,30 +359,13 @@ export function createAnalysisDebugViewer({ elements }) {
     }
   }
 
-  function drawFeatures(layer) {
-    const context = elements.canvas.getContext('2d')
-    const scale = Math.max(1, Math.min(image.width, image.height) / 420)
-    for (const placement of layer.placements) {
-      for (const entry of placement.roles) {
-        const rect = featureCellSourceRect(layer.candidate, entry.cell)
-        context.fillStyle = `${featureColors[entry.role] ?? '#176f9c'}cc`
-        context.fillRect(rect.x, rect.y, rect.width, rect.height)
-        context.lineWidth = Math.max(1, scale)
-        context.strokeStyle = '#ffffff'
-        context.strokeRect(rect.x, rect.y, rect.width, rect.height)
-      }
-    }
-  }
-
   function selectedLandmark(layer) {
     return layer.landmarks.find((landmark) => landmark.id === selectedLandmarkId)
   }
 
   function renderMetadata(layer) {
     elements.title.textContent = layerLabel(activeLayer)
-    elements.status.textContent = layer.placements.length > 0
-      ? `${layer.placements.length} 个五官 · ${layer.placements.reduce((sum, placement) => sum + placement.occupiedCells.length, 0)} 格`
-      : layer.available ? '图层已加载' : '当前分析未提供此图层'
+    elements.status.textContent = layer.available ? '图层已加载' : '当前分析未提供此图层'
     elements.confidence.textContent = formatConfidence(layer.confidence)
     elements.model.textContent = layer.modelVersion ?? '--'
     elements.provenance.textContent = provenanceText(layer.provenance)
@@ -482,7 +409,6 @@ export function createAnalysisDebugViewer({ elements }) {
     context.drawImage(sourceBuffer, 0, 0)
     if (visible.mask !== undefined) drawMask(visible.mask, colors[activeLayer])
     if (visible.landmarks.length > 0) drawLandmarks(visible.landmarks)
-    if (visible.placements.length > 0) drawFeatures(visible)
     renderControls()
     renderMetadata(visible)
   }
@@ -521,7 +447,6 @@ export function createAnalysisDebugViewer({ elements }) {
       image = next.image
       analysis = next.analysis ?? {}
       originalSubjectEvidence = next.originalSubjectEvidence
-      candidate = next.candidate
       route = next.route ?? 'deterministic'
       providers = next.providers ?? []
       contributions = next.contributions ?? []

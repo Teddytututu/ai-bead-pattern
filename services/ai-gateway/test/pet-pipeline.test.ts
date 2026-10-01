@@ -97,21 +97,11 @@ describe('pet pipeline regression', () => {
     })
     const candidate = result.recommended ?? result.bestEffort
     assert.ok(candidate?.gridRefinement)
-    const cellsByIndex = new Map(candidate.pattern.cells.map((cell) => [
-      cell.y * candidate.pattern.width + cell.x,
-      cell.colorId,
-    ]))
-    assert.ok(result.recommended, JSON.stringify({
-      status: result.status,
-      reasons: candidate.rejectionReasons,
-      score: candidate.score,
-      canvasPlan: candidate.canvasPlan,
-      palette: candidate.palettePlan?.selectedColorIds,
-      placements: candidate.featurePlacements?.map((placement) => ({
-        id: placement.featureId,
-        roles: placement.roles.map((role) => [role.role, cellsByIndex.get(role.cell)]),
-      })),
-    }))
+    // This fixture uses inferred pet geometry. Without synthetic feature painting,
+    // source mismatches stay visible to the quality gate instead of becoming a recommendation.
+    assert.equal(result.status, 'best-effort')
+    assert.ok(candidate.rejectionReasons.includes('hard-feature-source-mismatch'))
+    assert.equal(candidate.valid, false)
     assert.ok(candidate.score.identity >= 0.5)
     assert.ok((candidate.score.identityAppearance ?? 0) >= 0.45)
     const defectCost = (diagnostics: typeof candidate.gridRefinement.diagnosticsBefore) =>

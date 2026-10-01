@@ -4,7 +4,6 @@ import type {
   StructurePlan,
   ValuePlan,
 } from './contracts.js'
-import type { ResolvedFeaturePlacement } from './planning/feature-placement.js'
 import type {
   ArtDirectionExecutionSummary,
   PixelArtDirectionPlan,
@@ -139,8 +138,6 @@ export interface PatternOptions {
   artDirection?: ArtDirectionOptions
   optimization?: OptimizationOptions
   beadDiameterMm?: number
-  /** Manual components in normalized upload image pixel coordinates; no CSS coordinates. */
-  featureOverrides?: readonly FeatureOverride[]
 }
 
 export interface ImportanceMap {
@@ -233,19 +230,6 @@ export interface FeatureShape {
   expression?: 'neutral' | 'open' | 'closed' | 'smile'
   anchors?: readonly { x: number; y: number }[]
 }
-export interface FeatureOverride {
-  id: string
-  kind: 'eye' | 'nose' | 'mouth'
-  x: number
-  y: number
-  instanceId?: string
-  featureGroupId?: string
-  templateId?: string
-  hidden?: boolean
-  locked?: boolean
-  shape?: FeatureShape
-}
-
 export interface ImageLandmark {
   id: string
   kind: LandmarkKind
@@ -274,8 +258,6 @@ export interface ImageLandmark {
   instanceId?: string
   featureGroupId?: string
   featureShape?: FeatureShape
-  templateId?: string
-  placementLocked?: boolean
 }
 
 export interface ImageAnalysis {
@@ -352,7 +334,7 @@ export interface GridEditRecord {
   fromColorId: string
   toColorId: string
   reason: 'small-region' | 'isolated-cell' | 'stripe' | 'topology' | 'palette-coherence'
-    | 'feature-placement' | 'cluster-refinement' | 'symmetry' | 'tile-seam' | 'contour' | 'fill-fidelity'
+    | 'cluster-refinement' | 'symmetry' | 'tile-seam' | 'contour' | 'fill-fidelity'
 }
 
 export interface GenerationMetrics {
@@ -372,9 +354,6 @@ export interface GenerationMetrics {
   featurePurity: number
   featureConnectivity: number
   featureLocalContrast: number
-  hardFeatureCompleteness: number
-  featureCollisionCount: number
-  featureSymmetryError: number
   petPoseAvailable: boolean
   petPoseScore: number
   petPoseConfidence: number
@@ -526,9 +505,7 @@ export interface PatternCandidate {
   score: CandidateScore
   /** @experimental Executable V2 planning diagnostics for this candidate. */
   canvasPlan?: CanvasPlan
-  /** @experimental Discrete feature placements resolved before color quantization. */
-  featurePlacements?: readonly ResolvedFeaturePlacement[]
-  /** @experimental Region graph, bounded source mapping, and feature constraints. */
+  /** @experimental Region graph and bounded source mapping. */
   structurePlan?: StructurePlan
   /** @experimental Region-level light, base, shadow, and outline roles. */
   valuePlan?: ValuePlan

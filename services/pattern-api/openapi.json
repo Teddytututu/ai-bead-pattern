@@ -2483,14 +2483,6 @@
             "type": "object",
             "additionalProperties": true,
             "description": "Cell paths, physical colors, final retention/contrast diagnostics and warnings."
-          },
-          "featurePlacements": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": true,
-              "description": "Template ID/version, center, rotation, occupied/reserved cells and color roles."
-            }
           }
         },
         "required": [
@@ -2500,111 +2492,6 @@
           "score",
           "reasons",
           "pattern"
-        ],
-        "additionalProperties": false
-      },
-      "FeatureOverride": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 128
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "eye",
-              "nose",
-              "mouth"
-            ]
-          },
-          "x": {
-            "type": "number",
-            "minimum": 0,
-            "exclusiveMaximum": 1024
-          },
-          "y": {
-            "type": "number",
-            "minimum": 0,
-            "exclusiveMaximum": 1024
-          },
-          "instanceId": {
-            "type": "string"
-          },
-          "featureGroupId": {
-            "type": "string"
-          },
-          "templateId": {
-            "type": "string"
-          },
-          "hidden": {
-            "type": "boolean"
-          },
-          "locked": {
-            "type": "boolean",
-            "default": true
-          },
-          "shape": {
-            "type": "object",
-            "properties": {
-              "widthPx": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 2048
-              },
-              "heightPx": {
-                "type": "number",
-                "exclusiveMinimum": 0,
-                "maximum": 2048
-              },
-              "angleDegrees": {
-                "type": "number",
-                "minimum": -180,
-                "maximum": 180
-              },
-              "expression": {
-                "type": "string",
-                "enum": [
-                  "neutral",
-                  "open",
-                  "closed",
-                  "smile"
-                ]
-              },
-              "anchors": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "x": {
-                      "type": "number"
-                    },
-                    "y": {
-                      "type": "number"
-                    }
-                  },
-                  "required": [
-                    "x",
-                    "y"
-                  ],
-                  "additionalProperties": false
-                },
-                "maxItems": 16
-              }
-            },
-            "required": [
-              "widthPx",
-              "heightPx"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "x",
-          "y"
         ],
         "additionalProperties": false
       },
@@ -2868,14 +2755,6 @@
                 },
                 "required": [],
                 "additionalProperties": false
-              },
-              "featureOverrides": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/FeatureOverride"
-                },
-                "maxItems": 32,
-                "description": "Coordinates use normalized uploaded image pixels returned by POST /v1/images, before crop or contain. Hidden components are omitted; both eyes can have different y/size/template."
               }
             },
             "required": [],

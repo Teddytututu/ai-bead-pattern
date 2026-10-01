@@ -55,7 +55,7 @@ export function candidateFeatureVector(candidate) {
   const identityParts = [
     score.identity,
     score.identityAppearance ?? score.identity,
-    metrics.hardFeatureCompleteness,
+    metrics.featureCoverage,
   ]
   const contourParts = [score.structure, metrics.planBoundaryAgreement, metrics.sourceBoundaryAgreement]
   const thinParts = [
@@ -93,7 +93,7 @@ export function candidateFeatureVector(candidate) {
     pixelClusters: mean([score.cleanliness, 1 - clusterPenalty]),
     contourRhythm: mean(contourParts),
     thinStructure: mean(thinParts),
-    boundaryAnchors: mean([metrics.hardFeatureCompleteness, score.featureProtection]),
+    boundaryAnchors: mean([metrics.featureCoverage, score.featureProtection]),
     ...(petPoseAvailable ? {
       earStructure,
       muzzleStructure,

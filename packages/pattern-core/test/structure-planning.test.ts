@@ -4,7 +4,6 @@ import { describe, it } from 'node:test'
 import {
   buildStructurePlan,
   validateStructurePlan,
-  type ResolvedFeaturePlacement,
 } from '../src/experimental.js'
 import { sourcePointForGridCell } from '../src/image.js'
 import type { Lab } from '../src/index.js'
@@ -15,19 +14,6 @@ function guidance(width: number, height: number) {
     height,
     importance: new Float32Array(width * height),
     edge: new Float32Array(width * height),
-  }
-}
-
-function placement(cell: number): ResolvedFeaturePlacement {
-  return {
-    featureId: 'left-eye-center',
-    kind: 'eye',
-    templateId: 'eye-e1',
-    center: [cell, 0],
-    occupiedCells: [cell],
-    roles: [{ cell, role: 'eye-dark' }],
-    shift: [0, 0],
-    score: 1,
   }
 }
 
@@ -45,8 +31,8 @@ describe('StructurePlan', () => {
       semanticRegionIds: ['face-skin', 'face-skin', 'hair', 'hair'],
       importance: [0.8, 0.8, 0.7, 0.7],
       sourceGuidance: guidance(4, 1),
-      featurePlacements: [],
-      featureConstraints: [],
+
+
     })
 
     assert.equal(plan.regions.length, 2)
@@ -67,10 +53,10 @@ describe('StructurePlan', () => {
       semanticRegionIds: ['face-skin', 'face-skin', 'face-skin'],
       importance: [0.5, 0.2, 0.5],
       sourceGuidance: guidance(3, 1),
-      featureConstraints: [],
+
     }
-    const merged = buildStructurePlan({ ...common, featurePlacements: [] })
-    const protectedPlan = buildStructurePlan({ ...common, featurePlacements: [placement(1)] })
+    const merged = buildStructurePlan({ ...common })
+    const protectedPlan = buildStructurePlan({ ...common, protectedCells: new Set([1]) })
 
     assert.equal(merged.regions.length, 1)
     assert.ok(protectedPlan.regions.length > 1)
@@ -94,8 +80,8 @@ describe('StructurePlan', () => {
       semanticRegionIds: ['hair', 'face-skin', 'face-skin', 'face-skin', 'face-skin'],
       importance: [0.5, 0.5, 0.2, 0.5, 0.5],
       sourceGuidance: guidance(5, 1),
-      featurePlacements: [],
-      featureConstraints: [],
+
+
       minimumRegionCells: 2,
     })
 
@@ -123,8 +109,8 @@ describe('StructurePlan', () => {
       semanticRegionIds: new Array(16).fill('subject'),
       importance: new Array(16).fill(0.5),
       sourceGuidance,
-      featurePlacements: [],
-      featureConstraints: [],
+
+
       maximumSourceShiftCells: 0.4,
     })
     const cell = 1 * 4 + 1
@@ -151,8 +137,8 @@ describe('StructurePlan', () => {
       semanticRegionIds: new Array(9).fill('subject'),
       importance: new Array(9).fill(0.5),
       sourceGuidance,
-      featurePlacements: [],
-      featureConstraints: [],
+
+
       maximumSourceShiftCells: 0.35,
     })
     const cell = 4
@@ -180,8 +166,8 @@ describe('StructurePlan', () => {
       semanticRegionIds: new Array(9).fill('face-skin'),
       importance: new Array(9).fill(0.5),
       sourceGuidance,
-      featurePlacements: [placement(4)],
-      featureConstraints: [],
+      protectedCells: new Set([4]),
+
       maximumSourceShiftCells: 0.35,
     })
     const sourcePoint = sourcePointForGridCell(crop, fit, 1, 1)!

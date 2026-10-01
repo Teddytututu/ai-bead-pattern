@@ -4,7 +4,6 @@ import { describe, it } from 'node:test'
 
 import {
   applyCorrectedSubjectEvidence,
-  featureCellSourceRect,
   fitAnalysisDebugCanvas,
   resolveAnalysisDebugLayer,
 } from '../../src/analysis-debug-viewer.mjs'
@@ -49,24 +48,6 @@ const analysis = {
     faceLandmarks: 'mediapipe/face-v1',
     portraitSemantics: 'mediapipe/semantic-v1',
   },
-}
-
-const featureCandidate = {
-  canvasPlan: {
-    size: { width: 48, height: 48 },
-    crop: { x: 0, y: 0, width: 4, height: 2 },
-  },
-  featurePlacements: [{
-    featureId: 'left-eye-center',
-    kind: 'eye',
-    templateId: 'eye-e1',
-    center: [18, 24],
-    occupiedCells: [24 * 48 + 18],
-    roles: [{ cell: 24 * 48 + 18, role: 'eye-dark' }],
-    shift: [0, 0],
-    score: 0.95,
-  }],
-  pattern: { metadata: { algorithmVersion: 'feature-planning-v1' } },
 }
 
 describe('Analysis Debug Viewer layers', () => {
@@ -156,18 +137,6 @@ describe('Analysis Debug Viewer layers', () => {
     assert.equal(clothes.available, false)
   })
 
-  it('exposes resolved feature placements as a debug layer', () => {
-    const features = resolveAnalysisDebugLayer('features', {
-      analysis,
-      originalSubjectEvidence: aiEvidence,
-      candidate: featureCandidate,
-    })
-
-    assert.equal(features.available, true)
-    assert.equal(features.placements.length, 1)
-    assert.equal(features.modelVersion, 'feature-planning-v1')
-  })
-
   it('maps edge, depth, and embedding outputs into inspectable layers', () => {
     const learnedAnalysis = {
       ...analysis,
@@ -194,15 +163,6 @@ describe('Analysis Debug Viewer layers', () => {
     assert.equal(edges.modelVersion, 'birefnet-v1')
     assert.equal(depth.modelVersion, 'depth-v2')
     assert.match(embedding.detail, /embedding-similarity 0\.820/)
-  })
-
-  it('projects a grid cell through fitted square margins without stretching', () => {
-    assert.deepEqual(featureCellSourceRect(featureCandidate, 24 * 48 + 18), {
-      x: 1.5,
-      y: 1,
-      width: 1 / 12,
-      height: 1 / 12,
-    })
   })
 
   it('fits rectangular sources into the viewer without stretching', () => {
@@ -234,6 +194,6 @@ describe('Analysis Debug Viewer layers', () => {
     const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8')
 
     assert.match(html, /analysis: sourceAnalysis/)
-    assert.match(html, /data-analysis-layer="features"/)
+    assert.doesNotMatch(html, /data-analysis-layer="features"/)
   })
 })

@@ -142,7 +142,7 @@ describe('MARD 291 single ink and source fill', () => {
     assert.notEqual(byCell.get(markCell), byCell.get(markCell - 1), 'a labeled identity mark is a feature, not incidental shade noise')
     assert.ok(!candidate.edits.some(edit => edit.x === 15 && edit.y === 15 && edit.reason === 'palette-coherence'))
   })
-  it('keeps observed MARD eyes, mouth, reserved cells and contours out of every cleanup pass', async () => {
+  it('keeps observed source detail cells and contours out of every cleanup pass', async () => {
     const width = 32, height = 32, data = new Uint8ClampedArray(width * height * 4)
     for (let cell = 0; cell < width * height; cell++) data.set([187, 149, 110, 255], cell * 4)
     const mask = { width, height, values: new Float32Array(width * height).fill(1) }
@@ -158,8 +158,7 @@ describe('MARD 291 single ink and source fill', () => {
           paletteCoherence: 2, localSearchIterations: 3, refinementMode: 'quality' } },
     })
     const candidate = (result.recommended ?? result.bestEffort)!
-    assert.deepEqual(candidate.featurePlacements!.map(p => p.featureId).sort(), ['left-eye', 'mouth', 'right-eye'])
-    const locked = new Set([...candidate.featurePlacements!.flatMap(p => [...p.occupiedCells, ...(p.reservedCells ?? [])]),
+    const locked = new Set([10 * width + 10, 11 * width + 21, 20 * width + 16,
       ...candidate.contourPlan!.externalCells, ...candidate.contourPlan!.internalCells])
     const cleanupReasons = new Set(['small-region', 'isolated-cell', 'stripe', 'topology', 'palette-coherence', 'cluster-refinement', 'symmetry', 'fill-fidelity'])
     assert.ok(!candidate.edits.some(edit => locked.has(edit.y * width + edit.x) && cleanupReasons.has(edit.reason)))

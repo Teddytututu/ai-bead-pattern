@@ -25,6 +25,6 @@ test('exports the selected tone policy and allows a true zero strength', async (
   const document = JSON.parse(await readFile(await (await downloaded).path(), 'utf8'))
   expect(document.metadata.valueMode).toBe('stylized')
   expect(document.metadata.valueStrength).toBe(0)
-  expect(document.metadata.algorithmVersion).toBe('0.10.2-perler-color-fidelity')
+  expect(document.metadata.algorithmVersion).toBe('0.11.0-source-features')
   await page.screenshot({ path: testInfo.outputPath('value-policy-demo.png'), fullPage: true })
 })

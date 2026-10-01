@@ -230,7 +230,6 @@ export type {
   ImageAnalysis,
   ImageLandmark,
   FeatureShape,
-  FeatureOverride,
   ImageType,
   ImportanceMap,
   Lab,
@@ -282,5 +281,5 @@ export type {
   PalettePlanningDiagnostics,
   PaletteSubstitutionDiagnostic,
 } from './planning/palette-planner.js'
-export { prepareFeatureEvidence, projectFeatureShape, validateFeatureShape, validateFeatureOverrides } from './planning/feature-evidence.js'
-export { featureTemplateLibrary } from './planning/feature-template-library.js'
+
+export { projectFeatureShape, validateFeatureShape } from './landmarks.js'

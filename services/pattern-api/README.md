@@ -52,23 +52,15 @@ pnpm api:dev
 
 任务执行状态与 `result.generationStatus` 分开。`best-effort` 需要用户检查并接受后加 `acceptBestEffort=true` 才能导出不合格候选；`no-valid-candidate` 没有图纸。网格索引 `-1` 表示空白，其余值引用候选的 `colors`；材料数量只统计占用格。
 
-## 轮廓与五官参数
+## 轮廓参数
 
-`options.structure.contours: { external, internal, colorId? }` 控制外／内轮廓，`options.featureOverrides` 提供手动五官校正；微信 SDK 原样传递。以下片段放入创建任务请求的 `options`：
+`options.structure.contours: { external, internal, colorId? }` 控制外／内轮廓；微信 SDK 使用相同字段：
 
 ```json
-{
-  "structure": { "contours": { "external": true, "internal": false } },
-  "featureOverrides": [
-    { "id": "near-eye", "kind": "eye", "x": 100, "y": 80, "templateId": "eye-open-3x3", "locked": true },
-    { "id": "far-eye", "kind": "eye", "x": 160, "y": 95, "templateId": "eye-e1", "locked": true }
-  ]
-}
+{ "structure": { "contours": { "external": true, "internal": false } } }
 ```
 
-坐标处于上传返回的**规范化图片宽高**内，示例仅展示参数形式。最多 32 个部件，ID 唯一；`hidden: true` 排除部件，`instanceId`／`featureGroupId` 区分对象。`shape` 可传 `widthPx/heightPx/angleDegrees/expression/anchors`。未知模板、类型不匹配或越界坐标会被拒绝。
-
-双眼可不等高且使用不同模板；候选返回 `contourPlan` 和 `featurePlacements`，包含实际角度、中心、占格及保留格。点选／数值编辑目前在 Demo，原生小程序的完整点选编辑器仍待实现。
+候选返回 `contourPlan`，包含轮廓格、材料色及质量诊断。五官规则模板及其手动校正入口已删除；请求不再接受 `featureOverrides`，结果不再生成 `featurePlacements`。模型关键点只用于原图细节保护和评估。
 
 MARD 291 默认使用单色深描边，候选为 B22、B23、C12、C18、D4、D10、D15、D22、F7、F11、G8、R22；内外轮廓共用一色，显式指定不合规色号返回 `422 INVALID_CONTOUR_COLOR`。自动填色排除 H7；此限制不应用于 Perler 黑色或通用 24 色，详见[当前配色行为](../../docs/architecture.md#配色与五官的当前行为)。
 
@@ -83,7 +75,7 @@ MARD 291 默认使用单色深描边，候选为 B22、B23、C12、C18、D4、D1
 
 ## 可选分析与部署
 
-启动 `pnpm sam2:start`，在 API 环境设置 `SAM2_ENDPOINT=http://127.0.0.1:7103`，请求 `route: neural-analysis`，即可使用 Grounded-SAM-2 主体及部件蒙版、独立五官定位和已有模板系统。首次安装执行 `pnpm sam2:setup`，模型来源与验证边界见 [SAM2 服务说明](../sam2-sidecar/README.md)。
+启动 `pnpm sam2:start`，在 API 环境设置 `SAM2_ENDPOINT=http://127.0.0.1:7103`，请求 `route: neural-analysis`，即可使用 Grounded-SAM-2 主体及部件蒙版、独立部件定位与原图细节保护。首次安装执行 `pnpm sam2:setup`，模型来源与验证边界见 [SAM2 服务说明](../sam2-sidecar/README.md)。
 
 仅设置 `REMBG_ENDPOINT=http://127.0.0.1:7000` 时提供主体蒙版，返回部件识别未启用的提示；同时配置时优先 SAM2。strict 模式在分析失败时报错；best-effort 降级时明确返回警告与 `actualRoute: deterministic`。
 

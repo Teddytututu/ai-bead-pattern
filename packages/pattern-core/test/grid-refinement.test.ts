@@ -4,7 +4,6 @@ import { describe, it } from 'node:test'
 import { refineGridClusters } from '../src/experimental.js'
 import { gridRefinementSchema } from '../src/grid-refinement.js'
 import type { Lab, MaterialColor } from '../src/index.js'
-import type { ResolvedFeaturePlacement } from '../src/planning/feature-placement.js'
 
 const colors: readonly MaterialColor[] = [
   { id: 'red', name: 'Red', hex: '#ff0000', rgb: [255, 0, 0], lab: [55, 75, 55] },
@@ -18,24 +17,6 @@ const closeColors: readonly MaterialColor[] = [
 
 function labs(size: number, value: Lab = [55, 75, 55]): readonly Lab[] {
   return Array.from({ length: size }, () => value)
-}
-
-function placement(
-  featureId: string,
-  cell: number,
-  kind: ResolvedFeaturePlacement['kind'],
-  role: ResolvedFeaturePlacement['roles'][number]['role'],
-): ResolvedFeaturePlacement {
-  return {
-    featureId,
-    kind,
-    templateId: `${kind}-fixture`,
-    center: [cell, 1],
-    occupiedCells: [cell],
-    roles: [{ cell, role }],
-    shift: [0, 0],
-    score: 1,
-  }
 }
 
 function fragmentedArcCount(colorIds: readonly string[], width: number, height: number): number {
@@ -86,7 +67,7 @@ describe('unified grid refinement', () => {
       colors,
       boundaryStrength: new Float32Array(9),
       importance: new Array(9).fill(0.5),
-      featurePlacements: [],
+
       distanceMethod: 'delta-e-2000',
       mode: 'fast',
     })
@@ -114,7 +95,7 @@ describe('unified grid refinement', () => {
       colors,
       boundaryStrength: new Float32Array(9),
       importance: new Array(9).fill(0.5),
-      featurePlacements: [],
+
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
     })
@@ -122,25 +103,18 @@ describe('unified grid refinement', () => {
     assert.equal(result.colorIds[4], 'blue')
   })
 
-  it('locks model-planned eyes, nose, ear tips, mouth cells, and structural endpoints', () => {
+  it('preserves explicitly protected source details through cleanup', () => {
     const featureCells = [12, 14, 16, 18, 20]
     const result = refineGridClusters({
       colorIds: Array.from({ length: 33 }, (_, cell) => featureCells.includes(cell) ? 'blue' : 'red'),
       width: 11,
       height: 3,
       activeMask: new Uint8Array(33).fill(1),
-      protectedCells: new Set(),
+      protectedCells: new Set(featureCells),
       pixelLabs: labs(33),
       colors,
       boundaryStrength: new Float32Array(33),
       importance: new Array(33).fill(0),
-      featurePlacements: [
-        placement('left-eye', 12, 'eye', 'eye-dark'),
-        placement('nose-tip', 14, 'nose', 'nose-base'),
-        placement('left-ear-tip', 16, 'ear', 'ear-tip'),
-        placement('left-mouth-corner', 18, 'mouth', 'mouth-dark'),
-        placement('tail-tip', 20, 'custom', 'endpoint-dark'),
-      ],
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
     })
@@ -165,7 +139,7 @@ describe('unified grid refinement', () => {
       colors,
       boundaryStrength,
       importance: new Array(9).fill(0.4),
-      featurePlacements: [],
+
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
     })
@@ -190,7 +164,7 @@ describe('unified grid refinement', () => {
       colors: closeColors,
       boundaryStrength: new Float32Array(15),
       importance: new Array(15).fill(0.1),
-      featurePlacements: [],
+
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
     })
@@ -216,10 +190,7 @@ describe('unified grid refinement', () => {
       colors: closeColors,
       boundaryStrength: new Float32Array(25),
       importance: new Array(25).fill(0.05),
-      featurePlacements: [
-        placement('line-start', trunk[0]!, 'custom', 'endpoint-dark'),
-        placement('line-end', trunk.at(-1)!, 'custom', 'endpoint-dark'),
-      ],
+      protectedEndpointCells: new Set([trunk[0]!, trunk.at(-1)!]),
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
     })
@@ -250,10 +221,7 @@ describe('unified grid refinement', () => {
       colors: closeColors,
       boundaryStrength: new Float32Array(width * height),
       importance,
-      featurePlacements: [
-        placement('structure-start', structuralPath[0]!, 'custom', 'endpoint-dark'),
-        placement('structure-end', structuralPath.at(-1)!, 'custom', 'endpoint-dark'),
-      ],
+      protectedEndpointCells: new Set([structuralPath[0]!, structuralPath.at(-1)!]),
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
     })
@@ -287,10 +255,7 @@ describe('unified grid refinement', () => {
       colors: closeColors,
       boundaryStrength: new Float32Array(width * height),
       importance: new Array(width * height).fill(0.05),
-      featurePlacements: [
-        placement('structure-start', structuralPath[0]!, 'custom', 'endpoint-dark'),
-        placement('structure-end', structuralPath.at(-1)!, 'custom', 'endpoint-dark'),
-      ],
+      protectedEndpointCells: new Set([structuralPath[0]!, structuralPath.at(-1)!]),
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
     })
@@ -320,10 +285,7 @@ describe('unified grid refinement', () => {
         colors: closeColors,
         boundaryStrength: new Float32Array(size * size),
         importance: new Array(size * size).fill(0.05),
-        featurePlacements: [
-          placement(`line-start-${size}`, trunk[0]!, 'custom', 'endpoint-dark'),
-          placement(`line-end-${size}`, trunk.at(-1)!, 'custom', 'endpoint-dark'),
-        ],
+        protectedEndpointCells: new Set([trunk[0]!, trunk.at(-1)!]),
         distanceMethod: 'delta-e-2000',
         mode: 'quality',
       })
@@ -350,7 +312,7 @@ describe('unified grid refinement', () => {
       colors,
       boundaryStrength: new Float32Array(16),
       importance: new Array(16).fill(0.2),
-      featurePlacements: [],
+
       distanceMethod: 'delta-e-2000' as const,
     }
     const fast = refineGridClusters({ ...input, mode: 'fast' })
@@ -379,7 +341,7 @@ describe('unified grid refinement', () => {
       colors: closeColors,
       boundaryStrength: new Float32Array(16).fill(1),
       importance: new Array(16).fill(0),
-      featurePlacements: [],
+
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
     })
@@ -407,7 +369,7 @@ describe('unified grid refinement', () => {
       colors: closeColors,
       boundaryStrength: new Float32Array(16),
       importance: new Array(16).fill(0),
-      featurePlacements: [],
+
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
       budgets: {
@@ -442,7 +404,7 @@ describe('unified grid refinement', () => {
       colors: closeColors,
       boundaryStrength: new Float32Array(4).fill(1),
       importance: new Array(4).fill(0),
-      featurePlacements: [],
+
       distanceMethod: 'delta-e-2000',
       mode: 'quality',
       budgets: {

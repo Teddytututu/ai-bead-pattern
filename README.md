@@ -5,7 +5,7 @@
 ## 当前状态
 
 - 已接入通用 24、MARD 291、Perler 123；Perler 登记 123 个 SKU，其中 118 色参与自动配色。单张图纸最多 48 色，通用色卡最多 24 色。
-- 已实现主体轮廓、35 个五官规则模板、姿态保持、手动点选校正、蒙版补擦与撤销重做，以及保色和细节保护。
+- 已实现主体轮廓、原图细节保护、蒙版补擦与撤销重做，以及保色和细节保护。
 - 自动主体／部件分析固定使用 GroundingDINO Tiny + SAM 2.1 Small。产品 API、微信 SDK 和原生小程序示例可本地运行；真实微信环境与 HTTPS 部署仍待接入。
 - 已下载 2,435 张拼豆参考图纸，[数据清点、读格与预标注审核工具](tools/template-learning/README.md)已有实现。五官新路线采用现成网络，仅训练 adapter；[SDXL Inpainting＋LoRA 实验服务](services/sdxl-region-sidecar/README.md)已本地装配，支持全图条件下的区域生成、接受／撤销和导出，并通过 512/1024 推理及 LoRA 单步／重载验证。真实效果、配对目标、独立分组及正式训练仍待完成，详见[当前计划](docs/plans/README.md)。
 
@@ -30,7 +30,7 @@ pnpm build
 pnpm demo:net
 ```
 
-模型配置、权重版本及故障处理见 [SAM2 服务说明](services/sam2-sidecar/README.md)。侧栏的“五官定位与模板”支持原图点选、模板选择、隐藏与锁定；应用校正后重新生成。外／内轮廓独立开关，两眼保留原图高差与大小关系。`node scripts/diagnostics/render-contours-features-demo.mjs` 可生成模板总览和合成对照。
+模型配置、权重版本及故障处理见 [SAM2 服务说明](services/sam2-sidecar/README.md)。外／内轮廓独立开关；模型检测到的五官只作为原图细节保护与评估证据，不再套用规则模板补画。
 
 启用 SDXL 局部生成实验（独立 Python 环境，首次安装下载约 6.94 GB 模型及依赖）：
 
@@ -58,7 +58,7 @@ pnpm api:dev
 | `apps/demo/server` | Demo 静态服务与 AI HTTP 接口 |
 | `apps/demo/tests` | `unit` 单元测试、`e2e` 浏览器测试、`fixtures` 服务替身 |
 | `apps/wechat-miniapp` | 原生小程序客户端 |
-| `packages/pattern-core` | 画布、结构、模板、材料配色、精修与导出 |
+| `packages/pattern-core` | 画布、结构、材料配色、精修与导出 |
 | `packages/material-palettes` | 291／123／24 色卡注册和校验 |
 | `packages/pattern-api-contracts`、`packages/wechat-client` | 共享协议与微信 SDK |
 | `services/pattern-api` | HTTP API、Worker 与 SQLite |
@@ -66,7 +66,7 @@ pnpm api:dev
 | `tools` | 数据集采集、质量门禁和离线评测；各工具独立维护 |
 | `tests/fixtures` | 共享图片、数据格式和历史性能基准；模块测试留在所属包内 |
 | `scripts/dev` | Demo 联合启动与本地模型命令 |
-| `scripts/benchmarks`、`scripts/diagnostics` | 性能测量、颜色／模板诊断 |
+| `scripts/benchmarks`、`scripts/diagnostics` | 性能测量、颜色／结构诊断 |
 | `scripts/maintenance` | 色卡导入和 OpenAPI 生成 |
 | `assets/palettes` | 色卡、来源和许可 |
 | `docs/plans` | 产品计划、五官区域生成专项及开源模型调研 |
@@ -84,7 +84,7 @@ pnpm test:e2e
 pnpm benchmark:palette
 ```
 
-算法行为与边界见[架构文档](docs/architecture.md)。评测协议：[蒙版](docs/mask-failure-gate.md)、[人像视觉](docs/vision-gate.md)、[五官模板](docs/feature-planning-gate.md)。协议夹具通过不等于真实模型质量验收。
+算法行为与边界见[架构文档](docs/architecture.md)。评测协议：[蒙版](docs/mask-failure-gate.md)、[人像视觉](docs/vision-gate.md)。协议夹具通过不等于真实模型质量验收。
 
 ## 文档与数据
 

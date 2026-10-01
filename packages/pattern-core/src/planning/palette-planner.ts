@@ -10,7 +10,6 @@ import {
   type ValueRole,
 } from '../contracts.js'
 import type { ColorDistanceMethod, Lab, MaterialColor } from '../types.js'
-import type { ResolvedFeaturePlacement } from './feature-placement.js'
 
 export interface PalettePlanningInput {
   /** Keep local color evidence instead of flattening every tonal role to one color. */
@@ -22,7 +21,6 @@ export interface PalettePlanningInput {
   colors: readonly MaterialColor[]
   maximumColors: number
   distanceMethod: ColorDistanceMethod
-  featurePlacements: readonly ResolvedFeaturePlacement[]
   requiredColorIds?: readonly string[]
   /** Automatic fill exclusions; stock still describes the complete catalog. */
   excludedColorIds?: readonly string[]
@@ -225,16 +223,6 @@ function selectColors(
   const selectable = colors.filter((color) => stock(input, color.id) > 0)
   if (selectable.length === 0) throw new RangeError('Palette inventory has no available colors')
   const selected = new Set<string>(input.requiredColorIds ?? [])
-  const featureRoles = new Set(input.featurePlacements.flatMap((placement) =>
-    placement.roles.map((entry) => entry.role)))
-  if ([...featureRoles].some((role) => role.endsWith('-dark'))) {
-    selected.add([...selectable].sort((first, second) =>
-      first.lab[0] - second.lab[0] || first.id.localeCompare(second.id))[0]!.id)
-  }
-  if (featureRoles.has('eye-highlight') && selected.size < input.maximumColors) {
-    selected.add([...selectable].sort((first, second) =>
-      second.lab[0] - first.lab[0] || first.id.localeCompare(second.id))[0]!.id)
-  }
   while (selected.size < Math.min(input.maximumColors, selectable.length)) {
     let bestColor: PreparedColor | undefined
     let bestCost = Number.POSITIVE_INFINITY
@@ -415,13 +403,6 @@ function buildCellPalettePlan(input: PalettePlanningInput): PalettePlanningResul
   const weights = input.roleIdsByCell.map(id => Math.max(0.1, roles.get(id ?? '')?.importance ?? 0.1))
   const selected = new Set(input.requiredColorIds ?? [])
   const finiteStock = input.inventory !== undefined && Object.keys(input.inventory).length > 0
-  const featureRoles = new Set(input.featurePlacements.flatMap(placement => placement.roles.map(entry => entry.role)))
-  if (selected.size < input.maximumColors && [...featureRoles].some(role => role.endsWith('-dark'))) {
-    selected.add([...available].sort((a, b) => a.lab[0] - b.lab[0] || a.id.localeCompare(b.id))[0]!.id)
-  }
-  if (selected.size < input.maximumColors && featureRoles.has('eye-highlight')) {
-    selected.add([...available].sort((a, b) => b.lab[0] - a.lab[0] || a.id.localeCompare(b.id))[0]!.id)
-  }
   // Aggregate subset-selection costs by nearest physical color. This bounds the
   // greedy search to paletteSize buckets; final bead assignment still uses each cell's Lab.
   const availableIndices = available.map(color => indexById.get(color.id)!)

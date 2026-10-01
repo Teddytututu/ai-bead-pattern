@@ -229,8 +229,6 @@ function projectedCandidateHeadLandmarks(candidate, sourceLandmarks, candidateIm
   const fitHeight = Math.max(1, Math.min(gridHeight, Math.round(crop.height * scale)))
   const fitX = Math.floor((gridWidth - fitWidth) / 2)
   const fitY = Math.floor((gridHeight - fitHeight) / 2)
-  const placementById = new Map((candidate.featurePlacements ?? [])
-    .map((placement) => [placement.featureId, placement]))
   const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value))
   return sourceLandmarks.flatMap((landmark) => {
     if (headLandmarkKinds.has(landmark.kind) === false
@@ -238,13 +236,12 @@ function projectedCandidateHeadLandmarks(candidate, sourceLandmarks, candidateIm
     if (landmark.observationState === 'missing'
       || landmark.x < crop.x || landmark.y < crop.y
       || landmark.x >= crop.x + crop.width || landmark.y >= crop.y + crop.height) return []
-    const placement = placementById.get(landmark.id)
-    const gridX = placement?.center[0] ?? clamp(
+    const gridX = clamp(
       fitX + Math.floor((landmark.x - crop.x) / crop.width * fitWidth),
       fitX,
       fitX + fitWidth - 1,
     )
-    const gridY = placement?.center[1] ?? clamp(
+    const gridY = clamp(
       fitY + Math.floor((landmark.y - crop.y) / crop.height * fitHeight),
       fitY,
       fitY + fitHeight - 1,
@@ -253,45 +250,29 @@ function projectedCandidateHeadLandmarks(candidate, sourceLandmarks, candidateIm
       ...landmark,
       x: clamp((gridX + 0.5) * candidateImage.width / gridWidth, 0, candidateImage.width - 1),
       y: clamp((gridY + 0.5) * candidateImage.height / gridHeight, 0, candidateImage.height - 1),
-      confidence: Math.min(landmark.confidence, placement?.score ?? landmark.confidence),
-      observationState: placement === undefined ? 'inferred' : landmark.observationState,
+      confidence: landmark.confidence,
+      observationState: 'inferred',
     }]
   })
 }
 
-const facePlacementKinds = new Set(['eye', 'nose', 'mouth', 'ear'])
-
-function scopedFacePlacements(candidate, instanceId) {
-  return (candidate.featurePlacements ?? [])
-    .filter((placement) => facePlacementKinds.has(placement.kind))
-    .filter((placement) => instanceId === undefined
-      || placement.featureId.startsWith(`${instanceId}:`))
-}
-
-function placementFaceMask(candidate, occupancy, instanceId) {
-  const cells = scopedFacePlacements(candidate, instanceId)
-    .flatMap((placement) => placement.occupiedCells)
-  if (cells.length === 0) return undefined
-  const xs = cells.map((cell) => cell % occupancy.width)
-  const ys = cells.map((cell) => Math.floor(cell / occupancy.width))
-  const padding = Math.max(2, Math.round(Math.max(occupancy.width, occupancy.height) * 0.04))
-  const minimumX = Math.max(0, Math.min(...xs) - padding)
-  const maximumX = Math.min(occupancy.width - 1, Math.max(...xs) + padding)
-  const minimumY = Math.max(0, Math.min(...ys) - padding)
-  const maximumY = Math.min(occupancy.height - 1, Math.max(...ys) + padding)
-  const values = new Float32Array(occupancy.values.length)
-  for (let y = minimumY; y <= maximumY; y += 1) for (let x = minimumX; x <= maximumX; x += 1) {
-    const index = y * occupancy.width + x
-    values[index] = occupancy.values[index]
-  }
-  return { width: occupancy.width, height: occupancy.height, values }
-}
-
-function projectedFaceMask(candidate, sourceFaceMask, occupancy, instanceId) {
+function projectedFaceMask(candidate, sourceFaceMask, occupancy) {
   if (sourceFaceMask === undefined) return undefined
-  const mapping = candidate.structurePlan?.sourceMapping
+  let mapping = candidate.structurePlan?.sourceMapping
   if (mapping === undefined || mapping.length !== occupancy.values.length * 2) {
-    return placementFaceMask(candidate, occupancy, instanceId)
+    const crop = candidate.canvasPlan?.crop
+    if (crop === undefined) return undefined
+    const scale = Math.min(occupancy.width / crop.width, occupancy.height / crop.height)
+    const fitWidth = Math.max(1, Math.round(crop.width * scale))
+    const fitHeight = Math.max(1, Math.round(crop.height * scale))
+    const fitX = Math.floor((occupancy.width - fitWidth) / 2)
+    const fitY = Math.floor((occupancy.height - fitHeight) / 2)
+    mapping = Float32Array.from({ length: occupancy.values.length * 2 }, (_, index) => {
+      const cell = Math.floor(index / 2)
+      return index % 2 === 0
+        ? crop.x + (cell % occupancy.width - fitX + 0.5) * crop.width / fitWidth - 0.5
+        : crop.y + (Math.floor(cell / occupancy.width) - fitY + 0.5) * crop.height / fitHeight - 0.5
+    })
   }
   const values = new Float32Array(occupancy.values.length)
   for (let index = 0; index < values.length; index += 1) {
@@ -308,15 +289,7 @@ function projectedFaceMask(candidate, sourceFaceMask, occupancy, instanceId) {
     height: occupancy.height,
     values,
   }
-  return placementFaceMask(candidate, occupancy, instanceId)
-}
-
-function instanceFaceConfidence(candidate, instanceId) {
-  const scores = scopedFacePlacements(candidate, instanceId)
-    .filter((placement) => Number.isFinite(placement.score))
-    .map((placement) => Math.max(0, Math.min(1, placement.score)))
-  if (scores.length === 0) return candidate.metrics.featureVisibilityConfidence
-  return scores.reduce((sum, score) => sum + score, 0) / scores.length
+  return undefined
 }
 
 function instanceFaceRegions(analysis) {
@@ -429,7 +402,7 @@ export function createCandidateOpenClipViewPlan({
         referenceFaceMask: faceRegion.mask,
         candidateFaceMask: candidateInstanceFaceMask,
         referenceFaceConfidence: faceRegion.confidence,
-        candidateFaceConfidence: instanceFaceConfidence(candidate, instanceId),
+        candidateFaceConfidence: candidate.metrics.featureVisibilityConfidence,
       }),
       ...(sourceLandmarkEvidenceAvailable === false || projectedLandmarks.length === 0 ? {} : {
         referenceHeadLandmarks: sourceLandmarks,

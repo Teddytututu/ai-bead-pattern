@@ -33,8 +33,7 @@ console.log(JSON.stringify({ phase, status: result.status, outlineColors: [...ne
   sourceBoundaryAgreement: candidate.metrics.sourceBoundaryAgreement, sourceDeltaE: candidate.metrics.sourceMeanColorDistance }))
 if (phase === 'after') {
   const previous = JSON.parse(await readFile('output/diagnostics/fill-policy/before.json', 'utf8')).candidate
-  const excluded = new Set([previous, candidate].flatMap(c => [...c.contourPlan.externalCells, ...c.contourPlan.internalCells,
-    ...(c.featurePlacements ?? []).flatMap(feature => feature.occupiedCells)]))
+  const excluded = new Set([previous, candidate].flatMap(c => [...c.contourPlan.externalCells, ...c.contourPlan.internalCells]))
   const summarize = c => {
     const labs = new Map(c.pattern.palette.map(color => [color.id, rgbToLab(color.rgb)]))
     const grid = new Map(c.pattern.cells.map(cell => [cell.y * 64 + cell.x, labs.get(cell.colorId)]))

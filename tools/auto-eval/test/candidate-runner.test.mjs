@@ -199,7 +199,7 @@ function identitySourceMapping(width, height) {
   return mapping
 }
 
-function candidateForInstances(fixture, analysis, instanceIds, scoreByInstance = {}) {
+function candidateForInstances(fixture, analysis, instanceIds) {
   const activeMasks = instanceIds.map((instanceId) => analysis.semanticRegions
     .find((region) => region.id === `${instanceId}:subject`).mask)
   const activeValues = new Float32Array(fixture.image.width * fixture.image.height)
@@ -216,17 +216,6 @@ function candidateForInstances(fixture, analysis, instanceIds, scoreByInstance =
     cells.push({ x, y, colorId: 'body' })
     candidateData.set(fixture.image.data.subarray(index * 4, index * 4 + 4), index * 4)
   }
-  const featurePlacements = (analysis.landmarks ?? []).flatMap((landmark) => {
-    const instanceId = instanceIds.find((id) => landmark.id.startsWith(`${id}:`))
-    if (instanceId === undefined) return []
-    return [{
-      featureId: landmark.id,
-      kind: landmark.kind,
-      center: [landmark.x, landmark.y],
-      occupiedCells: [Math.round(landmark.y) * fixture.image.width + Math.round(landmark.x)],
-      score: scoreByInstance[instanceId] ?? landmark.confidence,
-    }]
-  })
   return {
     candidateImage: { width: fixture.image.width, height: fixture.image.height, data: candidateData },
     candidate: {
@@ -235,7 +224,6 @@ function candidateForInstances(fixture, analysis, instanceIds, scoreByInstance =
         crop: { x: 0, y: 0, width: fixture.image.width, height: fixture.image.height },
       },
       structurePlan: { sourceMapping: identitySourceMapping(fixture.image.width, fixture.image.height) },
-      featurePlacements,
       metrics: { featureVisibilityConfidence: 0.9 },
     },
   }
@@ -279,34 +267,6 @@ describe('OpenCLIP candidate view planning', () => {
 
     assert.ok(plan.views.some((view) => view.id === 'subject-mask'))
     assert.ok(plan.plannedViewIds.includes('subject-mask'))
-  })
-
-  it('derives each pet face confidence from placements in the same instance', () => {
-    const fixture = twoPetAnalysisFixture()
-    const base = mergeAnalysis(fixture.image, fixture.mask, fixture.metadata, 'pet')
-    const analysis = {
-      ...base,
-      semanticRegions: base.semanticRegions.map((region) => ({ ...region, confidence: 1 })),
-    }
-    const { candidate, candidateImage } = candidateForInstances(
-      fixture,
-      analysis,
-      ['pet-01', 'pet-02'],
-      { 'pet-01': 0.25, 'pet-02': 0.85 },
-    )
-    const plan = createCandidateOpenClipViewPlan({
-      referenceImage: fixture.image,
-      candidateImage,
-      analysis,
-      candidate,
-    })
-    const first = plan.views.find((view) => view.id === 'pet-01:face-mask')
-    const second = plan.views.find((view) => view.id === 'pet-02:face-mask')
-
-    assert.ok(first)
-    assert.ok(second)
-    assert.ok(Math.abs(first.evidenceConfidence - 0.25) < 1e-12)
-    assert.ok(Math.abs(second.evidenceConfidence - 0.85) < 1e-12)
   })
 
   it('leaves a single-point pet head out of the scoring plan', () => {
@@ -459,13 +419,6 @@ describe('automatic candidate batch persistence', () => {
       pattern: { width: fixture.image.width, height: fixture.image.height, cells },
       canvasPlan: { crop: { x: 0, y: 0, width: fixture.image.width, height: fixture.image.height } },
       structurePlan: { sourceMapping },
-      featurePlacements: analysis.landmarks.map((landmark) => ({
-        featureId: landmark.id,
-        kind: landmark.kind,
-        center: [landmark.x, landmark.y],
-        occupiedCells: [Math.round(landmark.y) * fixture.image.width + Math.round(landmark.x)],
-        score: landmark.confidence,
-      })),
       metrics: { featureVisibilityConfidence: 0.9 },
     }
 

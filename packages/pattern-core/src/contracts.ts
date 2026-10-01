@@ -71,23 +71,6 @@ export interface CanvasPlan {
   score: CanvasPlanScore
 }
 
-export interface FeatureConstraint {
-  id: string
-  kind: LandmarkKind
-  /** Absolute source-image pixel coordinates. */
-  sourceCenter: readonly [number, number]
-  /** Floating-point target-grid coordinates. */
-  targetCenter: readonly [number, number]
-  candidateTemplates: readonly string[]
-  minimumCells: number
-  maximumCells: number
-  allowedShiftCells: number
-  minimumContrastDeltaE: number
-  hard: boolean
-  affectsOccupancy: boolean
-  symmetryGroup?: string
-}
-
 export interface StructureRegion {
   id: number
   sourceRegionId?: string
@@ -107,7 +90,6 @@ export interface StructurePlan {
   /** Per-cell boundary strength in the inclusive range 0..1. */
   boundaryStrength: Float32Array
   regions: readonly StructureRegion[]
-  featureConstraints: readonly FeatureConstraint[]
   confidence: number
 }
 
@@ -421,34 +403,6 @@ export function validateStructurePlan(plan: StructurePlan): void {
       if (regionsById.get(adjacentId)?.adjacentRegionIds.includes(region.id) !== true) {
         throw new RangeError(`Structure adjacency ${region.id}-${adjacentId} must be symmetric`)
       }
-    }
-  }
-  assertUniqueStrings(plan.featureConstraints.map((constraint) => constraint.id), 'Feature constraint ids')
-  for (const constraint of plan.featureConstraints) {
-    assertLandmarkKind(constraint.kind, `Feature constraint ${constraint.id}`)
-    assertNonNegativeInteger(constraint.minimumCells, `Feature constraint ${constraint.id} minimum cells`)
-    assertNonNegativeInteger(constraint.maximumCells, `Feature constraint ${constraint.id} maximum cells`)
-    assertNonNegativeInteger(constraint.allowedShiftCells, `Feature constraint ${constraint.id} shift`)
-    if (constraint.minimumCells > constraint.maximumCells) {
-      throw new RangeError(`Feature constraint ${constraint.id} has an invalid cell budget`)
-    }
-    if (typeof constraint.affectsOccupancy !== 'boolean') {
-      throw new RangeError(`Feature constraint ${constraint.id} occupancy flag must be boolean`)
-    }
-    if (constraint.candidateTemplates.length === 0) {
-      throw new RangeError(`Feature constraint ${constraint.id} requires a candidate template`)
-    }
-    assertUniqueStrings(constraint.candidateTemplates, `Feature constraint ${constraint.id} templates`)
-    assertFinite(constraint.minimumContrastDeltaE, `Feature constraint ${constraint.id} contrast`)
-    if (constraint.minimumContrastDeltaE < 0) {
-      throw new RangeError(`Feature constraint ${constraint.id} contrast must be non-negative`)
-    }
-    for (const value of [...constraint.sourceCenter, ...constraint.targetCenter]) {
-      assertFinite(value, `Feature constraint ${constraint.id} coordinate`)
-    }
-    if (constraint.targetCenter[0] < 0 || constraint.targetCenter[0] >= plan.width
-      || constraint.targetCenter[1] < 0 || constraint.targetCenter[1] >= plan.height) {
-      throw new RangeError(`Feature constraint ${constraint.id} target center must stay inside the grid`)
     }
   }
   assertUnitInterval(plan.confidence, 'Structure plan confidence')

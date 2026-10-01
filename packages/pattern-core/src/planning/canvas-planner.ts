@@ -20,7 +20,6 @@ import {
   type ShapeRasterization,
 } from '../shape.js'
 import { ShapeVariantCache } from './shape-variant-cache.js'
-import { featureTemplateLibrary } from './feature-template-library.js'
 import type {
   CropRect,
   GridSize,
@@ -186,7 +185,6 @@ function allocatedCells(
   crop: CropRect,
   fit: CanvasFit,
 ): number {
-  if (landmark.templateId !== undefined) return featureTemplateLibrary.find(template => template.id === landmark.templateId)?.cells.length ?? 0
   if (landmark.featureShape !== undefined) return Math.min(profile.maximum, Math.max(1,
     Math.round(landmark.featureShape.widthPx * fit.width / crop.width)
       * Math.round(landmark.featureShape.heightPx * fit.height / crop.height)))
@@ -301,8 +299,6 @@ function analysisIdentity(input: CanvasPlanningInput): string {
       sourceRadiusPx: landmark.sourceRadiusPx,
       gridRadiusCells: landmark.gridRadiusCells,
       featureShape: landmark.featureShape,
-      templateId: landmark.templateId,
-      placementLocked: landmark.placementLocked,
       instanceId: landmark.instanceId,
       featureGroupId: landmark.featureGroupId,
     })),
@@ -324,16 +320,14 @@ function featureBudgets(
       && landmarkObservationState(landmark) !== 'missing')
     .map((landmark) => {
       const baseProfile = featureProfileForLandmark(landmark)
-      const selectedTemplate = featureTemplateLibrary.find(template => template.id === landmark.templateId)
       const projectedArea = landmark.featureShape === undefined ? baseProfile.preferred
         : Math.max(1, Math.round(landmark.featureShape.widthPx * fit.width / crop.width)
           * Math.round(landmark.featureShape.heightPx * fit.height / crop.height))
       const expandedMaximum = landmark.kind === 'eye' ? 25 : landmark.kind === 'mouth' ? 15 : landmark.kind === 'nose' ? 9 : baseProfile.maximum
       const profile = { ...baseProfile,
-        minimum: selectedTemplate?.cells.length ?? baseProfile.minimum,
-        preferred: selectedTemplate?.cells.length ?? Math.min(expandedMaximum, projectedArea),
-        maximum: selectedTemplate?.cells.length ?? (landmark.featureShape ? expandedMaximum : baseProfile.maximum),
-        shift: landmark.placementLocked ? 0 : baseProfile.shift,
+        minimum: baseProfile.minimum,
+        preferred: Math.min(expandedMaximum, projectedArea),
+        maximum: (landmark.featureShape ? expandedMaximum : baseProfile.maximum),
       }
       const theoreticalAllocation = allocatedCells(landmark, profile, crop, fit)
       const [gridX, gridY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)

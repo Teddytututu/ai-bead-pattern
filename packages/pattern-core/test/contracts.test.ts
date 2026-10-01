@@ -11,7 +11,6 @@ import {
   validateStructurePlan,
   validateValuePlan,
   type CanvasPlan,
-  type FeatureConstraint,
   type PalettePlan,
   type CandidateMetricsV2,
   type StructurePlan,
@@ -20,20 +19,6 @@ import {
 
 describe('V2 planning contracts', () => {
   it('exports staged planning data structures', () => {
-    const feature: FeatureConstraint = {
-      id: 'left-eye',
-      kind: 'eye',
-      sourceCenter: [10, 12],
-      targetCenter: [0, 0],
-      candidateTemplates: ['eye-1x1'],
-      minimumCells: 1,
-      maximumCells: 2,
-      allowedShiftCells: 1,
-      minimumContrastDeltaE: 18,
-      hard: true,
-      affectsOccupancy: false,
-      symmetryGroup: 'eyes',
-    }
     const canvas: CanvasPlan = {
       id: '48-square',
       size: { width: 48, height: 48 },
@@ -62,7 +47,6 @@ describe('V2 planning contracts', () => {
       regionIds: new Int32Array([-1]),
       boundaryStrength: new Float32Array([0]),
       regions: [],
-      featureConstraints: [feature],
       confidence: 1,
     }
     const value: ValuePlan = { roles: [] }
@@ -74,7 +58,6 @@ describe('V2 planning contracts', () => {
     }
 
     assert.equal(canvas.size.width, 48)
-    assert.equal(structure.featureConstraints[0]?.id, 'left-eye')
     assert.deepEqual(value.roles, [])
     assert.deepEqual(palette.selectedColorIds, [])
     assert.doesNotThrow(() => validateCanvasPlan(canvas))
@@ -124,7 +107,7 @@ describe('V2 planning contracts', () => {
       regionIds: new Int32Array([0, 0, 0, 0]),
       boundaryStrength: new Float32Array([0, 0, 0, 2]),
       regions: [],
-      featureConstraints: [],
+
       confidence: 1,
     }
 
@@ -179,13 +162,13 @@ describe('V2 planning contracts', () => {
     )
   })
 
-  it('exposes the color-fidelity release identity on the baseline engine', () => {
+  it('exposes the source-feature release identity on the baseline engine', () => {
     const algorithm = createPatternAlgorithm()
     assert.equal(algorithm.engine, 'baseline')
-    assert.equal(algorithm.version, '0.10.2-perler-color-fidelity')
+    assert.equal(algorithm.version, '0.11.0-source-features')
   })
 
-  it('rejects inconsistent region graphs and feature constraints', () => {
+  it('rejects inconsistent region graphs', () => {
     const structure: StructurePlan = {
       width: 2,
       height: 1,
@@ -197,28 +180,13 @@ describe('V2 planning contracts', () => {
         { id: 0, importance: 1, cellIndices: [0, 1], adjacentRegionIds: [0, 1] },
         { id: 1, importance: 1, cellIndices: [1], adjacentRegionIds: [] },
       ],
-      featureConstraints: [
-        {
-          id: 'eye',
-          kind: 'eye',
-          sourceCenter: [0, 0],
-          targetCenter: [2, 0],
-          candidateTemplates: [],
-          minimumCells: 1,
-          maximumCells: 1,
-          allowedShiftCells: -1,
-          minimumContrastDeltaE: -1,
-          hard: true,
-          affectsOccupancy: false,
-        },
-      ],
       confidence: 1,
     }
 
-    assert.throws(() => validateStructurePlan(structure), /region|cell|adjacen|template|target|shift|contrast/i)
+    assert.throws(() => validateStructurePlan(structure), /region|cell|adjacen/i)
   })
 
-  it('rejects fractional region ids and unknown constraint kinds at runtime', () => {
+  it('rejects fractional region ids at runtime', () => {
     const structure = {
       width: 1,
       height: 1,
@@ -227,19 +195,6 @@ describe('V2 planning contracts', () => {
       regionIds: [0],
       boundaryStrength: new Float32Array([0]),
       regions: [{ id: 0, importance: 1, cellIndices: [0], adjacentRegionIds: [] }],
-      featureConstraints: [{
-        id: 'feature',
-        kind: 'eye',
-        sourceCenter: [0, 0],
-        targetCenter: [0, 0],
-        candidateTemplates: ['single'],
-        minimumCells: 1,
-        maximumCells: 1,
-        allowedShiftCells: 0,
-        minimumContrastDeltaE: 0,
-        hard: false,
-        affectsOccupancy: false,
-      }],
       confidence: 1,
     } as unknown as StructurePlan
 
@@ -251,13 +206,7 @@ describe('V2 planning contracts', () => {
       } as unknown as StructurePlan),
       /region id/i,
     )
-    assert.throws(
-      () => validateStructurePlan({
-        ...structure,
-        featureConstraints: [{ ...structure.featureConstraints[0]!, kind: 'texture' }],
-      } as unknown as StructurePlan),
-      /feature kind/i,
-    )
+
   })
 
   it('validates value, palette, and candidate metric contracts', () => {

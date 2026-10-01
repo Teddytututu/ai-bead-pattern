@@ -21,7 +21,7 @@ describe('workbench product controls', () => {
     assert.match(html, /id="preferenceWorkbenchDialog"/)
     assert.match(html, /id="preferenceCandidateGrid"/)
     assert.match(html, /id="preferenceLayerControl"/)
-    assert.match(html, /data-preference-layer="features"/)
+    assert.doesNotMatch(html, /data-preference-layer="features"/)
     assert.match(html, /data-preference-layer="structure"/)
     assert.match(html, /data-preference-layer="value"/)
     assert.match(html, /data-preference-layer="refinement"/)
@@ -69,7 +69,7 @@ describe('workbench product controls', () => {
     const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8')
 
     assert.match(html, /projectSourceAnalysisToProposal/)
-    assert.match(html, /projectSourceAnalysisToProposal\(\s*correctedAnalysis,\s*learnedProposal\s*\)/)
+    assert.match(html, /projectSourceAnalysisToProposal\(\s*sourceAnalysis,\s*learnedProposal\s*\)/)
     assert.match(html, /analysis:\s*proposalAnalysis/)
   })
 

@@ -10,7 +10,6 @@ import type {
   Lab,
   MaterialColor,
 } from './types.js'
-import type { ResolvedFeaturePlacement } from './planning/feature-placement.js'
 
 export const gridRefinementSchema = Object.freeze({
   id: 'semantic-rag-branch-refinement-v2',
@@ -32,7 +31,7 @@ export interface GridRefinementInput {
   colors: readonly MaterialColor[]
   boundaryStrength: Float32Array
   importance: readonly number[]
-  featurePlacements: readonly ResolvedFeaturePlacement[]
+  protectedEndpointCells?: ReadonlySet<number>
   distanceMethod: ColorDistanceMethod
   mode: GridRefinementMode
   budgets?: GridRefinementBudgets
@@ -104,25 +103,6 @@ function isActive(input: GridRefinementInput, x: number, y: number): boolean {
     && input.activeMask[cellIndex(x, y, input.width)] === 1
 }
 
-function symmetryAxis(input: GridRefinementInput): number | undefined {
-  const eyes = input.featurePlacements.filter((placement) => placement.kind === 'eye')
-    .sort((first, second) => first.center[0] - second.center[0] || first.featureId.localeCompare(second.featureId))
-  if (eyes.length < 2) return undefined
-  return (eyes[0]!.center[0] + eyes[eyes.length - 1]!.center[0]) / 2
-}
-
-function mirroredCell(
-  input: GridRefinementInput,
-  cell: number,
-  axis: number | undefined,
-): number | undefined {
-  if (axis === undefined) return undefined
-  const x = cell % input.width
-  const y = Math.floor(cell / input.width)
-  const mirrorX = Math.round(axis * 2 - x)
-  return isActive(input, mirrorX, y) ? cellIndex(mirrorX, y, input.width) : undefined
-}
-
 function dataEnergy(
   input: GridRefinementInput,
   colorsById: ReadonlyMap<string, PreparedColor>,
@@ -136,9 +116,6 @@ function dataEnergy(
 
 function expandedProtectedCells(input: GridRefinementInput): ReadonlySet<number> {
   const cells = new Set(input.protectedCells)
-  for (const placement of input.featurePlacements) {
-    for (const cell of placement.occupiedCells) cells.add(cell)
-  }
   for (let cell = 0; cell < input.activeMask.length; cell += 1) {
     if (input.activeMask[cell] === 1
       && input.boundaryStrength[cell]! >= strongSemanticBoundary
@@ -311,10 +288,7 @@ function colorTopologyGuidance(
 ): ColorTopologyGuidance {
   const protectedMainPathCells = new Set<number>()
   const weakBranches: number[][] = []
-  const semanticEndpointCells = new Set(input.featurePlacements.flatMap((placement) =>
-    placement.roles
-      .filter(({ role }) => role === 'endpoint-dark')
-      .map(({ cell }) => cell)))
+  const semanticEndpointCells = input.protectedEndpointCells ?? new Set<number>()
   const maximumWeakBranchLength = Math.max(
     1,
     Math.min(4, Math.round(Math.min(input.width, input.height) / 16)),
@@ -604,7 +578,6 @@ function localEnergy(
   colorsById: ReadonlyMap<string, PreparedColor>,
   cell: number,
   candidateId: string,
-  axis: number | undefined,
 ): number {
   const x = cell % input.width
   const y = Math.floor(cell / input.width)
@@ -655,11 +628,6 @@ function localEnergy(
       }
     }
   }
-  const mirror = mirroredCell(input, cell, axis)
-  if (input.mode === 'quality' && mirror !== undefined && mirror !== cell
-    && colorIds[mirror] !== candidateId) {
-    energy += 2.5
-  }
   energy += localClusterArcEnergy(input, colorIds, cell, candidateId)
   return energy
 }
@@ -668,7 +636,6 @@ function totalEnergy(
   input: GridRefinementInput,
   colorIds: readonly string[],
   colorsById: ReadonlyMap<string, PreparedColor>,
-  axis: number | undefined,
 ): number {
   let energy = 0
   for (let cell = 0; cell < colorIds.length; cell += 1) {
@@ -693,9 +660,6 @@ function totalEnergy(
     }, 0)
     if (support === 0) energy += input.mode === 'quality' ? 11 : 8
     else if (support === 1) energy += input.mode === 'quality' ? 3 : 1.5
-    const mirror = mirroredCell(input, cell, axis)
-    if (input.mode === 'quality' && mirror !== undefined && cell < mirror
-      && colorIds[mirror] !== colorIds[cell]) energy += 2.5
     if (input.mode === 'quality') {
       energy += neighborArcPenalty(input, colorIds, cell, cell, colorIds[cell]!) * clusterArcWeight
     }
@@ -791,7 +755,6 @@ function bestRagGroupMerge(
   input: GridRefinementInput,
   colorIds: string[],
   colorsById: ReadonlyMap<string, PreparedColor>,
-  axis: number | undefined,
   weakBranches: readonly (readonly number[])[],
   acceptedEnergy: number,
   acceptedDefectCost: number,
@@ -805,7 +768,7 @@ function bestRagGroupMerge(
       const diagnostics = gridClusterDiagnostics(input, colorIds)
       const defectCost = visibleClusterDefectCost(diagnostics)
       if (defectCost < acceptedDefectCost) {
-        const energy = totalEnergy(input, colorIds, colorsById, axis)
+        const energy = totalEnergy(input, colorIds, colorsById)
         if (energy <= acceptedEnergy + 1e-6
           && (best === undefined
             || defectCost < best.defectCost
@@ -828,7 +791,6 @@ function candidateColors(
   input: GridRefinementInput,
   colorIds: readonly string[],
   cell: number,
-  axis: number | undefined,
 ): readonly string[] {
   const x = cell % input.width
   const y = Math.floor(cell / input.width)
@@ -841,8 +803,7 @@ function candidateColors(
       candidates.add(colorIds[cellIndex(nextX, nextY, input.width)]!)
     }
   }
-  const mirror = mirroredCell(input, cell, axis)
-  if (input.mode === 'quality' && mirror !== undefined) candidates.add(colorIds[mirror]!)
+
   return [...candidates].sort()
 }
 
@@ -921,7 +882,6 @@ function bestSingleDefectEdit(
   input: GridRefinementInput,
   colorIds: string[],
   colorsById: ReadonlyMap<string, PreparedColor>,
-  axis: number | undefined,
   acceptedEnergy: number,
   acceptedDefectCost: number,
 ): SingleDefectEdit | undefined {
@@ -938,13 +898,13 @@ function bestSingleDefectEdit(
   let best: SingleDefectEdit | undefined
   for (const { cell } of cells) {
     const currentId = colorIds[cell]!
-    for (const candidateId of candidateColors(input, colorIds, cell, axis)) {
+    for (const candidateId of candidateColors(input, colorIds, cell)) {
       if (candidateId === currentId) continue
       colorIds[cell] = candidateId
       const diagnostics = gridClusterDiagnostics(input, colorIds)
       const defectCost = visibleClusterDefectCost(diagnostics)
       if (defectCost < acceptedDefectCost) {
-        const energy = totalEnergy(input, colorIds, colorsById, axis)
+        const energy = totalEnergy(input, colorIds, colorsById)
         if (energy <= acceptedEnergy + 1e-6
           && (best === undefined
             || defectCost < best.defectCost
@@ -982,12 +942,11 @@ export function refineGridClusters(rawInput: GridRefinementInput): GridRefinemen
   validateInput(input)
   const preparedColors = prepareColors(input.colors)
   const colorsById = new Map(preparedColors.map((color) => [color.id, color]))
-  const axis = symmetryAxis(input)
   const original = [...input.colorIds]
   const colorIds = [...input.colorIds]
   const diagnosticsBefore = gridClusterDiagnostics(input, original)
   const budgetViolationsBefore = budgetViolations(diagnosticsBefore, input.budgets)
-  const energyBefore = totalEnergy(input, colorIds, colorsById, axis)
+  const energyBefore = totalEnergy(input, colorIds, colorsById)
   let acceptedEnergy = energyBefore
   let acceptedDefectCost = visibleClusterDefectCost(diagnosticsBefore)
   let completedIterations = 0
@@ -997,7 +956,6 @@ export function refineGridClusters(rawInput: GridRefinementInput): GridRefinemen
         input,
         colorIds,
         colorsById,
-        axis,
         topologyGuidance.weakBranches,
         acceptedEnergy,
         acceptedDefectCost,
@@ -1021,10 +979,10 @@ export function refineGridClusters(rawInput: GridRefinementInput): GridRefinemen
         || belongsToProtectedDiagonalTransition(input, colorIds, cell)) continue
       const currentId = colorIds[cell]!
       let bestId = currentId
-      let bestEnergy = localEnergy(input, colorIds, colorsById, cell, currentId, axis)
-      for (const candidateId of candidateColors(input, colorIds, cell, axis)) {
+      let bestEnergy = localEnergy(input, colorIds, colorsById, cell, currentId)
+      for (const candidateId of candidateColors(input, colorIds, cell)) {
         if (candidateId === currentId) continue
-        const energy = localEnergy(input, colorIds, colorsById, cell, candidateId, axis)
+        const energy = localEnergy(input, colorIds, colorsById, cell, candidateId)
         if (energy < bestEnergy - 0.25
           || (Math.abs(energy - bestEnergy) <= 1e-9 && candidateId.localeCompare(bestId) < 0)) {
           bestId = candidateId
@@ -1037,7 +995,7 @@ export function refineGridClusters(rawInput: GridRefinementInput): GridRefinemen
       }
     }
     if (changes === 0) break
-    const candidateEnergy = totalEnergy(input, colorIds, colorsById, axis)
+    const candidateEnergy = totalEnergy(input, colorIds, colorsById)
     const candidateDiagnostics = gridClusterDiagnostics(input, colorIds)
     const candidateDefectCost = visibleClusterDefectCost(candidateDiagnostics)
     if (candidateEnergy > acceptedEnergy + 1e-6
@@ -1055,7 +1013,6 @@ export function refineGridClusters(rawInput: GridRefinementInput): GridRefinemen
         input,
         colorIds,
         colorsById,
-        axis,
         acceptedEnergy,
         acceptedDefectCost,
       )
@@ -1069,15 +1026,13 @@ export function refineGridClusters(rawInput: GridRefinementInput): GridRefinemen
   const edits: GridEditRecord[] = []
   for (let cell = 0; cell < colorIds.length; cell += 1) {
     if (input.activeMask[cell] !== 1 || original[cell] === colorIds[cell]) continue
-    const mirror = mirroredCell(input, cell, axis)
+
     edits.push({
       x: cell % input.width,
       y: Math.floor(cell / input.width),
       fromColorId: original[cell]!,
       toColorId: colorIds[cell]!,
-      reason: mirror !== undefined && original[mirror] === colorIds[cell]
-        ? 'symmetry'
-        : 'cluster-refinement',
+      reason: 'cluster-refinement',
     })
   }
   return {

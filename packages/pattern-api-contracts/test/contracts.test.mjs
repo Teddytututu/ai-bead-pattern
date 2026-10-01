@@ -2,18 +2,14 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { parseCreateJob, ContractError } from '../dist/index.js'
 
-test('preserves independent contours and asymmetric manual facial components with bounded validation', () => {
-  const featureOverrides = [{ id: 'near', kind: 'eye', x: 21, y: 12, templateId: 'eye-open-3x3' }, { id: 'far', kind: 'eye', x: 42, y: 20, hidden: true }]
+test('preserves contours and rejects the retired facial override API', () => {
   const contours = { external: true, internal: false, colorId: 'A1' }
-  const result = parseCreateJob({ imageId: 'x', options: { structure: { contours }, featureOverrides } })
-  assert.deepEqual(result.options.featureOverrides, featureOverrides)
+  const result = parseCreateJob({ imageId: 'x', options: { structure: { contours } } })
   assert.deepEqual(result.options.structure.contours, contours)
   for (const options of [
-    { structure: { contours: { external: 'yes' } } }, { structure: { contours: { width: 3 } } },
-    { featureOverrides: [{ ...featureOverrides[0], kind: 'mouth' }] },
-    { featureOverrides: [{ ...featureOverrides[0], x: 1024 }] },
-    { featureOverrides: [{ ...featureOverrides[0], shape: { widthPx: 2, heightPx: 3, angleDegrees: 181 } }] },
-    { featureOverrides: [featureOverrides[0], featureOverrides[0]] },
+    { structure: { contours: { external: 'yes' } } },
+    { structure: { contours: { width: 3 } } },
+    { featureOverrides: [] },
   ]) assert.throws(() => parseCreateJob({ imageId: 'x', options }), ContractError)
 })
 test('validates and preserves independent tone and outline controls', () => {

@@ -1,6 +1,6 @@
 # 当前实现架构
 
-算法版本为 `0.10.2-perler-color-fidelity`，以 [pipeline.ts](../packages/pattern-core/src/pipeline.ts) 为准。本文维护当前运行行为；后续交付与验收状态统一见[产品计划](plans/contours-features-editing-perler-123-plan.md)。
+算法版本为 `0.11.0-source-features`，以 [pipeline.ts](../packages/pattern-core/src/pipeline.ts) 为准。本文维护当前运行行为；后续交付与验收状态统一见[产品计划](plans/contours-features-editing-perler-123-plan.md)。
 
 ## 两条运行入口
 
@@ -21,7 +21,7 @@ flowchart TD
 
 - **浏览器工作台**：`apps/demo/index.html` 在浏览器执行核心算法；`apps/demo/server/serve.mjs` 提供静态资源和 `/api/ai/*`，由 `apps/demo/server/ai-api.mjs` 接入 Gateway。它不经过产品任务 API。
 - **小程序产品链路**：`apps/wechat-miniapp` → `packages/wechat-client` → `services/pattern-api` → `src/worker.ts`。服务负责会话、上传校正、资源归属、幂等任务、取消/恢复、持久化和导出，Worker 执行分析与生成。默认一个计算 Worker，具体契约见 [API 说明](../services/pattern-api/README.md)。
-- **离线评测**：`tools/auto-eval` 生成候选、取得视觉评分并应用偏好判断；`mask-gate`、`vision-gate`、`feature-gate` 分别维护蒙版、视觉证据和特征规划的评测协议与报告。评测入口不等同于产品入口。
+- **离线评测**：`tools/auto-eval` 生成候选、取得视觉评分并应用偏好判断；`mask-gate`、`vision-gate` 分别维护蒙版和视觉证据的评测协议与报告。评测入口不等同于产品入口。
 
 ## 依赖与构建边界
 
@@ -39,11 +39,11 @@ flowchart TD
 
 当前 `mvp` 结构路线按以下职责组织；A0/A1 保留为最近邻和面积采样对照：
 
-1. 校验请求、规范化分析证据及人工五官修正，建立生成身份。
+1. 校验请求、校验分析证据，建立生成身份。
 2. 生成源图引导、主体形状候选、占位方案和 `CanvasPlan`。
-3. 采样并确定五官离散格位，建立 `StructurePlan` 和源图映射。
+3. 根据原图采样建立 `StructurePlan` 和源图映射，保护有证据支持的关键细节格。
 4. 分别规划蒙版轮廓和 `ValuePlan`；结构路线的明暗规划关闭旧内置描边，避免与独立轮廓叠加。
-5. 建立 `PalettePlan`，映射真实材料颜色，解析五官颜色并应用轮廓。MARD 291 的填色/统一描边规则在此生效。色卡注册表支持 291/123/24；Perler 保留完整 123 SKU，生成候选只使用 118 个可自动匹配颜色，详见[数据来源与边界](perler-123.md)。
+5. 建立 `PalettePlan`，映射真实材料颜色并应用轮廓。MARD 291 的填色/统一描边规则在此生效。色卡注册表支持 291/123/24；Perler 保留完整 123 SKU，生成候选只使用 118 个可自动匹配颜色，详见[数据来源与边界](perler-123.md)。
 6. 保护五官与轮廓，执行配色优化及 Fast/Quality 网格精修。
 7. 计算原图保真、结构、拓扑与制作指标，执行质量门禁并排序，返回推荐、备选或 best-effort。
 
@@ -56,9 +56,9 @@ flowchart TD
 - `structure.valueMode` 支持 `preserve / adaptive / stylized`；还原风格默认保色，`valueStrength: 0` 旁路明暗调整。配色量化、几何映射和精修造成的误差通过阶段诊断分别报告，保色不表示最终零色差。
 - MARD 291 自动填色排除 H7，内外轮廓使用同一个合规深色号。Perler 黑色正常参与匹配；5 个特殊材质色不自动使用。色卡参考 RGB 不等于实物测色。
 - MVP 精修对清理产生的逐格额外 ΔE00 设上限：MARD 为 6，Perler 为 4；超过上限恢复清理前的匹配色。Perler 在保色／零强度时不移动结构取色位置。这些约束不保证最终总色差低于该数值。
-- 35 个规则模板为项目自绘，记录宽高、功能格、保留底色格及锚点。双眼独立选型，联合搜索保留源图相对姿态，不奖励等高或等面积；缺失和手动隐藏的部件不生成。
-- 五官先联合落格，再解析材料色并进入受保护的精修；嘴角作为同一嘴部组件的证据。`symmetryQuality`／`featureSymmetryError` 是兼容字段名，现表示原图相对姿态保持。
-- 外／内轮廓独立开关，缺少主体证据时不制造画框；A0/A1 采样对照不套用结构模板和描边。具体请求、坐标和限额见 [API 五官参数](../services/pattern-api/README.md#轮廓与五官参数)。
+- 五官规则模板、选型／联合落格搜索和模板补色已删除。分析提供的五官位置与蒙版仅用于保护、采样和质量评估，不补画眼白、高光或缺失部件。
+- 精修保护原图关键点所在格与模型部件边界，不根据双眼推导镜像轴。`symmetryQuality` 评估原图相对位置保持；模板占格、碰撞和位移指标已移除。
+- 外／内轮廓独立开关，缺少主体证据时不制造画框；A0/A1 保留为采样对照。轮廓配置见 [API 说明](../services/pattern-api/README.md#轮廓参数)。
 
 Demo 的蒙版编辑区分草稿与确认，补画／擦除支持撤销重做；网络圈选失败时保留当前蒙版。确认后再触发完整生成。偏好工具位于内部入口 `?internal=1`，记录保存在浏览器本地，支持 Bradley–Terry 聚合。
 
@@ -80,11 +80,11 @@ Gateway 统一 Provider 注册、请求校验、超时/取消、证据融合和�
 
 `pet-analysis.ts` 的旧几何推断仍被离线评测使用，`enrichPetGeometryAnalysis` 也仍作为公开函数保留，但正式 Gateway 不再自动调用它。后续须先迁移评测证据和公开调用方，再删除这条兼容路径。
 
-同样，`searchFeaturePairs` 的实验导出、独立明暗规划器的轮廓接口及偏好记录兼容层仍有使用与测试，不能只因主流程使用新接口就删除。`pipeline.ts` 与 Demo 页面职责较集中，后续拆分应保持输出、生成身份与缓存行为不变。
+独立明暗规划器的轮廓接口及偏好记录兼容层仍有使用与测试。`pipeline.ts` 与 Demo 页面职责较集中，后续拆分应保持输出、生成身份与缓存行为不变。
 
 ## 评测与复现入口
 
-常规检查使用根目录的 `pnpm test`、`pnpm typecheck`、`pnpm test:e2e`。真实质量标准分别由[蒙版](mask-failure-gate.md)、[人像视觉](vision-gate.md)、[五官](feature-planning-gate.md)协议维护。
+常规检查使用根目录的 `pnpm test`、`pnpm typecheck`、`pnpm test:e2e`。真实质量标准分别由[蒙版](mask-failure-gate.md)、[人像视觉](vision-gate.md)协议维护。
 
 构建后可运行 `node scripts/diagnostics/triage-color-fidelity.mjs` 做分阶段色差对照，或运行 `node scripts/diagnostics/compare-color-harmony.mjs --palette perler-123 --reference mard-291 --baseline <旧版 dist/index.js> --label perler-before-after` 比较版本。输入、配置、算法与色卡版本须一起固定；旧版本从 Git 取回，不保留多套说明文档。
 

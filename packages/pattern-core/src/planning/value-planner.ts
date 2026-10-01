@@ -420,24 +420,6 @@ function buildOutlineImportance(
     const regionalImportance = Math.min(0.8, group.importance * 0.8)
     for (const cell of group.cells) importance[cell] = Math.max(importance[cell]!, regionalImportance)
   }
-  for (const constraint of input.structurePlan.featureConstraints) {
-    const radius = Math.max(
-      0,
-      Math.ceil(Math.sqrt(Math.max(1, constraint.maximumCells)) / 2 + constraint.allowedShiftCells),
-    )
-    const minimumX = Math.max(0, Math.floor(constraint.targetCenter[0] - radius))
-    const maximumX = Math.min(input.structurePlan.width - 1, Math.ceil(constraint.targetCenter[0] + radius))
-    const minimumY = Math.max(0, Math.floor(constraint.targetCenter[1] - radius))
-    const maximumY = Math.min(input.structurePlan.height - 1, Math.ceil(constraint.targetCenter[1] + radius))
-    const featureImportance = constraint.hard ? 1 : 0.9
-    for (let y = minimumY; y <= maximumY; y += 1) {
-      for (let x = minimumX; x <= maximumX; x += 1) {
-        const cell = y * input.structurePlan.width + x
-        if (input.activeMask[cell] !== 1) continue
-        importance[cell] = Math.max(importance[cell]!, featureImportance)
-      }
-    }
-  }
   return importance
 }
 

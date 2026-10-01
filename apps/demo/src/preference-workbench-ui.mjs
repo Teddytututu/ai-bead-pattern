@@ -68,16 +68,6 @@ function overlayCell(context, canvas, pattern, cell, fill, stroke = fill) {
 
 function drawOverlay(canvas, candidate, layer, annotations) {
   const context = canvas.getContext('2d')
-  if (layer === 'features') {
-    for (const placement of candidate.featurePlacements ?? []) {
-      for (const cell of placement.occupiedCells) {
-        overlayCell(context, canvas, candidate.pattern, {
-          x: cell % candidate.pattern.width,
-          y: Math.floor(cell / candidate.pattern.width),
-        }, 'rgba(225,63,55,.38)', '#b92d28')
-      }
-    }
-  }
   if (layer === 'structure') {
     const hues = ['rgba(37,125,115,.32)', 'rgba(226,180,48,.30)', 'rgba(214,83,77,.28)', 'rgba(39,105,153,.28)']
     for (const region of candidate.structurePlan?.regions ?? []) {

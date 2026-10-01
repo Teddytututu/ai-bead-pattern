@@ -24,7 +24,7 @@ function structurePlan(): StructurePlan {
       cellIndices: [0, 1, 2, 3],
       adjacentRegionIds: [],
     }],
-    featureConstraints: [],
+
     confidence: 1,
   }
 }
@@ -44,7 +44,7 @@ function semanticStructurePlan(): StructurePlan {
       { id: 3, sourceRegionId: 'subject-body', label: 'subject body', importance: 0.9, cellIndices: [3], adjacentRegionIds: [4] },
       { id: 4, sourceRegionId: 'background', label: 'background', importance: 0.3, cellIndices: [4], adjacentRegionIds: [3] },
     ],
-    featureConstraints: [],
+
     confidence: 1,
   }
 }
@@ -75,7 +75,7 @@ function outlinedSquareStructurePlan(): StructurePlan {
       cellIndices: Array.from({ length: width * height }, (_, index) => index),
       adjacentRegionIds: [],
     }],
-    featureConstraints: [],
+
     confidence: 1,
   }
 }
@@ -124,7 +124,7 @@ function splitOutlineStructurePlan(sharedSourceRegion: boolean): StructurePlan {
         adjacentRegionIds: [0],
       },
     ],
-    featureConstraints: [],
+
     confidence: 1,
   }
 }
@@ -329,38 +329,6 @@ describe('ValuePlan', () => {
     assert.equal(result.diagnostics.outline.selectedOutlineCells, 22)
   })
 
-  it('keeps selective body outlines open while retaining a hard ear-tip boundary', () => {
-    const structure = outlinedSquareStructurePlan()
-    structure.regions[0]!.importance = 1
-    structure.featureConstraints = [{
-      id: 'left-ear-tip',
-      kind: 'ear',
-      sourceCenter: [0, 0],
-      targetCenter: [0, 0],
-      candidateTemplates: ['ear-tip-1'],
-      minimumCells: 1,
-      maximumCells: 1,
-      allowedShiftCells: 0,
-      minimumContrastDeltaE: 10,
-      hard: true,
-      affectsOccupancy: true,
-    }]
-    const result = buildValuePlan({
-      structurePlan: structure,
-      pixelLabs: Array.from({ length: 25 }, () => [62, 4, 3] as Lab),
-      activeMask: new Uint8Array(25).fill(1),
-      levels: 3,
-      outlineMode: 'selective',
-      lighting: { direction: [-1, -1], intensity: 0.7, ambientLight: 0.25 },
-    })
-    const outline = result.plan.roles.find((role) => role.kind === 'outline')
-
-    assert.ok(outline)
-    assert.equal(result.roleIdsByCell[0], outline.id)
-    assert.ok(result.diagnostics.outline.selectedOutlineCells < 16)
-    assert.ok(result.diagnostics.outline.openLightFacingCells > 0)
-  })
-
   it('removes the outline role when four-level planning explicitly selects off', () => {
     const result = buildValuePlan({
       structurePlan: outlinedSquareStructurePlan(),
@@ -409,7 +377,7 @@ describe('ValuePlan', () => {
         { id: 0, sourceRegionId: 'metal', label: 'metal', importance: 1, cellIndices: [0], adjacentRegionIds: [1] },
         { id: 1, sourceRegionId: 'fabric', label: 'fabric', importance: 1, cellIndices: [1], adjacentRegionIds: [0] },
       ],
-      featureConstraints: [],
+
       confidence: 1,
     }
     const baseline = buildValuePlan({

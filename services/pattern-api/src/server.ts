@@ -5,7 +5,7 @@ import { resolve, join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import sharp from 'sharp'
 import { getPalette, listPalettes } from '@ai-bead-pattern/material-palettes'
-import { createPatternAlgorithm, patternMaterialsCsv, patternSvg, validateFeatureOverrides, isDeepSaturatedInk } from '@ai-bead-pattern/pattern-core'
+import { createPatternAlgorithm, patternMaterialsCsv, patternSvg, isDeepSaturatedInk } from '@ai-bead-pattern/pattern-core'
 import { apiLimits, parseCreateJob, record, nonempty, ContractError, type JobView, type ApiErrorBody } from '@ai-bead-pattern/pattern-api-contracts'
 import { Store, type Stored, type ImageRecord, type JobRecord, type SavedResult } from './store.js'
 
@@ -191,7 +191,7 @@ export async function createPatternApi(options: ApiOptions) {
       const url = new URL(request.url ?? '/', 'http://localhost'), path = url.pathname, method = request.method
       if (path === '/healthz' && method === 'GET') return send({ status: 'ok' })
       if (path === '/v1/capabilities' && method === 'GET') return send({ apiVersion: 'v1', defaultPaletteId: 'mard-291', routes: ['deterministic', ...(options.rembgEndpoint || options.sam2Endpoint ? ['neural-analysis'] : [])], limits: apiLimits,
-        features: { independentContours: true, manualFeatureOverrides: true, featureCoordinateSpace: 'normalized-upload-pixels', templateVersion: 'feature-templates-v2' },
+        features: { independentContours: true },
         analysis: { configured: endpoints.length > 0, requiresConsent: remoteAnalysis, locationLabel: options.remoteAnalysisLabel ?? '自有本机服务' }, retentionMs: ttl })
       if ((path === '/v1/auth/wechat' || path === '/v1/auth/dev') && method === 'POST') {
         const input = record(await json(request), path.endsWith('/dev') ? ['userId'] : ['code'])
@@ -269,8 +269,6 @@ export async function createPatternApi(options: ApiOptions) {
           return send(view(owned<JobRecord>('job', String(prior.jobId), owner)), 202)
         }
         const image = owned<ImageRecord>('image', input.imageId, owner)
-        try { validateFeatureOverrides(input.options.featureOverrides, image.width, image.height) }
-        catch { throw new HttpError(422, 'INVALID_FEATURE', '五官坐标或模板无效，请使用上传接口返回的图片尺寸') }
         let palette
         try { palette = await getPalette(input.paletteId, input.paletteVersion) }
         catch { throw new HttpError(404, 'PALETTE_NOT_FOUND', '色卡或版本不存在') }

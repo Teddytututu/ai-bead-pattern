@@ -49,7 +49,7 @@ try {
       ...(result.recommended ? { recommendedId: result.recommended.id } : {}),
       ...(result.bestEffort ? { bestEffortId: result.bestEffort.id } : {}),
       candidates: candidates.map(c => ({ id: c.id, style: c.style, valid: c.valid, score: c.score.total, reasons: c.rejectionReasons, pattern: createPatternDocument(c.pattern),
-        contourPlan: c.contourPlan, featurePlacements: c.featurePlacements })),
+        contourPlan: c.contourPlan })),
     },
     patterns: Object.fromEntries(candidates.map(c => [c.id, c.pattern])),
   }

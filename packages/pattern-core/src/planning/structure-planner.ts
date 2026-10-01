@@ -1,9 +1,8 @@
 import { deltaE76 } from '../color.js'
 import { sourcePointForGridCell, type CanvasFit } from '../image.js'
 import type { SourceGuidance } from '../structure.js'
-import type { StructurePlan, StructureRegion, FeatureConstraint } from '../contracts.js'
+import type { StructurePlan, StructureRegion } from '../contracts.js'
 import type { CropRect, Lab } from '../types.js'
-import type { ResolvedFeaturePlacement } from './feature-placement.js'
 
 export interface StructurePlanningInput {
   width: number
@@ -15,8 +14,7 @@ export interface StructurePlanningInput {
   semanticRegionIds: readonly (string | undefined)[]
   importance: readonly number[]
   sourceGuidance: SourceGuidance
-  featurePlacements: readonly ResolvedFeaturePlacement[]
-  featureConstraints: readonly FeatureConstraint[]
+  protectedCells?: ReadonlySet<number>
   minimumRegionCells?: number
   maximumSourceShiftCells?: number
 }
@@ -112,10 +110,6 @@ function initialRegionIds(input: StructurePlanningInput): Int32Array {
     nextId += 1
   }
   return ids
-}
-
-function protectedCells(placements: readonly ResolvedFeaturePlacement[]): ReadonlySet<number> {
-  return new Set(placements.flatMap((placement) => placement.occupiedCells))
 }
 
 function collectRegions(
@@ -366,7 +360,7 @@ function boundaryStrength(
 
 export function buildStructurePlan(input: StructurePlanningInput): StructurePlan {
   validateInput(input)
-  const featureProtected = protectedCells(input.featurePlacements)
+  const featureProtected = input.protectedCells ?? new Set<number>()
   const initial = initialRegionIds(input)
   const merged = mergeSmallRegions(input, initial, featureProtected)
   const simplified = simplifyBoundaries(input, merged, featureProtected)
@@ -375,9 +369,6 @@ export function buildStructurePlan(input: StructurePlanningInput): StructurePlan
   const semanticCells = input.semanticRegionIds.filter((id, cell) =>
     input.activeMask[cell] === 1 && id !== undefined).length
   const activeCells = input.activeMask.reduce((sum, value) => sum + value, 0)
-  const featureConfidence = input.featurePlacements.length === 0
-    ? 0.5
-    : input.featurePlacements.reduce((sum, placement) => sum + placement.score, 0) / input.featurePlacements.length
   return {
     width: input.width,
     height: input.height,
@@ -390,7 +381,6 @@ export function buildStructurePlan(input: StructurePlanningInput): StructurePlan
     regionIds: normalized.regionIds,
     boundaryStrength: boundaryStrength(input, normalized.regionIds, sourceMapping),
     regions: normalized.regions,
-    featureConstraints: [...input.featureConstraints],
-    confidence: clamp(0.55 + (semanticCells / Math.max(1, activeCells)) * 0.35 + featureConfidence * 0.1, 0, 1),
+    confidence: clamp(0.6 + (semanticCells / Math.max(1, activeCells)) * 0.35, 0, 1),
   }
 }

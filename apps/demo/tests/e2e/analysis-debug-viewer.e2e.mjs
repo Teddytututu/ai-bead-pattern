@@ -77,15 +77,11 @@ test('keeps a wide source proportional in the mobile analysis viewer', async ({ 
   await expect(page.getByRole('button', { name: '关闭图像理解' })).toBeInViewport()
 })
 
-test('shows resolved neural eye template cells for the sample image', async ({ page }) => {
+test('keeps source eye masks without a template overlay', async ({ page }) => {
   await page.goto('/apps/demo/')
   await waitForGeneration(page)
   await page.getByRole('button', { name: '分析图层' }).click()
-
   const dialog = page.getByRole('dialog', { name: '图像理解' })
-  const features = dialog.getByRole('button', { name: '五官落格', exact: true })
-  await expect(features).toBeEnabled()
-  await features.click()
-  await expect(features).toHaveAttribute('aria-pressed', 'true')
-  await expect(dialog.locator('#analysisDebugStatus')).toContainText('五官')
+  await expect(dialog.getByRole('button', { name: '五官落格', exact: true })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: '眼睛蒙版', exact: true })).toBeVisible()
 })

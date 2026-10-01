@@ -94,19 +94,16 @@ test('Perler 123 reaches worker, API catalog and all exports with real SKUs', as
   assert.equal(metadata.format, 'png'); assert.ok(metadata.width >= 32 * 46)
 })
 
-test('manual feature coordinates and contour switches reach the worker and final result', async t => {
+test('contour switches reach the worker while retired facial overrides are rejected', async t => {
   const h = await harness(t), token = await h.auth(), uploaded = (await h.upload(token)).json.data
   const base = { imageId: uploaded.imageId, options: { canvas: { mode: 'fixed', size: { width: 32, height: 32 } }, styles: ['faithful'], maxCandidates: 1,
-    structure: { contours: { external: false, internal: true } }, featureOverrides: [
-      { id: 'near', kind: 'eye', x: 6, y: 3, templateId: 'eye-open-3x3' },
-      { id: 'far', kind: 'eye', x: 14, y: 6, templateId: 'eye-e1' },
-    ] } }
-  const bad = await h.call('/v1/pattern-jobs', { token, method: 'POST', key: 'bad-face', data: { ...base, options: { ...base.options, featureOverrides: [{ ...base.options.featureOverrides[0], x: uploaded.width }] } } })
+    structure: { contours: { external: false, internal: true } } } }
+  const bad = await h.call('/v1/pattern-jobs', { token, method: 'POST', key: 'bad-face', data: { ...base, options: { ...base.options, featureOverrides: [] } } })
   assert.equal(bad.status, 422)
   const badInk = await h.call('/v1/pattern-jobs', { token, method: 'POST', key: 'bad-ink', data: { ...base,
     options: { ...base.options, structure: { contours: { external: true, colorId: 'H7' } } } } })
   assert.equal(badInk.status, 422); assert.equal(badInk.json.error.code, 'INVALID_CONTOUR_COLOR')
-  const submitted = await h.call('/v1/pattern-jobs', { token, method: 'POST', key: 'manual-face', data: base })
+  const submitted = await h.call('/v1/pattern-jobs', { token, method: 'POST', key: 'contours', data: base })
   assert.equal(submitted.status, 202)
   const jobId = submitted.json.data.jobId
   assert.equal((await h.done(jobId, token)).state, 'succeeded')
@@ -114,10 +111,7 @@ test('manual feature coordinates and contour switches reach the worker and final
   assert.equal(c.contourPlan.options.external, false); assert.equal(c.contourPlan.options.internal, true)
   assert.equal(c.pattern.metadata.contours.external, false); assert.equal(c.pattern.metadata.contours.internal, true)
   assert.ok(c.contourPlan.diagnostics.warnings.includes('contour-internal-evidence-unavailable'))
-  assert.equal(c.featurePlacements.length, 2)
-  const near = c.featurePlacements.find(p => p.featureId === 'near'), far = c.featurePlacements.find(p => p.featureId === 'far')
-  assert.ok(near.center[1] < far.center[1]); assert.equal(near.occupiedCells.length, 5); assert.equal(far.occupiedCells.length, 1)
-  assert.ok(c.pattern.materials.length > 1)
+  assert.equal(Object.hasOwn(c, 'featurePlacements'), false)
 })
 test('rejects unauthenticated, oversized, invalid and unsupported requests', async t => {
   const h = await harness(t), token = await h.auth()

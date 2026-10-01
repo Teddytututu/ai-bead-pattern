@@ -668,12 +668,6 @@
       .sidebar .section:nth-child(3) .check-item { justify-content: flex-start; flex-direction: row-reverse; }
       .sidebar .section:nth-child(4) .check-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
     }
-    #featureEditor label { display: block; margin: 8px 0; font-size: 12px; }
-    #featureEditor select, #featureEditor input:not([type="checkbox"]) { width: 100%; padding: 5px; }
-    #featureEditor .feature-coordinates { display: flex; gap: 8px; }
-    #featureEditor .feature-coordinates label { min-width: 0; flex: 1; }
-    #featureEditor p { font-size: 12px; color: var(--muted); line-height: 1.6; }
-    #featureStatus { overflow-wrap: anywhere; margin: 0; }
     .product-mask-tools p { font-size: 12px; color: var(--muted); line-height: 1.7; }
     .mask-subtools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
     .mask-subtools button { justify-content: center; }
@@ -734,8 +728,6 @@
         </div>
         <p class="mask-tool-note">主体：圈选后自动贴合并重新生成。眼睛：在完整格图上确定辅助区域，再局部生成。</p>
       </section>
-      <section class="section" id="featureEditor"></section>
-      <p class="section analysis-source" id="featureStatus" aria-live="polite"></p>
       <section class="section mask-gate-panel" id="maskGatePanel" hidden>
         <h2 class="section-title">Mask Gate</h2>
         <p class="mask-gate-sample" id="maskGateSample">等待 sidecar</p>
@@ -950,7 +942,6 @@
         <dl class="diagnostic-list">
           <div><dt>精修能量</dt><dd id="gridRefinementEnergy">--</dd></div>
           <div><dt>结构重绘区域</dt><dd id="structureRegionCount">--</dd></div>
-          <div><dt>五官格</dt><dd id="featurePlacementCount">--</dd></div>
           <div><dt>明暗角色</dt><dd id="valueRoleCount">--</dd></div>
           <div><dt>色板角色</dt><dd id="paletteRoleCount">--</dd></div>
           <div><dt>碎裂环段</dt><dd id="clusterFragmentChange">--</dd></div>
@@ -988,7 +979,6 @@
           <div class="preference-layer-control" id="preferenceLayerControl" aria-label="候选图层">
             <button type="button" data-preference-layer="pattern" aria-pressed="false">图纸</button>
             <button type="button" data-preference-layer="grid" aria-pressed="true">网格</button>
-            <button type="button" data-preference-layer="features" aria-pressed="false">关键点</button>
             <button type="button" data-preference-layer="structure" aria-pressed="false">结构区</button>
             <button type="button" data-preference-layer="value" aria-pressed="false">明度区</button>
             <button type="button" data-preference-layer="refinement" aria-pressed="false">精修差异</button>
@@ -1133,7 +1123,6 @@
             <button class="analysis-debug-layer" type="button" data-analysis-layer="mouth" aria-pressed="false">嘴部蒙版</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="body-parts" aria-pressed="false">身体部件</button>
             <button class="analysis-debug-layer" type="button" data-analysis-layer="landmarks" aria-pressed="false">关键点</button>
-            <button class="analysis-debug-layer" type="button" data-analysis-layer="features" aria-pressed="false">五官落格</button>
           </div>
         </nav>
         <div class="analysis-debug-workspace">
@@ -1200,8 +1189,6 @@
       loadMaskGateSample,
     } from './src/mask-gate.mjs'
     import { inferSubjectAnalysis } from './src/subject-mask.mjs'
-    import { createFeatureEditor } from './src/feature-editor.mjs'
-    import { featureTemplateLibrary, prepareFeatureEvidence, validateFeatureOverrides } from '/packages/pattern-core/dist/index.js'
     import {
       loadPreferenceRecords,
       resolveCandidatePreference,
@@ -1293,7 +1280,6 @@
       shapeHoles: document.querySelector('#shapeHoles'),
       gridRefinementEnergy: document.querySelector('#gridRefinementEnergy'),
       structureRegionCount: document.querySelector('#structureRegionCount'),
-      featurePlacementCount: document.querySelector('#featurePlacementCount'),
       valueRoleCount: document.querySelector('#valueRoleCount'),
       paletteRoleCount: document.querySelector('#paletteRoleCount'),
       clusterFragmentChange: document.querySelector('#clusterFragmentChange'),
@@ -1404,9 +1390,6 @@
     let selectedValueLevels = 3
     let selectedOutlineMode = 'full'
     let selectedRefinementMode = 'quality'
-    const featureEditor = createFeatureEditor({ container: document.querySelector('#featureEditor'), canvas: elements.sourcePreview,
-      templates: featureTemplateLibrary, getImage: () => sourceImage, getAnalysis: () => sourceAnalysis,
-      onChange: () => renderSourcePreview(), validate: validateFeatureOverrides })
     let showGrid = true
     let currentGenerationId
     let activePreferencePair
@@ -2056,7 +2039,6 @@
       const width = buffer.width * scale
       const height = buffer.height * scale
       context.drawImage(buffer, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height)
-      featureEditor.draw()
     }
 
     function selectedStyles() {
@@ -2087,7 +2069,6 @@
         styles: selectedStyles(),
         baseline: selectedBaseline,
         aiEnhancement: selectedModelRoute !== 'deterministic',
-        featureOverrides: featureEditor.overrides(),
         backgroundRgb: [245, 245, 242],
         structure: {
           importanceStrength: 3.5,
@@ -2198,17 +2179,14 @@
         )
         const proposalGrid = learnedProposal?.targetGrid
         const options = generationOptions()
-        const correctedAnalysis = prepareFeatureEvidence({ image: sourceImage, palette, analysis: sourceAnalysis, options }).analysis ?? sourceAnalysis
-        // Corrections have been merged in source coordinates; project them together with the evidence.
-        delete options.featureOverrides
         const inferredProposalAnalysis = learnedProposal === undefined
           ? undefined
           : inferSubjectAnalysis(learnedProposal.image)
         const projectedSourceAnalysis = learnedProposal === undefined
           ? undefined
-          : projectSourceAnalysisToProposal(correctedAnalysis, learnedProposal)
+          : projectSourceAnalysisToProposal(sourceAnalysis, learnedProposal)
         const proposalAnalysis = learnedProposal === undefined
-          ? correctedAnalysis
+          ? sourceAnalysis
           : {
             ...inferredProposalAnalysis,
             ...projectedSourceAnalysis,
@@ -2314,7 +2292,6 @@
     }
 
     function renderPattern(candidate) {
-      document.querySelector('#featureStatus').textContent = (candidate.featurePlacements ?? []).map(p => `${p.featureId}：${p.templateId}，位置 ${p.center.join(', ')}${p.rotationDegrees ? `，${p.rotationDegrees}°` : ''}`).join('；') || '未生成五官模板；可在原图中手动校正。'
       const contour = candidate.contourPlan
       elements.contourStatus.textContent = contour ? `轮廓 ${contour.diagnostics.retainedCells}/${contour.diagnostics.selectedCells} 格${contour.colorPolicy === 'single-deep-saturated' ? `；单色深描边 ${contour.options.colorId}` : ''}；对比不足 ${contour.diagnostics.unresolvedContrastCells} 格${contour.diagnostics.externalSource === 'unavailable' && contour.options.external ? '；缺少主体蒙版，外轮廓未生成' : ''}${contour.diagnostics.internalSource === 'unavailable' && contour.options.internal ? '；缺少区域证据，内轮廓未生成' : ''}` : ''
       drawPattern(elements.patternCanvas, candidate.pattern, { grid: showGrid, beads: true })
@@ -2351,9 +2328,6 @@
       elements.structureRegionCount.textContent = candidate.structurePlan === undefined
         ? '--'
         : String(candidate.structurePlan.regions.length)
-      elements.featurePlacementCount.textContent = candidate.featurePlacements === undefined
-        ? '--'
-        : String(new Set(candidate.featurePlacements.flatMap((entry) => entry.occupiedCells)).size)
       elements.valueRoleCount.textContent = candidate.valuePlan === undefined
         ? '--'
         : String(candidate.valuePlan.roles.length)
