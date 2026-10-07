@@ -77,7 +77,7 @@ describe('baseline-specific golden fixtures', () => {
     }
   })
 
-  it('keeps a hard feature visible through grid cleanup', async () => {
+  it('keeps a non-facial identity mark visible through grid cleanup', async () => {
     const result = await algorithm.generate({
       image: featureGoldenImage,
       palette: baselineGoldenPalette,

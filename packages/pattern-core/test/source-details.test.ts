@@ -43,16 +43,19 @@ describe('source-only facial details', () => {
       assert.equal(Object.hasOwn(candidate, 'featurePlacements'), false)
       assert.ok(candidate.edits.every(edit => edit.reason !== ('feature-placement' as string)))
     })
-    it(`preserves independently positioned source eyes and mouth at ${size} cells`, async () => {
+    it(`samples source eyes and mouth with the ordinary pixel cleanup at ${size} cells`, async () => {
       const input = request(size, true)
       const result = await createPatternAlgorithm().generate(input)
       const candidate = result.recommended ?? result.bestEffort
       assert.ok(candidate)
-      const cells = new Map(candidate.pattern.cells.map(cell => [cell.y * size + cell.x, cell.colorId]))
-      for (const point of input.analysis!.landmarks!) {
-        const x = Math.floor(point.x * size / 256), y = Math.floor(point.y * size / 256)
-        assert.equal(cells.get(y * size + x), 'dark', point.id)
-      }
+      const ordinary = await createPatternAlgorithm().generate({
+        ...input, analysis: { ...input.analysis, landmarks: [] },
+      })
+      const sampled = ordinary.recommended ?? ordinary.bestEffort
+      assert.ok(sampled)
+      assert.deepEqual(candidate.pattern.cells, sampled.pattern.cells)
+      assert.deepEqual(candidate.materialCounts, sampled.materialCounts)
+      assert.equal(candidate.metrics.featureVisibilityConfidence, 0)
       assert.equal(candidate.pattern.cells.some(cell => cell.colorId === 'white'), false)
     })
   }

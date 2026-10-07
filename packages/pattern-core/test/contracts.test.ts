@@ -162,10 +162,10 @@ describe('V2 planning contracts', () => {
     )
   })
 
-  it('exposes the source-feature release identity on the baseline engine', () => {
+  it('exposes the source-sampling release identity on the baseline engine', () => {
     const algorithm = createPatternAlgorithm()
     assert.equal(algorithm.engine, 'baseline')
-    assert.equal(algorithm.version, '0.11.0-source-features')
+    assert.equal(algorithm.version, '0.12.0-source-sampling')
   })
 
   it('rejects inconsistent region graphs', () => {

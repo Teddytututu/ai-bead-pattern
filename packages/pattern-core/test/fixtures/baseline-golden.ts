@@ -69,8 +69,8 @@ export const featureGoldenImage = pixelImage(3, 3, [
 export const featureGoldenAnalysis: ImageAnalysis = {
   confidence: 1,
   landmarks: [{
-    id: 'eye',
-    kind: 'eye',
+    id: 'mark',
+    kind: 'identity-mark',
     x: 1,
     y: 1,
     confidence: 1,

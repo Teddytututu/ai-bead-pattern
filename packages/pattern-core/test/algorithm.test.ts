@@ -285,7 +285,7 @@ describe('deterministic pattern algorithm', () => {
     assert.ok(success(result).metrics.meanColorDistance > 0)
   })
 
-  it('keeps a hard landmark cell during local cleanup', async () => {
+  it('keeps a hard landmark cell during local cleanup for non-facial identity marks', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const red = [255, 0, 0] as const
     const blue = [0, 0, 255] as const
@@ -295,7 +295,7 @@ describe('deterministic pattern algorithm', () => {
     })
     request.analysis = {
       landmarks: [
-        { id: 'left-eye', kind: 'eye', x: 1, y: 1, confidence: 1, priority: 'hard' },
+        { id: 'left-mark', kind: 'identity-mark', x: 1, y: 1, confidence: 1, priority: 'hard' },
       ],
     }
 
@@ -304,7 +304,7 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(success(result).pattern.cells[4]?.colorId, 'blue')
   })
 
-  it('locks the full hard-feature grid radius during cleanup', async () => {
+  it('locks the full hard-feature grid radius during cleanup for non-facial identity marks', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const red = [255, 0, 0] as const
     const blue = [0, 0, 255] as const
@@ -325,8 +325,8 @@ describe('deterministic pattern algorithm', () => {
     request.analysis = {
       confidence: 1,
       landmarks: [{
-        id: 'eye',
-        kind: 'eye',
+        id: 'mark',
+        kind: 'identity-mark',
         x: 2,
         y: 2,
         confidence: 1,
@@ -342,7 +342,7 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(candidate(result).pattern.cells.find((cell) => cell.x === 2 && cell.y === 2)?.colorId, 'blue')
   })
 
-  it('keeps hard-feature labels fixed during palette coherence optimization', async () => {
+  it('keeps hard-feature labels fixed during palette coherence optimization for non-facial identity marks', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const red = [255, 0, 0] as const
     const blue = [0, 0, 255] as const
@@ -360,8 +360,8 @@ describe('deterministic pattern algorithm', () => {
     request.analysis = {
       confidence: 1,
       landmarks: [{
-        id: 'eye',
-        kind: 'eye',
+        id: 'mark',
+        kind: 'identity-mark',
         x: 1,
         y: 1,
         confidence: 1,
@@ -453,7 +453,7 @@ describe('deterministic pattern algorithm', () => {
     assert.deepEqual(success(result).materialCounts, [{ colorId: 'red', count: 8 }])
   })
 
-  it('maps protected landmarks into the centered content area', async () => {
+  it('maps protected landmarks into the centered content area for non-facial identity marks', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const source = image(4, 1, [
       [255, 0, 0], [0, 0, 255], [255, 0, 0], [255, 0, 0],
@@ -464,7 +464,7 @@ describe('deterministic pattern algorithm', () => {
     })
     request.analysis = {
       landmarks: [
-        { id: 'eye', kind: 'eye', x: 1, y: 0, confidence: 1, priority: 'hard', radius: 0 },
+        { id: 'mark', kind: 'identity-mark', x: 1, y: 0, confidence: 1, priority: 'hard', radius: 0 },
       ],
     }
 
@@ -1044,7 +1044,7 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(candidate(result).canvasPlan?.occupancyMode, 'subject-shape')
   })
 
-  it('uses the subject shape to evaluate explicit full-frame canvas plans', async () => {
+  it('uses the subject shape to evaluate explicit full-frame canvas plans for non-facial identity marks', async () => {
     const source = image(8, 8, Array.from({ length: 64 }, () => [255, 0, 0] as const))
     const subjectValues = new Float32Array(64)
     for (let y = 1; y < 4; y += 1) {
@@ -1057,7 +1057,7 @@ describe('deterministic pattern algorithm', () => {
         confidence: 1,
         subjectMask: { width: 8, height: 8, values: subjectValues },
         landmarks: [
-          { id: 'eye', kind: 'eye', x: 7, y: 7, confidence: 1, priority: 'hard' },
+          { id: 'mark', kind: 'identity-mark', x: 7, y: 7, confidence: 1, priority: 'hard' },
         ],
       },
       options: {
@@ -1204,15 +1204,15 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(success(result).metrics.featureVisibilityConfidence, 0)
   })
 
-  it('keeps landmark confidence independent from the analysis summary', async () => {
+  it('keeps landmark confidence independent from the analysis summary for non-facial identity marks', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
     const request = fixedRequest(source)
     request.analysis = {
       confidence: 0,
       landmarks: [{
-        id: 'eye',
-        kind: 'eye',
+        id: 'mark',
+        kind: 'identity-mark',
         x: 0,
         y: 0,
         confidence: 1,
@@ -1226,7 +1226,7 @@ describe('deterministic pattern algorithm', () => {
     assert.ok(candidate(result).metrics.featureExpressibility > 0)
   })
 
-  it('scores feature visibility from the final grid colors', async () => {
+  it('scores feature visibility from the final grid colors for non-facial identity marks', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const redOnlyPalette: MaterialPalette = {
       id: 'red-only',
@@ -1244,8 +1244,8 @@ describe('deterministic pattern algorithm', () => {
     request.analysis = {
       confidence: 1,
       landmarks: [{
-        id: 'eye',
-        kind: 'eye',
+        id: 'mark',
+        kind: 'identity-mark',
         x: 1,
         y: 1,
         confidence: 1,
@@ -1628,7 +1628,7 @@ describe('deterministic pattern algorithm', () => {
     assert.ok(semanticGap(high.roles) > semanticGap(low.roles))
   })
 
-  it('scores canvas candidates by landmark expressibility', async () => {
+  it('scores canvas candidates by landmark expressibility for non-facial identity marks', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const source = image(8, 2, Array.from({ length: 16 }, () => [255, 0, 0] as const))
     const result = await algorithm.generate({
@@ -1636,8 +1636,8 @@ describe('deterministic pattern algorithm', () => {
       palette,
       analysis: {
         landmarks: [
-          { id: 'left-eye', kind: 'eye', x: 2.1, y: 0.5, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
-          { id: 'right-eye', kind: 'eye', x: 3.9, y: 0.5, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+          { id: 'left-mark', kind: 'identity-mark', x: 2.1, y: 0.5, confidence: 1, priority: 'hard', symmetryGroup: 'marks' },
+          { id: 'right-mark', kind: 'identity-mark', x: 3.9, y: 0.5, confidence: 1, priority: 'hard', symmetryGroup: 'marks' },
         ],
       },
       options: {
@@ -1683,7 +1683,7 @@ describe('deterministic pattern algorithm', () => {
       > result.alternatives[0]!.metrics.referenceBoundaryAgreement)
   })
 
-  it('vetoes a canvas candidate that merges hard paired features', async () => {
+  it('vetoes a canvas candidate that merges hard paired features for non-facial identity marks', async () => {
     const algorithm = createPatternAlgorithm({ clock: () => 123 })
     const skin = [240, 190, 160] as const
     const black = [0, 0, 0] as const
@@ -1705,8 +1705,8 @@ describe('deterministic pattern algorithm', () => {
       analysis: {
         confidence: 1,
         landmarks: [
-          { id: 'left-eye', kind: 'eye', x: 2, y: 1, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
-          { id: 'right-eye', kind: 'eye', x: 3, y: 1, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+          { id: 'left-mark', kind: 'identity-mark', x: 2, y: 1, confidence: 1, priority: 'hard', symmetryGroup: 'marks' },
+          { id: 'right-mark', kind: 'identity-mark', x: 3, y: 1, confidence: 1, priority: 'hard', symmetryGroup: 'marks' },
         ],
       },
       options: {
@@ -1724,7 +1724,7 @@ describe('deterministic pattern algorithm', () => {
     assert.ok(result.alternatives[0]?.rejectionReasons.includes('hard-feature-collision'))
   })
 
-  it('lets canvas planning veto a hard pair before final feature scoring', async () => {
+  it('lets canvas planning veto a hard pair before final feature scoring for non-facial identity marks', async () => {
     const skin = [240, 190, 160] as const
     const black = [0, 0, 0] as const
     const pixels: Array<readonly [number, number, number]> = Array.from(
@@ -1746,8 +1746,8 @@ describe('deterministic pattern algorithm', () => {
       analysis: {
         confidence: 1,
         landmarks: [
-          { id: 'left-eye', kind: 'eye', x: 42, y: 34, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
-          { id: 'right-eye', kind: 'eye', x: 46, y: 34, confidence: 1, priority: 'hard', symmetryGroup: 'eyes' },
+          { id: 'left-mark', kind: 'identity-mark', x: 42, y: 34, confidence: 1, priority: 'hard', symmetryGroup: 'marks' },
+          { id: 'right-mark', kind: 'identity-mark', x: 46, y: 34, confidence: 1, priority: 'hard', symmetryGroup: 'marks' },
         ],
       },
       options: {
@@ -2005,7 +2005,7 @@ describe('deterministic pattern algorithm', () => {
     )
   })
 
-  it('returns best-effort semantics when every candidate violates hard features', async () => {
+  it('returns best-effort semantics when every candidate violates hard features for non-facial identity marks', async () => {
     const source = image(2, 2, Array.from({ length: 4 }, () => [255, 0, 0] as const))
     const request = fixedRequest(source, { maxColors: 1 })
     request.palette = {
@@ -2015,8 +2015,8 @@ describe('deterministic pattern algorithm', () => {
     }
     request.analysis = {
       landmarks: [{
-        id: 'eye',
-        kind: 'eye',
+        id: 'mark',
+        kind: 'identity-mark',
         x: 0,
         y: 0,
         confidence: 1,
@@ -2054,7 +2054,7 @@ describe('deterministic pattern algorithm', () => {
     assert.equal(result.recommended?.valid, true)
   })
 
-  it('infers a feature carrier from the surrounding semantic region', async () => {
+  it('infers a feature carrier from the surrounding semantic region for non-facial identity marks', async () => {
     const skin = [240, 190, 160] as const
     const black = [0, 0, 0] as const
     const pixels: Array<readonly [number, number, number]> = Array.from({ length: 9 }, () => skin)
@@ -2072,8 +2072,8 @@ describe('deterministic pattern algorithm', () => {
     request.analysis = {
       semanticRegions: [
         {
-          id: 'eye-region',
-          label: 'eye',
+          id: 'mark-region',
+          label: 'mark',
           confidence: 1,
           mask: { width: 3, height: 3, values: new Float32Array([0, 0, 0, 0, 1, 0, 0, 0, 0]) },
         },
@@ -2085,13 +2085,13 @@ describe('deterministic pattern algorithm', () => {
         },
       ],
       landmarks: [{
-        id: 'eye',
-        kind: 'eye',
+        id: 'mark',
+        kind: 'identity-mark',
         x: 1,
         y: 1,
         confidence: 1,
         priority: 'hard',
-        featureRegionId: 'eye-region',
+        featureRegionId: 'mark-region',
         carrierRegionId: 'face-region',
       }],
     }

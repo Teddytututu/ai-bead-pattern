@@ -1,4 +1,5 @@
 import { validateFeatureShape } from './landmarks.js'
+import { sourceSamplingAnalysis } from './source-sampling-analysis.js'
 import {
   colorDistance,
   prepareColors,
@@ -37,7 +38,6 @@ import {
 } from './image.js'
 import {
   landmarkEffectiveConfidence,
-  landmarkObservationState,
   landmarkGridRadiusCells,
 } from './landmarks.js'
 import { optimizePaletteAssignments } from './palette-optimization.js'
@@ -1260,15 +1260,7 @@ interface FeatureEvaluationProfile {
   minimumBoundary: number
 }
 
-const featureProfiles: Readonly<Record<LandmarkKind, FeatureEvaluationProfile>> = {
-  eye: {
-    metric: 'blob', kindWeight: 1.4, minimumCoverage: 0.75, minimumPurity: 0.35,
-    minimumConnectivity: 0.75, minimumContrast: 0.2, minimumBoundary: 0,
-  },
-  nose: {
-    metric: 'blob', kindWeight: 1, minimumCoverage: 0.5, minimumPurity: 0.25,
-    minimumConnectivity: 0.5, minimumContrast: 0.08, minimumBoundary: 0,
-  },
+const featureProfiles: Readonly<Partial<Record<LandmarkKind, FeatureEvaluationProfile>>> = {
   'identity-mark': {
     metric: 'blob', kindWeight: 1.3, minimumCoverage: 0.6, minimumPurity: 0.3,
     minimumConnectivity: 0.6, minimumContrast: 0.12, minimumBoundary: 0,
@@ -1276,10 +1268,6 @@ const featureProfiles: Readonly<Record<LandmarkKind, FeatureEvaluationProfile>> 
   custom: {
     metric: 'blob', kindWeight: 0.8, minimumCoverage: 0.5, minimumPurity: 0.25,
     minimumConnectivity: 0.5, minimumContrast: 0.1, minimumBoundary: 0,
-  },
-  mouth: {
-    metric: 'blob', kindWeight: 1.2, minimumCoverage: 0.45, minimumPurity: 0,
-    minimumConnectivity: 0.45, minimumContrast: 0.08, minimumBoundary: 0,
   },
   ear: {
     metric: 'contour', kindWeight: 0.9, minimumCoverage: 0, minimumPurity: 0,
@@ -1339,10 +1327,7 @@ function preferredFeaturePaletteColorIds(
   colors: readonly PreparedColor[],
 ): ReadonlyMap<string, string> {
   const kindOrder = new Map<LandmarkKind, number>([
-    ['eye', 0],
-    ['nose', 1],
-    ['mouth', 2],
-    ['identity-mark', 3],
+    ['identity-mark', 0],
   ])
   const landmarks = [...(request.analysis?.landmarks ?? [])]
     .filter((landmark) => landmark.priority === 'hard'
@@ -1375,7 +1360,7 @@ function featureVisibility(
 ): FeatureVisibilityResult {
   const landmarks = (analysis?.landmarks ?? []).filter((landmark) =>
     landmarkEffectiveConfidence(landmark) > 0
-      && (!['eye', 'mouth', 'nose'].includes(landmark.kind) || landmarkObservationState(landmark) === 'observed')
+      && featureProfiles[landmark.kind] !== undefined
       && landmark.x >= crop.x && landmark.y >= crop.y
       && landmark.x < crop.x + crop.width && landmark.y < crop.y + crop.height,
   )
@@ -1394,7 +1379,7 @@ function featureVisibility(
   }
   const colorsById = new Map(palette.map((color) => [color.id, color]))
   const evaluated = landmarks.map((landmark) => {
-    const profile = featureProfiles[landmark.kind]
+    const profile = featureProfiles[landmark.kind]!
     const effectiveConfidence = landmarkEffectiveConfidence(landmark)
     const [centerX, centerY] = gridCellForSourcePoint(crop, fit, landmark.x, landmark.y)
     const center = centerY * width + centerX
@@ -2298,7 +2283,6 @@ function generateCandidate(
   const appliesPetPoseGate = petPose.available && petPose.confidence >= 0.45
   const poseValid = appliesPetPoseGate === false || petPose.score >= 0.4
   const requiredEarSpanCells = size.width >= 64 ? 4 : size.width >= 48 ? 3 : 2
-  const requiredMuzzleSeparationCells = size.width >= 48 ? 2 : 1
   const maximumFrontVerticalRunRatio = size.width >= 64
     ? 0.35
     : size.width >= 48 ? 0.45 : size.width >= 32 ? 0.55 : 0.72
@@ -2306,9 +2290,6 @@ function generateCandidate(
     || (petPose.earConnected
       && petPose.earSpanCells >= requiredEarSpanCells
       && petPose.earStructure >= 0.55)
-  const muzzleValid = appliesPetPoseGate === false
-    || (petPose.muzzleStructure >= 0.55
-      && petPose.muzzleSeparationCells >= requiredMuzzleSeparationCells)
   const frontColumnValid = appliesPetPoseGate === false
     || petPose.frontVerticalRunRatio <= maximumFrontVerticalRunRatio
   const semanticIdentityValid = (
@@ -2316,7 +2297,6 @@ function generateCandidate(
       || (score.identity >= 0.38
         && poseValid
         && earValid
-        && muzzleValid
         && frontColumnValid)
   )
   const identityValid = petInstanceIntegrity.valid && semanticIdentityValid
@@ -2325,7 +2305,6 @@ function generateCandidate(
     ...visibility.rejectionReasons,
     ...(poseValid ? [] : ['pet-pose-structure']),
     ...(earValid ? [] : ['pet-ear-disconnected']),
-    ...(muzzleValid ? [] : ['pet-muzzle-collapsed']),
     ...(frontColumnValid ? [] : ['pet-front-column']),
     ...petInstanceIntegrity.rejectionReasons,
     ...(semanticIdentityValid ? [] : ['pet-identity-low-similarity']),
@@ -2539,7 +2518,7 @@ export class DeterministicPatternAlgorithm {
 
   constructor(config: { version?: string; clock?: () => number; yieldControl?: () => Promise<void> }) {
     this.engine = 'baseline'
-    this.version = config.version ?? '0.11.0-source-features'
+    this.version = config.version ?? '0.12.0-source-sampling'
     this.#clock = config.clock ?? Date.now
     this.#yieldControl = config.yieldControl
   }
@@ -2551,6 +2530,8 @@ export class DeterministicPatternAlgorithm {
     let canvasPlanningMs = 0
     let candidateGenerationMs = 0
     validateRequest(request)
+    const samplingAnalysis = sourceSamplingAnalysis(request.analysis)
+    if (samplingAnalysis !== undefined) request = { ...request, analysis: samplingAnalysis }
     request = { ...request, palette: { ...request.palette,
       version: request.palette.version ?? await createPaletteVersion(request.palette) } }
     const baseline = request.options.baseline ?? 'mvp'

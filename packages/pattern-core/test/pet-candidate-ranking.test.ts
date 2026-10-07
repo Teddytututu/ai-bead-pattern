@@ -1,3 +1,4 @@
+import { sourceSamplingAnalysis } from '../src/source-sampling-analysis.js'
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
@@ -142,10 +143,10 @@ function finalMask(output: PatternCandidate): Uint8Array {
 }
 
 describe('pet candidate structure ranking', () => {
-  it('publishes final-grid ear, muzzle, jaw-separation, and chest-run diagnostics', async () => {
+  it('publishes final-grid body and ear diagnostics from the active sampling analysis', async () => {
     const generated = await generate(detailedPetMask())
     const pose = evaluatePetPoseStructure({
-      analysis: generated.analysis,
+      analysis: sourceSamplingAnalysis(generated.analysis)!,
       crop: { x: 0, y: 0, width, height },
       fit: { x: 0, y: 0, width, height },
       width,
@@ -197,7 +198,7 @@ describe('pet candidate structure ranking', () => {
     assert.ok(broken.candidate.rejectionReasons.includes('pet-ear-disconnected'))
   })
 
-  it('ranks separated jaws with a complete nose cap above a collapsed muzzle', async () => {
+  it('keeps muzzle shape in the source mask without enforcing nose-cap diagnostics', async () => {
     const preservedMask = detailedPetMask()
     const collapsedMask = preservedMask.slice()
     collapsedMask[7 * width + 16] = 0
@@ -206,15 +207,11 @@ describe('pet candidate structure ranking', () => {
 
     const [preserved, collapsed] = await Promise.all([generate(preservedMask), generate(collapsedMask)])
 
-    assert.ok(
-      preserved.candidate.score.poseStructure > collapsed.candidate.score.poseStructure + 0.04,
-      JSON.stringify({ preserved: preserved.candidate.score, collapsed: collapsed.candidate.score }),
-    )
-    assert.ok(preserved.candidate.score.total > collapsed.candidate.score.total + 0.005)
-    assert.ok(preserved.candidate.metrics.petMuzzleSeparationCells
-      > collapsed.candidate.metrics.petMuzzleSeparationCells)
-    assert.ok(preserved.candidate.metrics.petMuzzleStructure > collapsed.candidate.metrics.petMuzzleStructure + 0.2)
-    assert.ok(collapsed.candidate.rejectionReasons.includes('pet-muzzle-collapsed'))
+    assert.equal(preserved.candidate.metrics.petMuzzleStructure, 0)
+    assert.equal(collapsed.candidate.metrics.petMuzzleStructure, 0)
+    assert.equal(preserved.candidate.rejectionReasons.includes('pet-muzzle-collapsed'), false)
+    assert.equal(collapsed.candidate.rejectionReasons.includes('pet-muzzle-collapsed'), false)
+    assert.notDeepEqual(finalMask(preserved.candidate), finalMask(collapsed.candidate))
   })
 
   it('ranks an articulated chest turn above a long near-vertical front column', async () => {
