@@ -97,10 +97,14 @@ describe('pet pipeline regression', () => {
     })
     const candidate = result.recommended ?? result.bestEffort
     assert.ok(candidate?.gridRefinement)
-    // This fixture uses inferred pet geometry. Without synthetic feature painting,
-    // source mismatches stay visible to the quality gate instead of becoming a recommendation.
+    assert.equal(candidate.gridRefinement.mode, 'quality')
+    // Facial hints are filtered before sampling. The inferred contour still fails
+    // the boundary gate, so this fixture remains a best-effort result.
     assert.equal(result.status, 'best-effort')
-    assert.ok(candidate.rejectionReasons.includes('hard-feature-source-mismatch'))
+    assert.ok(
+      candidate.rejectionReasons.includes('hard-feature-boundary'),
+      candidate.rejectionReasons.join(', '),
+    )
     assert.equal(candidate.valid, false)
     assert.ok(candidate.score.identity >= 0.5)
     assert.ok((candidate.score.identityAppearance ?? 0) >= 0.45)
