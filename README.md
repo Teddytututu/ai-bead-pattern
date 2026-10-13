@@ -51,6 +51,7 @@ pnpm test:e2e
 - [文档目录](docs/README.md)：运行、接口、标注、数据与评测。
 - [架构](docs/architecture.md)：实际执行链路和模块边界。
 - [训练路线](docs/training.md)：两阶段任务、当前缺口与验收。
+- [Qwen 教师图下载](docs/qwen-teachers-1162.md)：1,162 张合格图、解压步骤、固定分组和 SHA-256 校验。
 - [教师审核](apps/teacher-review/README.md)和[独立眼睛标注](docs/region-annotation-guide.md)：两套不同的数据流程。
 - [产品 API](services/pattern-api/README.md)和[小程序](apps/wechat-miniapp/README.md)：手机客户端接入。
 - [数据处理](docs/privacy.md)：上传、保存、模型调用和删除边界。

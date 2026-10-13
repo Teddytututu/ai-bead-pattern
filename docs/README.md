@@ -11,6 +11,7 @@
 | HTTP 任务与导出 | [Pattern API](../services/pattern-api/README.md) |
 | 手机客户端 | [微信小程序](../apps/wechat-miniapp/README.md) |
 | 原图 → 卡通图审核 | [教师审核操作](../apps/teacher-review/README.md) |
+| 1,162 张合格 Qwen 卡通教师图 | [下载与使用说明](qwen-teachers-1162.md) |
 | 教师服务、冻结、训练及备份 | [Teacher Loop](../tools/teacher-loop/README.md) |
 | 完整格图上的眼睛目标标注 | [训练标注](region-annotation-guide.md) |
 | 工作台局部修复契约 | [区域生成 v3](region-generation-v3.md) |
